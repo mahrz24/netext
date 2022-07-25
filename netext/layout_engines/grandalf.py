@@ -13,8 +13,9 @@ class GrandalfView:
 def _create_vertex(node: Hashable, data: Dict[Hashable, Any]) -> Vertex:
     v = Vertex(node)
     v.view = GrandalfView()
-    v.view.w = data["_netext_node_buffer"].width
-    v.view.h = data["_netext_node_buffer"].height
+    # TODO: A width of 1 does not work well and makes to much space, so we scale up by some arbitrary constant
+    v.view.w = data["_netext_node_buffer"].width*5
+    v.view.h = data["_netext_node_buffer"].height*5
     return v
 
 
@@ -28,4 +29,6 @@ class GrandalfSugiyamaLayout(LayoutEngine):
         sug = SugiyamaLayout(graph)
         sug.init_all(roots=[vertices[0]])
         sug.draw(3)
-        return {v.data: v.view.xy for v in graph.sV}
+        # Rescale back, but leave a bit more space to avoid overlaps in the
+        # terminal coordinate space.
+        return {v.data: (v.view.xy[0]/4, v.view.xy[1]/8) for v in graph.sV}
