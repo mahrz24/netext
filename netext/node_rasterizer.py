@@ -39,6 +39,7 @@ def rasterize_node(node, data) -> NodeBuffer:
     return NodeBuffer(
         x=0,
         y=0,
+        z_index=-1,
         width=segment.cell_length,
         height=1,
         segments=[OffsetSegment(x_offset=0, y_offset=0, segment=segment)],

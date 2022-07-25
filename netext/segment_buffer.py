@@ -15,6 +15,11 @@ class OffsetSegment(BaseModel):
     x_offset: NonNegativeInt # Offset from left x
     y_offset: NonNegativeInt # Offset from top y
 
+    def __lt__(self, value):
+        if isinstance(value, OffsetSegment):
+            return self.x_offset < value.x_offset and self.y_offset == self.y_offset
+        return False
+
 
 class SegmentBuffer(BaseModel):
     
