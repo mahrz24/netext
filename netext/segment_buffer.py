@@ -1,0 +1,43 @@
+from typing import List
+
+from pydantic import BaseModel, NonNegativeInt, PositiveInt
+from rich.segment import Segment
+from rich.style import Style
+from typing import Any
+
+import math
+
+
+
+class OffsetSegment(BaseModel):
+    segment: Any # TODO Should be segment, check pydantic arbitrary types or not use pydantic.
+    
+    x_offset: NonNegativeInt # Offset from left x
+    y_offset: NonNegativeInt # Offset from top y
+
+
+class SegmentBuffer(BaseModel):
+    
+    segments: List[OffsetSegment]
+    z_index: float = 0
+
+    @property
+    def left_x(self):
+        return NotImplemented
+
+    @property
+    def right_x(self):
+        return NotImplemented
+
+    @property
+    def top_y(self):
+        return NotImplemented
+
+    @property
+    def bottom_y(self):
+        return NotImplemented
+
+    def __lt__(self, value):
+        if isinstance(value, SegmentBuffer):
+            return self.left_x < value.left_x
+        return False
