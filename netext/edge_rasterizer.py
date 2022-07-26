@@ -1,11 +1,13 @@
+from typing import Any, Dict, Hashable, List
+
 import grandalf.graphs
 from pydantic import BaseModel, NonNegativeInt
-from .segment_buffer import SegmentBuffer, OffsetSegment
-from .node_rasterizer import NodeBuffer
-from typing import Hashable, Any, List, Dict
-
 from rich.segment import Segment
 from rich.style import Style
+
+from .node_rasterizer import NodeBuffer
+from .segment_buffer import OffsetSegment, SegmentBuffer
+
 
 # TODO: Use also in node buffer
 class Point(BaseModel):
