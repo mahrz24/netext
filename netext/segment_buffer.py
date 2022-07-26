@@ -7,10 +7,10 @@ from rich.style import Style
 
 
 class OffsetSegment(BaseModel):
-    segment: Any # TODO Should be segment, check pydantic arbitrary types or not use pydantic.
-    
-    x_offset: NonNegativeInt # Offset from left x
-    y_offset: NonNegativeInt # Offset from top y
+    segment: Any  # TODO Should be segment, check pydantic arbitrary types or not use pydantic.
+
+    x_offset: NonNegativeInt  # Offset from left x
+    y_offset: NonNegativeInt  # Offset from top y
 
     def __lt__(self, value):
         if isinstance(value, OffsetSegment):
@@ -19,7 +19,7 @@ class OffsetSegment(BaseModel):
 
 
 class SegmentBuffer(BaseModel):
-    
+
     segments: List[OffsetSegment]
     z_index: float = 0
 

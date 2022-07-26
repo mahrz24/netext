@@ -5,6 +5,7 @@
 # Refactoring
 
 * Extract buffer renderer to own module to make it better testable
+* Clean up bresenham line drawing algorithm
 
 # Tests & Benchmarks
 
@@ -16,6 +17,7 @@
 * Different edge routing algorithms
     * Straight lines
 * Better line rendering
+    * Use unicode block characters and or slashes & dashes for lines
 * Attributes for nodes & edges
 * Custom node rendering
 * Edge labels
