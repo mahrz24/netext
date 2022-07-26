@@ -1,12 +1,9 @@
-from typing import List
+import math
+from typing import Any, List
 
 from pydantic import BaseModel, NonNegativeInt, PositiveInt
 from rich.segment import Segment
 from rich.style import Style
-from typing import Any
-
-import math
-
 
 
 class OffsetSegment(BaseModel):

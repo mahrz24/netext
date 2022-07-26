@@ -1,20 +1,19 @@
-from typing import Dict, List, Tuple, TypeVar, Generic, Hashable
+from collections import defaultdict
 from heapq import merge
 from itertools import chain
-from collections import defaultdict
-from rich.console import Console, ConsoleOptions, RenderResult, Measurement
-from rich.segment import Segment
-from rich.style import Style
-from rich import print
+from math import ceil
+from typing import Dict, Generic, Hashable, List, Tuple, TypeVar
 
 import networkx as nx
+from rich import print
+from rich.console import Console, ConsoleOptions, Measurement, RenderResult
+from rich.segment import Segment
+from rich.style import Style
 
-from .node_rasterizer import rasterize_node, NodeBuffer
-from .edge_rasterizer import rasterize_edge, EdgeBuffer
+from .edge_rasterizer import EdgeBuffer, rasterize_edge
 from .layout_engines.engine import LayoutEngine
 from .layout_engines.grandalf import GrandalfSugiyamaLayout
-
-from math import ceil
+from .node_rasterizer import NodeBuffer, rasterize_node
 
 G = TypeVar("G", nx.Graph, nx.DiGraph)
 

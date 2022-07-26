@@ -1,14 +1,11 @@
-from typing import List
+import math
+from typing import Any, List
 
 from pydantic import BaseModel, NonNegativeInt, PositiveInt
 from rich.segment import Segment
 from rich.style import Style
-from typing import Any
 
-from .segment_buffer import SegmentBuffer, OffsetSegment
-
-
-import math
+from .segment_buffer import OffsetSegment, SegmentBuffer
 
 
 class NodeBuffer(SegmentBuffer):

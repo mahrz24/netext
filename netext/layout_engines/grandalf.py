@@ -1,8 +1,11 @@
 import typing
-from typing import Hashable, Dict, Any
-from .engine import LayoutEngine
-from grandalf.graphs import Vertex,Edge,Graph,graph_core
+from typing import Any, Dict, Hashable
+
+from grandalf.graphs import Edge, Graph, Vertex, graph_core
 from grandalf.layouts import SugiyamaLayout
+
+from .engine import LayoutEngine
+
 
 class GrandalfView:
     w = 0
