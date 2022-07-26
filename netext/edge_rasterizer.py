@@ -80,7 +80,7 @@ def rasterize_edge(
                     )
                 )
                 current_segment = ""
-                last_offset = x-x0
+                last_offset = x - x0
                 D = D - 2 * dx
             D = D + 2 * dy
 
@@ -109,7 +109,7 @@ def rasterize_edge(
             dx = -dx
         D = (2 * dx) - dy
 
-        for y in range(y0, y1+1):
+        for y in range(y0, y1 + 1):
             segments.append(
                 OffsetSegment(
                     x_offset=x,
@@ -121,7 +121,7 @@ def rasterize_edge(
                 x = x + xi
                 D = D + (2 * (dx - dy))
             else:
-                D = D + 2*dx
+                D = D + 2 * dx
 
     for i, segment in enumerate(segments):
         segment.y_offset = i
