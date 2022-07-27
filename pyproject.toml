@@ -21,6 +21,9 @@ pre-commit = "^2.20.0"
 [tool.black]
 preview = true
 
+[tool.isort]
+profile = "black"
+
 [tool.pyright]
 include = ["netext", "examples", "tests"]
 typeCheckingMode = "basic"
