@@ -1,7 +1,6 @@
-import typing
 from typing import Any, Dict, Hashable
 
-from grandalf.graphs import Edge, Graph, Vertex, graph_core
+from grandalf.graphs import Edge, Vertex, graph_core
 from grandalf.layouts import SugiyamaLayout
 
 from .engine import LayoutEngine

@@ -3,7 +3,6 @@ from rich import print
 from rich.panel import Panel
 
 from netext import TerminalGraph
-from netext.terminal_graph import TerminalGraph
 
 g = binomial_tree(4)
 g1 = paley_graph(5)
