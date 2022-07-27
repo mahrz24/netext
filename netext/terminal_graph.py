@@ -3,7 +3,8 @@ from math import ceil
 from typing import Dict, Generic, Hashable, List, Tuple, TypeVar
 
 import networkx as nx
-from rich.console import Console, ConsoleOptions, Measurement, RenderResult
+from rich.console import Console, ConsoleOptions, RenderResult
+from rich.measure import Measurement
 
 from .buffer_renderer import render_buffers
 from .edge_rasterizer import EdgeBuffer, rasterize_edge
@@ -15,7 +16,9 @@ G = TypeVar("G", nx.Graph, nx.DiGraph)
 
 
 class TerminalGraph(Generic[G]):
-    def __init__(self, g: G, layout_engine: LayoutEngine = GrandalfSugiyamaLayout()):
+    def __init__(
+        self, g: G, layout_engine: LayoutEngine[G] = GrandalfSugiyamaLayout[G]()
+    ):
         self._nx_graph = g.copy()
         # First we create the node buffers, this allows us to pass the sizing information to the
         # layout engine. For each node in the graph we generate a node buffer that contains the
