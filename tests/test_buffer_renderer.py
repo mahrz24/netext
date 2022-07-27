@@ -33,6 +33,7 @@ class LineBuffer(SegmentBuffer):
 def console():
     return Console()
 
+
 def test_simple_render(console):
     test_buffer = LineBuffer(
         x=0,
@@ -44,5 +45,3 @@ def test_simple_render(console):
         console.print(Group(*render_buffers([test_buffer], 10, 1)))
 
     assert capture.get() == "XXXXXXXXXX\n"
-
-    

@@ -1,6 +1,5 @@
-from typing import Any, Dict, Hashable, List
+from typing import Any, Dict, Hashable
 
-import grandalf.graphs
 from pydantic import BaseModel, NonNegativeInt
 from rich.segment import Segment
 from rich.style import Style

@@ -1,0 +1,6 @@
+[flake8]
+# We allow 120 characters for comments
+max-line-length = 120
+extend-ignore =
+    # See https://github.com/PyCQA/pycodestyle/issues/373
+    E203,

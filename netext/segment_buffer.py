@@ -1,9 +1,6 @@
-import math
 from typing import Any, List
 
-from pydantic import BaseModel, NonNegativeInt, PositiveInt
-from rich.segment import Segment
-from rich.style import Style
+from pydantic import BaseModel, NonNegativeInt
 
 
 class OffsetSegment(BaseModel):
@@ -19,7 +16,6 @@ class OffsetSegment(BaseModel):
 
 
 class SegmentBuffer(BaseModel):
-
     segments: List[OffsetSegment]
     z_index: float = 0
 
