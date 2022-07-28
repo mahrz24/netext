@@ -1,10 +1,9 @@
 import pytest
-
 from pydantic import NonNegativeInt
-from rich.segment import Segment, Segments
 from rich.console import Console
-from netext.buffer_renderer import render_buffers
+from rich.segment import Segment, Segments
 
+from netext.buffer_renderer import render_buffers
 from netext.segment_buffer import OffsetSegment, SegmentBuffer
 
 

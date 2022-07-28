@@ -1,4 +1,5 @@
 from typing import Dict, Generic, Hashable, Tuple, TypeVar
+
 import networkx as nx
 
 G = TypeVar("G", nx.Graph, nx.DiGraph)
