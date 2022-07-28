@@ -48,4 +48,8 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
     - name: Test with pytest
       run: |
-        poetry run pytest
+        poetry run pytest --cov=netext --cov-report=xml:coverage.xml 
+    - uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage.xml
+        verbose: true # optional (default = false)
