@@ -15,16 +15,14 @@ jobs:
 
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.9", "3.10"]
-
+      fail-fast: true
+     
     steps:
     - uses: actions/checkout@v3
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.10
       uses: actions/setup-python@v3
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: 3.10
     - run: pip install --upgrade pip
     - name: Install Poetry
       run: |
@@ -40,22 +38,19 @@ jobs:
       id: cache
       with:
         path: .venv
-        key: ubuntu-latest-${{ matrix.python-version }}-poetry-${{ steps.poetry-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
+        key: ubuntu-latest-3.10-poetry-${{ steps.poetry-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
         restore-keys: |
-          ubuntu-latest-${{ matrix.python-version }}-poetry-${{ steps.poetry-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
+          ubuntu-latest-3.10-poetry-${{ steps.poetry-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
     - name: Install dependencies
       run: |
         poetry install
       if: steps.cache.outputs.cache-hit != 'true'
     - run: pip install pyright
-      if: ${{ matrix.python-version }} == "3.10" 
     - uses: pre-commit/action@v3.0.0
-      if: ${{ matrix.python-version }} == "3.10" 
     - name: Test with pytest
       run: |
         poetry run pytest --cov=netext --cov-report=xml:coverage.xml 
     - uses: codecov/codecov-action@v3
-      if: ${{ matrix.python-version }} == "3.10" 
       with:
         files: ./coverage.xml
         verbose: true # optional (default = false)
