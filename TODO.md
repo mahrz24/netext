@@ -1,10 +1,14 @@
 # Library Setup
 
-* Precommit & github actions
+* ~~Precommit with black, flake8, isort~~
+* ~~Github actions~~
+* ~~Coverage~~
+* Setup ASV benchmarking
+* Write a README
 
 # Refactoring
 
-* Extract buffer renderer to own module to make it better testable
+* ~~Extract buffer renderer to own module to make it better testable~~
 * Clean up bresenham line drawing algorithm
 
 # Tests & Benchmarks
