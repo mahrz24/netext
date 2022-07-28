@@ -17,6 +17,8 @@ pytest = "^7.1.2"
 black = {version = "^22.6.0", allow-prereleases = true}
 isort = "^5.10.1"
 pre-commit = "^2.20.0"
+pytest-cov = "^3.0.0"
+coverage = {extras = ["toml"], version = "^6.4.2"}
 
 [tool.black]
 preview = true
