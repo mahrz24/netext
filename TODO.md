@@ -4,7 +4,10 @@
 * ~~Github actions~~
 * ~~Coverage~~
 * Setup ASV benchmarking
-* Write a README
+* Write a README (add badges)
+* Setup code owners
+* Enable dependabot & codeql
+* Add documentation
 
 # Refactoring
 
@@ -13,8 +16,12 @@
 
 # Tests & Benchmarks
 
-* Tests for buffer renderer
+* Extensive tests for buffer renderer, the renderer can handle many cases which need good attention so that all edge cases work:
+    * Overlaps
+    * Rounding errors
+    * Arbitrary shapes
 * Benchmarks for buffer renderer
+* Bring code coverage to a healthy level
 
 # Features
 

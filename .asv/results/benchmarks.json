@@ -1,0 +1,19 @@
+{
+    "benchmarks.TimeSuite.time_render_binomial_tree_4": {
+        "code": "class TimeSuite:\n    def time_render_binomial_tree_4(self):\n        with self.console.capture():\n            self.console.print(self.terminal_graph)\n\n    def setup(self):\n        self.graph = binomial_tree(4)\n        self.terminal_graph = TerminalGraph(self.graph)\n        self.console = Console()",
+        "min_run_count": 2,
+        "name": "benchmarks.TimeSuite.time_render_binomial_tree_4",
+        "number": 0,
+        "param_names": [],
+        "params": [],
+        "repeat": 0,
+        "rounds": 2,
+        "sample_time": 0.01,
+        "timeout": 60.0,
+        "type": "time",
+        "unit": "seconds",
+        "version": "ea0003cf2b031259f305e9ec93e0d6da3f4ffc562ebb86f36262ab3505a3c366",
+        "warmup_time": -1
+    },
+    "version": 2
+}
