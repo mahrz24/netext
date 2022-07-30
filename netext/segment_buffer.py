@@ -20,6 +20,10 @@ class SegmentBuffer(BaseModel):
     z_index: float = 0
 
     @property
+    def y_offsets(self) -> List[int]:
+        return sorted([segment.y_offset for segment in self.segments])
+
+    @property
     def left_x(self):
         return NotImplemented
 
@@ -39,3 +43,7 @@ class SegmentBuffer(BaseModel):
         if isinstance(value, SegmentBuffer):
             return self.left_x < value.left_x
         return False
+
+    def next_segement(row: int) -> OffsetSegment:
+        # This is very inefficient right now, either
+

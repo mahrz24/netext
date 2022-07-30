@@ -21,12 +21,12 @@ def render_buffers(
         active_buffers = sorted(
             [
                 (
-                    buffer.left_x + buffer.segments[buffer_row + 1].x_offset,
-                    buffer.segments[buffer_row + 1].segment,
+                    buffer.left_x + buffer.next_segment(buffer_row).x_offset,
+                    buffer.next_segment(buffer_row).segment,
                     buffer_row + 1,
                     buffer,
                 )
-                for _, segment, buffer_row, buffer in active_buffers
+                for _, _, buffer_row, buffer in active_buffers
                 if row <= buffer.bottom_y
             ]
         )
@@ -82,14 +82,30 @@ def render_buffers(
                     segment_left_x_next <= segment_left_x + full_segment_cell_length
                     and buffer_next.z_index < buffer.z_index
                 ):
+                    # We have to account for the case where we are already past
+                    # the left of the next buffer due to already previously
+                    # yielded segments (hence the max)
                     segment, overflow_segment = segment.split_cells(
-                        segment_left_x_next - segment_left_x
+                        max(0, segment_left_x_next - current_x)
                     )
+
+                    # In case we already are past the new left x we have
+                    # to adjust the new buffer
                     working_buffers.insert(
                         i + 1,
-                        (segment_left_x_next, overflow_segment, buffer_row, buffer),
+                        (
+                            segment_left_x_next
+                            - min(0, segment_left_x_next - current_x),
+                            overflow_segment,
+                            buffer_row,
+                            buffer,
+                        ),
                     )
                     break
+
+            # Do not render over the right boundary
+            if current_x + segment.cell_length > width:
+                segment = segment.split_cells(width - current_x)[0]
 
             # If the overlap from a prior segment or the overlap of an upcoming
             # segment (with lower z-index) cut the segment to disappear, nothing
