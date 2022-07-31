@@ -21,8 +21,8 @@ def render_buffers(
         active_buffers = sorted(
             [
                 (
-                    buffer.left_x + buffer.next_segment(buffer_row).x_offset,
-                    buffer.next_segment(buffer_row).segment,
+                    buffer.left_x + buffer.segments[buffer_row + 1].x_offset,
+                    buffer.segments[buffer_row + 1].segment,
                     buffer_row + 1,
                     buffer,
                 )

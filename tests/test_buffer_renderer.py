@@ -408,6 +408,7 @@ def test_render_node_buffer_with_empty_line(console):
         height=3,
         segments=[
             OffsetSegment(segment=Segment("X"), x_offset=1, y_offset=0),
+            OffsetSegment(segment=Segment(""), x_offset=0, y_offset=1),
             OffsetSegment(segment=Segment("X"), x_offset=1, y_offset=2),
         ],
     )
@@ -418,7 +419,27 @@ def test_render_node_buffer_with_empty_line(console):
     assert capture.get() == " X \n   \n X \n"
 
 
+
+def test_render_node_buffer_with_empty_line_and_no_buffer(console):
+    test_buffer = NodeBuffer(
+        x=1,
+        y=1,
+        width=3,
+        height=3,
+        segments=[
+            OffsetSegment(segment=Segment("X"), x_offset=1, y_offset=0),
+            OffsetSegment(segment=Segment(""), x_offset=0, y_offset=1),
+            OffsetSegment(segment=Segment("X"), x_offset=1, y_offset=2),
+        ],
+    )
+
+    with console.capture() as capture:
+        console.print(Segments(render_buffers([test_buffer], 3, 4)))
+
+    assert capture.get() == " X \n   \n X \n   \n"
+
+
 # Tests missing:
 # Y coordinates need to be unique
+# Each row needs ot have a segment (which maybe empty)
 # Segment length cannot run over buffer right_x
-# Empty lines
