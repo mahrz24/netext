@@ -12,6 +12,13 @@ def render_buffers(
 ) -> Iterator[Segment]:
     buffers_by_row = defaultdict(list)
     for buffer in buffers:
+        y_offsets = [segment.y_offset for segment in buffer.segments]
+        assert len(set(y_offsets)) == len(
+            y_offsets
+        ), "Duplicate segments with same y offsets in buffers are not allowed."
+        assert y_offsets == list(
+            range(buffer.top_y, buffer.bottom_y + 1)
+        ), "Buffer does not contain a segment for all rows or segments are not ordered."
         buffers_by_row[buffer.top_y] = sorted(buffers_by_row[buffer.top_y] + [buffer])
 
     active_buffers = []
@@ -26,7 +33,7 @@ def render_buffers(
                     buffer_row + 1,
                     buffer,
                 )
-                for _, segment, buffer_row, buffer in active_buffers
+                for _, _, buffer_row, buffer in active_buffers
                 if row <= buffer.bottom_y
             ]
         )
@@ -57,6 +64,11 @@ def render_buffers(
 
             full_segment_cell_length = segment.cell_length
 
+            assert (
+                segment_left_x + full_segment_cell_length
+                <= buffer.left_x + buffer.width
+            ), "Segment overflow."
+
             # Empty segments should be ignored, though ideally we should not store them
             # in the buffer at all.
             if full_segment_cell_length == 0:
@@ -82,14 +94,30 @@ def render_buffers(
                     segment_left_x_next <= segment_left_x + full_segment_cell_length
                     and buffer_next.z_index < buffer.z_index
                 ):
+                    # We have to account for the case where we are already past
+                    # the left of the next buffer due to already previously
+                    # yielded segments (hence the max)
                     segment, overflow_segment = segment.split_cells(
-                        segment_left_x_next - segment_left_x
+                        max(0, segment_left_x_next - current_x)
                     )
+
+                    # In case we already are past the new left x we have
+                    # to adjust the new buffer
                     working_buffers.insert(
                         i + 1,
-                        (segment_left_x_next, overflow_segment, buffer_row, buffer),
+                        (
+                            segment_left_x_next
+                            - min(0, segment_left_x_next - current_x),
+                            overflow_segment,
+                            buffer_row,
+                            buffer,
+                        ),
                     )
                     break
+
+            # Do not render over the right boundary of the canvas
+            if current_x + segment.cell_length > width:
+                segment = segment.split_cells(width - current_x)[0]
 
             # If the overlap from a prior segment or the overlap of an upcoming
             # segment (with lower z-index) cut the segment to disappear, nothing
