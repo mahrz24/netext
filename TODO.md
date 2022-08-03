@@ -3,7 +3,7 @@
 * ~~Precommit with black, flake8, isort~~
 * ~~Github actions~~
 * ~~Coverage~~
-* Setup ASV benchmarking
+* ~~Setup ASV benchmarking~~
 * Write a README (add badges)
 * Setup code owners
 * Enable dependabot & codeql
@@ -16,12 +16,12 @@
 
 # Tests & Benchmarks
 
-* Extensive tests for buffer renderer, the renderer can handle many cases which need good attention so that all edge cases work:
-    * Overlaps
-    * Rounding errors
-    * Arbitrary shapes
+* ~~Tests for buffer renderer~~
+* Tests for edge rasterizer
+* Tests for node erasterizer
+* Simple tests for terminal graph
 * Benchmarks for buffer renderer
-* Bring code coverage to a healthy level
+* ~~Bring code coverage to a healthy level~~
 
 # Features
 
