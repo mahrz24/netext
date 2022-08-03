@@ -12,6 +12,13 @@ def render_buffers(
 ) -> Iterator[Segment]:
     buffers_by_row = defaultdict(list)
     for buffer in buffers:
+        y_offsets = [segment.y_offset for segment in buffer.segments]
+        assert len(set(y_offsets)) == len(
+            y_offsets
+        ), "Duplicate segments with same y offsets in buffers are not allowed."
+        assert y_offsets == list(
+            range(buffer.top_y, buffer.bottom_y + 1)
+        ), "Buffer does not contain a segment for all rows or segments are not ordered."
         buffers_by_row[buffer.top_y] = sorted(buffers_by_row[buffer.top_y] + [buffer])
 
     active_buffers = []
@@ -56,6 +63,11 @@ def render_buffers(
             segment_left_x, segment, buffer_row, buffer = working_buffers.pop(0)
 
             full_segment_cell_length = segment.cell_length
+
+            assert (
+                segment_left_x + full_segment_cell_length
+                <= buffer.left_x + buffer.width
+            ), "Segment overflow."
 
             # Empty segments should be ignored, though ideally we should not store them
             # in the buffer at all.
@@ -103,7 +115,7 @@ def render_buffers(
                     )
                     break
 
-            # Do not render over the right boundary
+            # Do not render over the right boundary of the canvas
             if current_x + segment.cell_length > width:
                 segment = segment.split_cells(width - current_x)[0]
 

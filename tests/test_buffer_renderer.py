@@ -301,7 +301,7 @@ def test_render_multiple_buffers_with_multiple_overlaps(console):
         ),
         LineBuffer(
             x=4,
-            width=2,
+            width=4,
             z_index=-2,
             segments=[
                 OffsetSegment(segment=Segment("1234"), x_offset=0, y_offset=0),
@@ -334,7 +334,7 @@ def test_render_multiple_buffers_with_multiple_overlaps_middle_in_front(console)
         ),
         LineBuffer(
             x=4,
-            width=2,
+            width=4,
             z_index=-1,
             segments=[
                 OffsetSegment(segment=Segment("1234"), x_offset=0, y_offset=0),
@@ -419,7 +419,6 @@ def test_render_node_buffer_with_empty_line(console):
     assert capture.get() == " X \n   \n X \n"
 
 
-
 def test_render_node_buffer_with_empty_line_and_no_buffer(console):
     test_buffer = NodeBuffer(
         x=1,
@@ -439,7 +438,54 @@ def test_render_node_buffer_with_empty_line_and_no_buffer(console):
     assert capture.get() == " X \n   \n X \n   \n"
 
 
-# Tests missing:
-# Y coordinates need to be unique
-# Each row needs ot have a segment (which maybe empty)
-# Segment length cannot run over buffer right_x
+def test_render_node_buffer_with_duplicate_y_offset_fails(console):
+    test_buffer = NodeBuffer(
+        x=1,
+        y=1,
+        width=3,
+        height=2,
+        segments=[
+            OffsetSegment(segment=Segment("X"), x_offset=1, y_offset=0),
+            OffsetSegment(segment=Segment(""), x_offset=0, y_offset=0),
+            OffsetSegment(segment=Segment("X"), x_offset=1, y_offset=1),
+        ],
+    )
+
+    with pytest.raises(
+        AssertionError,
+        match="Duplicate segments with same y offsets in buffers are not allowed",
+    ):
+        list(render_buffers([test_buffer], 3, 4))
+
+
+def test_render_node_buffer_with_missing_y_offset_fails(console):
+    test_buffer = NodeBuffer(
+        x=1,
+        y=1,
+        width=3,
+        height=3,
+        segments=[
+            OffsetSegment(segment=Segment("X"), x_offset=1, y_offset=0),
+            OffsetSegment(segment=Segment("X"), x_offset=1, y_offset=2),
+        ],
+    )
+
+    with pytest.raises(
+        AssertionError, match="Buffer does not contain a segment for all rows"
+    ):
+        list(render_buffers([test_buffer], 3, 4))
+
+
+def test_render_buffer_with_overflow_segment_fails(console):
+    test_buffers = [
+        LineBuffer(
+            x=1,
+            width=1,
+            segments=[
+                OffsetSegment(segment=Segment("AB"), x_offset=0, y_offset=0),
+            ],
+        ),
+    ]
+
+    with pytest.raises(AssertionError, match="Segment overflow"):
+        list(render_buffers(test_buffers, 3, 1))
