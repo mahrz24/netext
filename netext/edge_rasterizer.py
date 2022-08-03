@@ -83,13 +83,14 @@ def rasterize_edge(
                 D = D - 2 * dx
             D = D + 2 * dy
 
-        segments.append(
-            OffsetSegment(
-                x_offset=last_offset,
-                y_offset=0,
-                segment=Segment(current_segment, Style(color="green")),
+        if current_segment:
+            segments.append(
+                OffsetSegment(
+                    x_offset=last_offset,
+                    y_offset=0,
+                    segment=Segment(current_segment, Style(color="green")),
+                )
             )
-        )
 
         if reverse:
             segments = list(reversed(segments))
