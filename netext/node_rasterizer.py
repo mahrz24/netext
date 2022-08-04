@@ -15,19 +15,19 @@ class NodeBuffer(SegmentBuffer):
 
     @property
     def left_x(self):
-        return self.x - math.floor(self.width / 2)
+        return self.x - math.floor(self.width / 2.0)
 
     @property
     def right_x(self):
-        return self.x + math.floor(self.width / 2)
+        return self.x + math.floor(self.width / 2.0)
 
     @property
     def top_y(self):
-        return self.y - math.floor(self.height / 2)
+        return self.y - math.floor(self.height / 2.0)
 
     @property
     def bottom_y(self):
-        return self.y + math.floor(self.height / 2)
+        return self.y + math.floor(self.height / 2.0)
 
 
 def rasterize_node(node, data) -> NodeBuffer:

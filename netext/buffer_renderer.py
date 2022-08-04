@@ -16,8 +16,9 @@ def render_buffers(
         assert len(set(y_offsets)) == len(
             y_offsets
         ), "Duplicate segments with same y offsets in buffers are not allowed."
-        assert y_offsets == list(
-            range(buffer.top_y, buffer.bottom_y + 1)
+        buffer_y_span = list(range(0, buffer.bottom_y + 1 - buffer.top_y))
+        assert (
+            y_offsets == buffer_y_span
         ), "Buffer does not contain a segment for all rows or segments are not ordered."
         buffers_by_row[buffer.top_y] = sorted(buffers_by_row[buffer.top_y] + [buffer])
 
@@ -64,9 +65,10 @@ def render_buffers(
 
             full_segment_cell_length = segment.cell_length
 
+            # The final position is allowed to be the first element outside of the
+            # canvas. Otherwise it's an overflow.
             assert (
-                segment_left_x + full_segment_cell_length
-                <= buffer.left_x + buffer.width
+                segment_left_x + full_segment_cell_length <= buffer.right_x + 1
             ), "Segment overflow."
 
             # Empty segments should be ignored, though ideally we should not store them

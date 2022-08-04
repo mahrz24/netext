@@ -18,7 +18,7 @@ class LineBuffer(SegmentBuffer):
 
     @property
     def right_x(self):
-        return self.x + self.width
+        return self.x + self.width - 1
 
     @property
     def top_y(self):
