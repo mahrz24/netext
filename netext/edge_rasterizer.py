@@ -1,19 +1,21 @@
+from dataclasses import dataclass
 from typing import Any, Dict, Hashable
 
-from pydantic import BaseModel, NonNegativeInt
 from rich.segment import Segment
 from rich.style import Style
 
 from .node_rasterizer import NodeBuffer
-from .segment_buffer import OffsetSegment, SegmentBuffer
+from .segment_buffer import OffsetLine, SegmentBuffer
 
 
 # TODO: Use also in node buffer
-class Point(BaseModel):
-    x: NonNegativeInt
-    y: NonNegativeInt
+@dataclass
+class Point:
+    x: int
+    y: int
 
 
+@dataclass
 class EdgeBuffer(SegmentBuffer):
     start: Point
     end: Point
@@ -36,11 +38,11 @@ class EdgeBuffer(SegmentBuffer):
 
     @property
     def width(self):
-        return self.right_x - self.left_x
+        return self.right_x - self.left_x + 1
 
     @property
     def height(self):
-        return self.bottom_y - self.top_y
+        return self.bottom_y - self.top_y + 1
 
 
 def rasterize_edge(
@@ -80,7 +82,7 @@ def rasterize_edge(
             current_segment += "."
             if D > 0:
                 offset_segments.append(
-                    OffsetSegment(
+                    OffsetLine(
                         x_offset=last_offset,
                         y_offset=0,
                         segments=[Segment(current_segment, Style(color="green"))],
@@ -93,7 +95,7 @@ def rasterize_edge(
 
         if current_segment:
             offset_segments.append(
-                OffsetSegment(
+                OffsetLine(
                     x_offset=last_offset,
                     y_offset=0,
                     segments=[Segment(current_segment, Style(color="green"))],
@@ -119,7 +121,7 @@ def rasterize_edge(
 
         for y in range(y0, y1 + 1):
             offset_segments.append(
-                OffsetSegment(
+                OffsetLine(
                     x_offset=x,
                     y_offset=0,
                     segments=[Segment(".", Style(color="green"))],
@@ -135,7 +137,10 @@ def rasterize_edge(
         offset_segment.y_offset = i
 
     edge_buffer = EdgeBuffer(
-        start=Point(x=x0, y=y0), end=Point(x=x1, y=y1), offset_segments=offset_segments
+        z_index=0,
+        start=Point(x=x0, y=y0),
+        end=Point(x=x1, y=y1),
+        segment_lines=offset_segments,
     )
 
     return edge_buffer

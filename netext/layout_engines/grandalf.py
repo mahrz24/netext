@@ -37,4 +37,4 @@ class GrandalfSugiyamaLayout(LayoutEngine[G]):
         sug.draw(3)
         # Rescale back, but leave a bit more space to avoid overlaps in the
         # terminal coordinate space.
-        return {v.data: (v.view.xy[0] / 4, v.view.xy[1] / 8) for v in graph.sV}  # type: ignore
+        return {v.data: (v.view.xy[0] / 4, v.view.xy[1] / 6) for v in graph.sV}  # type: ignore

@@ -1,23 +1,26 @@
-from typing import Any, List
+from dataclasses import dataclass
+from typing import List
 
-from pydantic import BaseModel, NonNegativeInt
+from rich.segment import Segment
 
 
-class OffsetSegment(BaseModel):
-    segments: List[Any]  # TODO Should be segment, check pydantic arbitrary types or not use pydantic.
+@dataclass
+class OffsetLine:
+    segments: List[Segment]
 
-    x_offset: NonNegativeInt  # Offset from left x
-    y_offset: NonNegativeInt  # Offset from top y
+    x_offset: int  # Offset from left x
+    y_offset: int  # Offset from top y
 
     def __lt__(self, value):
-        if isinstance(value, OffsetSegment):
+        if isinstance(value, OffsetLine):
             return self.x_offset < value.x_offset and self.y_offset == self.y_offset
         return False
 
 
-class SegmentBuffer(BaseModel):
-    offset_segments: List[OffsetSegment]
-    z_index: float = 0
+@dataclass
+class SegmentBuffer:
+    segment_lines: List[OffsetLine]
+    z_index: float
 
     @property
     def left_x(self):
@@ -35,6 +38,13 @@ class SegmentBuffer(BaseModel):
     def bottom_y(self):
         return NotImplemented
 
+    @property
+    def width(self):
+        return NotImplemented
+
+    @property
+    def height(self):
+        return NotImplemented
 
     def __lt__(self, value):
         if isinstance(value, SegmentBuffer):
