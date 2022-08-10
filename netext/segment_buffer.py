@@ -4,7 +4,7 @@ from pydantic import BaseModel, NonNegativeInt
 
 
 class OffsetSegment(BaseModel):
-    segment: Any  # TODO Should be segment, check pydantic arbitrary types or not use pydantic.
+    segments: List[Any]  # TODO Should be segment, check pydantic arbitrary types or not use pydantic.
 
     x_offset: NonNegativeInt  # Offset from left x
     y_offset: NonNegativeInt  # Offset from top y
@@ -16,7 +16,7 @@ class OffsetSegment(BaseModel):
 
 
 class SegmentBuffer(BaseModel):
-    segments: List[OffsetSegment]
+    offset_segments: List[OffsetSegment]
     z_index: float = 0
 
     @property
@@ -34,6 +34,7 @@ class SegmentBuffer(BaseModel):
     @property
     def bottom_y(self):
         return NotImplemented
+
 
     def __lt__(self, value):
         if isinstance(value, SegmentBuffer):

@@ -19,7 +19,7 @@
 * ~~Tests for buffer renderer~~
 * Tests for edge rasterizer
 * Tests for node erasterizer
-* Simple tests for terminal graph
+* ~~Simple tests for terminal graph~~
 * Benchmarks for buffer renderer
 * ~~Bring code coverage to a healthy level~~
 

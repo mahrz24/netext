@@ -3,6 +3,9 @@ import math
 from pydantic import NonNegativeInt, PositiveInt
 from rich.segment import Segment
 from rich.style import Style
+from rich.console import Console
+from rich.text import Text
+from rich.panel import Panel
 
 from .segment_buffer import OffsetSegment, SegmentBuffer
 
@@ -30,13 +33,18 @@ class NodeBuffer(SegmentBuffer):
         return self.y + math.floor(self.height / 2.0)
 
 
+
+
 def rasterize_node(node, data) -> NodeBuffer:
-    segment = Segment(str(node), Style(color="red"))
+    console = Console(width=5, height=2)
+    segment_lines = list(console.render_lines(Panel(Text(str(node)))))
+    offset_segments = [OffsetSegment(x_offset=0, y_offset=i, segments=segments) for i, segments in enumerate(segment_lines)]
+    print(offset_segments)
     return NodeBuffer(
         x=0,
         y=0,
         z_index=-1,
-        width=segment.cell_length,
-        height=1,
-        segments=[OffsetSegment(x_offset=0, y_offset=0, segment=segment)],
+        width=5,
+        height=len(offset_segments),
+        offset_segments=offset_segments,
     )

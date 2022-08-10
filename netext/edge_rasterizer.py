@@ -34,6 +34,14 @@ class EdgeBuffer(SegmentBuffer):
     def bottom_y(self):
         return max(self.start.y, self.end.y)
 
+    @property
+    def width(self):
+        return self.right_x - self.left_x
+
+    @property
+    def height(self):
+        return self.bottom_y - self.top_y
+
 
 def rasterize_edge(
     u_buffer: NodeBuffer, v_buffer: NodeBuffer, data: Dict[Hashable, Any]
@@ -46,7 +54,7 @@ def rasterize_edge(
     x1 = v_buffer.x
     y1 = v_buffer.y
 
-    segments = []
+    offset_segments = []
 
     if abs(y1 - y0) < abs(x1 - x0):
         if x0 > x1:
@@ -71,11 +79,11 @@ def rasterize_edge(
         for x in range(x0, x1 + 1):
             current_segment += "."
             if D > 0:
-                segments.append(
+                offset_segments.append(
                     OffsetSegment(
                         x_offset=last_offset,
                         y_offset=0,
-                        segment=Segment(current_segment, Style(color="green")),
+                        segments=[Segment(current_segment, Style(color="green"))],
                     )
                 )
                 current_segment = ""
@@ -84,16 +92,16 @@ def rasterize_edge(
             D = D + 2 * dy
 
         if current_segment:
-            segments.append(
+            offset_segments.append(
                 OffsetSegment(
                     x_offset=last_offset,
                     y_offset=0,
-                    segment=Segment(current_segment, Style(color="green")),
+                    segments=[Segment(current_segment, Style(color="green"))],
                 )
             )
 
         if reverse:
-            segments = list(reversed(segments))
+            offset_segments = list(reversed(offset_segments))
     else:
         if y0 > y1:
             x1, x0 = x0, x1
@@ -110,11 +118,11 @@ def rasterize_edge(
         D = (2 * dx) - dy
 
         for y in range(y0, y1 + 1):
-            segments.append(
+            offset_segments.append(
                 OffsetSegment(
                     x_offset=x,
                     y_offset=0,
-                    segment=Segment(".", Style(color="green")),
+                    segments=[Segment(".", Style(color="green"))],
                 )
             )
             if D > 0:
@@ -123,11 +131,11 @@ def rasterize_edge(
             else:
                 D = D + 2 * dx
 
-    for i, segment in enumerate(segments):
-        segment.y_offset = i
+    for i, offset_segment in enumerate(offset_segments):
+        offset_segment.y_offset = i
 
     edge_buffer = EdgeBuffer(
-        start=Point(x=x0, y=y0), end=Point(x=x1, y=y1), segments=segments
+        start=Point(x=x0, y=y0), end=Point(x=x1, y=y1), offset_segments=offset_segments
     )
 
     return edge_buffer
