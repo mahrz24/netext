@@ -10,7 +10,6 @@ python = "^3.9"
 rich = "^12.5.1"
 networkx = "^2.8.5"
 grandalf = "^0.7"
-pydantic = "^1.9.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"

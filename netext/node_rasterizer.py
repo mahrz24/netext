@@ -1,8 +1,12 @@
 import math
 from dataclasses import dataclass
+from typing import Any, Dict, Hashable
 
+from rich import box
 from rich.console import Console
-from rich.table import Table
+from rich.panel import Panel
+from rich.style import Style
+from rich.text import Text
 
 from .segment_buffer import OffsetLine, SegmentBuffer
 
@@ -39,24 +43,34 @@ class NodeBuffer(SegmentBuffer):
         return self.node_height
 
 
-def rasterize_node(node, data) -> NodeBuffer:
-    # TODO pass console
-    console = Console()
+def rasterize_node(
+    console: Console, node: Hashable, data: Dict[Hashable, Any]
+) -> NodeBuffer:
+    shape = data.get("$shape", "box")
+    style = data.get("$style", Style())
+    text_style = data.get("$text-style", Style())
 
-    # Allow custom renderable, specific shapes (for non square rendering)
-    table = Table(title="Node")
+    content_renderable = Text(str(node), style=text_style)
 
-    table.add_column("Node", justify="right", style="cyan", no_wrap=True)
-    table.add_column("Data", style="magenta")
+    if shape == "box":
+        box_type = data.get("$box-type", box.ROUNDED)
+        node_renderable = Panel(
+            content_renderable, expand=False, style=style, box=box_type
+        )
+    else:
+        node_renderable = content_renderable
 
-    table.add_row(str(node), repr(data))
-
-    segment_lines = list(console.render_lines(table, pad=False))
+    segment_lines = list(console.render_lines(node_renderable, pad=False))
     segment_lines = [
         OffsetLine(x_offset=0, y_offset=i, segments=segments)
         for i, segments in enumerate(segment_lines)
     ]
-    width = sum(segment.cell_length for segment in segment_lines[0].segments)
+    width = max(
+        segment_line.x_offset
+        + sum(segment.cell_length for segment in segment_line.segments)
+        for segment_line in segment_lines
+    )
+
     return NodeBuffer(
         x=0,
         y=0,

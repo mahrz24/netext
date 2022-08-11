@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from typing import Any, Dict, Hashable
+from typing import Any
 
+from rich.console import Console
 from rich.segment import Segment
 from rich.style import Style
 
@@ -46,7 +47,7 @@ class EdgeBuffer(SegmentBuffer):
 
 
 def rasterize_edge(
-    u_buffer: NodeBuffer, v_buffer: NodeBuffer, data: Dict[Hashable, Any]
+    console: Console, u_buffer: NodeBuffer, v_buffer: NodeBuffer, data: Any
 ) -> EdgeBuffer:
     # TODO: In the first prototype we just support straight lines from
     # center point to center point
