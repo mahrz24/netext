@@ -29,7 +29,8 @@
     * Straight lines
 * Better line rendering
     * Use unicode block characters and or slashes & dashes for lines
-* Attributes for nodes & edges
-* Custom node rendering
+* ~~Attributes for nodes~~
+* Attributes for edges
+* ~~Custom node rendering~~
 * Edge labels
 * Directed edges (arrow heads)

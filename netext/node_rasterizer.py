@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Hashable
 
 from rich import box
-from rich.console import Console
+from rich.console import Console, RenderableType
 from rich.panel import Panel
 from rich.style import Style
 from rich.text import Text
@@ -43,14 +43,20 @@ class NodeBuffer(SegmentBuffer):
         return self.node_height
 
 
+def _default_content_renderer(
+    node_str: str, data: Dict[Hashable, Any], text_style: Style
+) -> RenderableType:
+    return Text(node_str, style=text_style)
+
+
 def rasterize_node(
     console: Console, node: Hashable, data: Dict[Hashable, Any]
 ) -> NodeBuffer:
     shape = data.get("$shape", "box")
     style = data.get("$style", Style())
     text_style = data.get("$text-style", Style())
-
-    content_renderable = Text(str(node), style=text_style)
+    content_renderer = data.get("$node-renderer", _default_content_renderer)
+    content_renderable = content_renderer(str(node), data, text_style)
 
     if shape == "box":
         box_type = data.get("$box-type", box.ROUNDED)
