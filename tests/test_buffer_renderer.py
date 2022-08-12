@@ -60,6 +60,22 @@ def test_render_trivial(console):
     assert capture.get() == "XXXXXXXXXX\n"
 
 
+def test_render_trivial_multiple_segments(console):
+    test_buffer = LineBuffer(
+        z_index=0,
+        x=0,
+        line_width=10,
+        segment_lines=[
+            OffsetLine(segments=10 * [Segment("X")], x_offset=0, y_offset=0)
+        ],
+    )
+
+    with console.capture() as capture:
+        console.print(Segments(render_buffers([test_buffer], 10, 1)))
+
+    assert capture.get() == "XXXXXXXXXX\n"
+
+
 def test_render_segment_with_offset(console):
     test_buffer = LineBuffer(
         z_index=0,
@@ -95,6 +111,24 @@ def test_render_segment_with_offset_cropped(console):
         line_width=11,
         segment_lines=[
             OffsetLine(segments=[Segment(9 * "X" + "Y")], x_offset=1, y_offset=0)
+        ],
+    )
+
+    with console.capture() as capture:
+        console.print(Segments(render_buffers([test_buffer], 10, 1)))
+
+    assert capture.get() == " XXXXXXXXX\n"
+
+
+def test_render_segment_with_offset_cropped_multiple_segments(console):
+    test_buffer = LineBuffer(
+        z_index=0,
+        x=0,
+        line_width=11,
+        segment_lines=[
+            OffsetLine(
+                segments=[Segment(9 * "X"), Segment("Y")], x_offset=1, y_offset=0
+            )
         ],
     )
 
@@ -162,6 +196,26 @@ def test_render_segment_empty(console):
     assert capture.get() == "          \n"
 
 
+def test_render_segment_empty_with_multiple_segments(console):
+    test_buffer = LineBuffer(
+        z_index=0,
+        x=0,
+        line_width=10,
+        segment_lines=[
+            OffsetLine(
+                segments=[Segment(""), Segment("X"), Segment(""), Segment("Y")],
+                x_offset=0,
+                y_offset=0,
+            )
+        ],
+    )
+
+    with console.capture() as capture:
+        console.print(Segments(render_buffers([test_buffer], 10, 1)))
+
+    assert capture.get() == "XY        \n"
+
+
 def test_render_mutliple_buffers(console):
     test_buffers = [
         LineBuffer(
@@ -214,6 +268,64 @@ def test_render_multiple_buffers_with_overlap(console):
     assert capture.get() == " XXXXYYXX \n"
 
 
+def test_render_multiple_buffers_with_overlap_and_multiple_segments(console):
+    test_buffers = [
+        LineBuffer(
+            z_index=0,
+            x=1,
+            line_width=8,
+            segment_lines=[
+                OffsetLine(
+                    segments=[Segment("XXXXX"), Segment("ZZZ")], x_offset=0, y_offset=0
+                ),
+            ],
+        ),
+        LineBuffer(
+            x=5,
+            line_width=2,
+            z_index=-1,
+            segment_lines=[
+                OffsetLine(segments=[Segment("YY")], x_offset=0, y_offset=0),
+            ],
+        ),
+    ]
+
+    with console.capture() as capture:
+        console.print(Segments(render_buffers(test_buffers, 10, 1)))
+
+    assert capture.get() == " XXXXYYZZ \n"
+
+
+def test_render_multiple_buffers_with_overlap_and_multiple_segments_in_overlap(console):
+    test_buffers = [
+        LineBuffer(
+            z_index=0,
+            x=1,
+            line_width=8,
+            segment_lines=[
+                OffsetLine(
+                    segments=[Segment("XXXXX"), Segment("ZZZ")], x_offset=0, y_offset=0
+                ),
+            ],
+        ),
+        LineBuffer(
+            x=5,
+            line_width=2,
+            z_index=-1,
+            segment_lines=[
+                OffsetLine(
+                    segments=[Segment("Y"), Segment("Y")], x_offset=0, y_offset=0
+                ),
+            ],
+        ),
+    ]
+
+    with console.capture() as capture:
+        console.print(Segments(render_buffers(test_buffers, 10, 1)))
+
+    assert capture.get() == " XXXXYYZZ \n"
+
+
 def test_render_multiple_buffers_with_overlap_hidden(console):
     test_buffers = [
         LineBuffer(
@@ -222,6 +334,34 @@ def test_render_multiple_buffers_with_overlap_hidden(console):
             line_width=8,
             segment_lines=[
                 OffsetLine(segments=[Segment("XXXXXXXX")], x_offset=0, y_offset=0),
+            ],
+        ),
+        LineBuffer(
+            x=5,
+            line_width=2,
+            z_index=1,
+            segment_lines=[
+                OffsetLine(segments=[Segment("YY")], x_offset=0, y_offset=0),
+            ],
+        ),
+    ]
+
+    with console.capture() as capture:
+        console.print(Segments(render_buffers(test_buffers, 10, 1)))
+
+    assert capture.get() == " XXXXXXXX \n"
+
+
+def test_render_multiple_buffers_with_overlap_hidden_multiple_segments(console):
+    test_buffers = [
+        LineBuffer(
+            z_index=0,
+            x=1,
+            line_width=8,
+            segment_lines=[
+                OffsetLine(
+                    segments=[Segment("XXX"), Segment("XXXXX")], x_offset=0, y_offset=0
+                ),
             ],
         ),
         LineBuffer(
@@ -264,6 +404,46 @@ def test_render_multiple_buffers_with_nested_overlap(console):
             z_index=-2,
             segment_lines=[
                 OffsetLine(segments=[Segment("12")], x_offset=0, y_offset=0),
+            ],
+        ),
+    ]
+
+    with console.capture() as capture:
+        console.print(Segments(render_buffers(test_buffers, 10, 1)))
+
+    assert capture.get() == " AX12WFGH \n"
+
+
+def test_render_multiple_buffers_with_nested_overlap_multiple_segments(console):
+    test_buffers = [
+        LineBuffer(
+            z_index=0,
+            x=1,
+            line_width=8,
+            segment_lines=[
+                OffsetLine(
+                    segments=[Segment("ABCD"), Segment("EFGH")], x_offset=0, y_offset=0
+                ),
+            ],
+        ),
+        LineBuffer(
+            x=2,
+            line_width=4,
+            z_index=-1,
+            segment_lines=[
+                OffsetLine(
+                    segments=[Segment("XYZ"), Segment("W")], x_offset=0, y_offset=0
+                ),
+            ],
+        ),
+        LineBuffer(
+            x=3,
+            line_width=2,
+            z_index=-2,
+            segment_lines=[
+                OffsetLine(
+                    segments=[Segment("1"), Segment("2")], x_offset=0, y_offset=0
+                ),
             ],
         ),
     ]

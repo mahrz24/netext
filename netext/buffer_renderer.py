@@ -1,6 +1,6 @@
 from collections import defaultdict
 from heapq import merge
-from typing import Iterable, Iterator
+from typing import Iterable, Iterator, List, Tuple
 
 from rich.segment import Segment
 
@@ -24,7 +24,7 @@ def render_buffers(
         )
         buffers_by_row[buffer.top_y] = sorted(buffers_by_row[buffer.top_y] + [buffer])
 
-    active_buffers = []
+    active_buffers: List[Tuple[int, List[Segment], int, SegmentBuffer]] = []
     for row in range(height):
         # This contains information where the segments for the currently
         # active buffers start (active buffer == intersects with current line)
@@ -65,7 +65,6 @@ def render_buffers(
         while working_buffers:
             line_left_x, segments, buffer_row, buffer = working_buffers.pop(0)
             full_segments_cell_length = sum(segment.cell_length for segment in segments)
-
             # The final position is allowed to be the first element outside of the
             # canvas. Otherwise it's an overflow.
             assert (
@@ -73,7 +72,11 @@ def render_buffers(
             ), "Segment overflow."
 
             segment_left_x = line_left_x
+            skip_remaining_segments = False
             for j, segment in enumerate(segments):
+                if skip_remaining_segments:
+                    break
+
                 full_segment_cell_length = segment.cell_length
                 # Empty segments should be ignored, though ideally we should not store them
                 # in the buffer at all.
@@ -83,7 +86,7 @@ def render_buffers(
                 # We need to cut the segment and only print the non overlapped part if the current x coordinate
                 # is already the buffer's left boundary.
                 if current_x > segment_left_x:
-                    segment = segment.split_cells(current_x - line_left_x)[1]
+                    segment = segment.split_cells(current_x - segment_left_x)[1]
                 elif current_x < segment_left_x:
                     # Pad to the left boundary of the segment
                     yield Segment(" " * (segment_left_x - current_x))
@@ -118,6 +121,10 @@ def render_buffers(
                                 buffer,
                             ),
                         )
+
+                        # We found an overlap and inserted the working buffer again past the overlap
+                        # inclduing the remaining segments
+                        skip_remaining_segments = True
                         break
 
                 # Do not render over the right boundary of the canvas
@@ -130,7 +137,7 @@ def render_buffers(
                 if segment.cell_length > 0:
                     yield segment
                     current_x += segment.cell_length
-                    segment_left_x += segment.cell_length
+                segment_left_x += full_segment_cell_length
 
         if current_x < width:
             yield Segment(" " * (width - current_x))
