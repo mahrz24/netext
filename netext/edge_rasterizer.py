@@ -80,7 +80,7 @@ def rasterize_edge(
         current_segment = ""
 
         for x in range(x0, x1 + 1):
-            current_segment += "."
+            current_segment += "-"
             if D > 0:
                 offset_segments.append(
                     OffsetLine(
@@ -125,7 +125,7 @@ def rasterize_edge(
                 OffsetLine(
                     x_offset=x,
                     y_offset=0,
-                    segments=[Segment(".", Style(color="green"))],
+                    segments=[Segment("|", Style(color="green"))],
                 )
             )
             if D > 0:

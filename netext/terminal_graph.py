@@ -53,6 +53,8 @@ class TerminalGraph(Generic[G]):
             buffer.x = pos[0]
             buffer.y = pos[1]
 
+        # Assign magnets to edges
+
         # Now we rasterize the edges
         self.edge_buffers: List[EdgeBuffer] = [
             rasterize_edge(console, node_buffers[u], node_buffers[v], data)
