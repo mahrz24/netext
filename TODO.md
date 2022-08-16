@@ -12,7 +12,7 @@
 # Refactoring
 
 * ~~Extract buffer renderer to own module to make it better testable~~
-* Clean up bresenham line drawing algorithm
+* ~~Clean up bresenham line drawing algorithm~~
 
 # Tests & Benchmarks
 
@@ -26,11 +26,19 @@
 # Features
 
 * Different edge routing algorithms
+    * Direct connection
     * Straight lines
 * Better line rendering
-    * Use unicode block characters and or slashes & dashes for lines
+    * Use magnets on the node border for edge positions
+    * Edge routing gives multiple segments of an edge, each segment can be drawn using different algorithms
+        * Box characters (straight lines only) with corner connection (only for straight lines)
+            * For this mode straight lines or direct connection should not matter
+        * General, lines draw into a bitmap buffer, that is turned into segments (makes braille box drawing easier to use)
+            * Simple mode (dots along the lines)
+            * Braille (not for straight lines)
 * ~~Attributes for nodes~~
 * Attributes for edges
 * ~~Custom node rendering~~
 * Edge labels
+* Node labels (not part of the placement algorithm)
 * Directed edges (arrow heads)
