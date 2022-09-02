@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, List
 
 from rich.console import Console
@@ -7,6 +8,17 @@ from rich.style import Style
 
 from .node_rasterizer import NodeBuffer
 from .segment_buffer import OffsetLine, SegmentBuffer
+
+
+class EdgeRoutingMode(Enum):
+    direct = "direct"
+    straight = "straight"
+
+
+class LineSegmentDrawingMode(Enum):
+    box = "box"
+    single_character = "single_character"
+    braille = "braille"
 
 
 # TODO: Use also in node buffer
