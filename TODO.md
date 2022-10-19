@@ -41,4 +41,5 @@
 * ~~Custom node rendering~~
 * Edge labels
 * Node labels (not part of the placement algorithm)
+* Specify attribute on the graph level and propagate to nodes / edges
 * Directed edges (arrow heads)
