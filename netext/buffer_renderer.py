@@ -10,7 +10,7 @@ from .segment_buffer import SegmentBuffer
 def render_buffers(
     buffers: Iterable[SegmentBuffer], width: int, height: int
 ) -> Iterator[Segment]:
-    buffers_by_row = defaultdict(list)
+    buffers_by_row: dict[int, list[SegmentBuffer]] = defaultdict(list)
     for buffer in buffers:
         y_offsets = [segment.y_offset for segment in buffer.segment_lines]
         assert len(set(y_offsets)) == len(
