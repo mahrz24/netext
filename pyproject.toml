@@ -6,11 +6,11 @@ authors = ["Malte Klemm <me@malteklemm.de>"]
 license = "MIT"
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.10"
 rich = "^12.5.1"
 networkx = "^2.8.5"
 grandalf = "^0.7"
-pydantic = "^1.9.1"
+bitarray = "^2.6.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
@@ -20,6 +20,7 @@ pre-commit = "^2.20.0"
 pytest-cov = "^3.0.0"
 coverage = {extras = ["toml"], version = "^6.4.2"}
 asv = "^0.5.1"
+pyupgrade = "^3.3.1"
 
 [tool.black]
 preview = true
@@ -30,6 +31,7 @@ profile = "black"
 [tool.pyright]
 include = ["netext", "examples", "tests"]
 typeCheckingMode = "basic"
+pythonVersion = "3.10"
 venv = ".venv"
 venv_path = "."
 

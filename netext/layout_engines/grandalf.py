@@ -1,4 +1,5 @@
-from typing import Any, Dict, Hashable
+from collections.abc import Hashable
+from typing import Any
 
 from grandalf.graphs import Edge, Vertex, graph_core
 from grandalf.layouts import SugiyamaLayout
@@ -12,7 +13,7 @@ class GrandalfView:
     xy = (0, 0)
 
 
-def _create_vertex(node: Hashable, data: Dict[Hashable, Any]) -> Vertex:
+def _create_vertex(node: Hashable, data: dict[Hashable, Any]) -> Vertex:
     v = Vertex(node)
 
     # The API is a bit weird that it assumes to just add some members externally.
@@ -37,4 +38,4 @@ class GrandalfSugiyamaLayout(LayoutEngine[G]):
         sug.draw(3)
         # Rescale back, but leave a bit more space to avoid overlaps in the
         # terminal coordinate space.
-        return {v.data: (v.view.xy[0] / 4, v.view.xy[1] / 8) for v in graph.sV}  # type: ignore
+        return {v.data: (v.view.xy[0] / 4, v.view.xy[1] / 6) for v in graph.sV}  # type: ignore

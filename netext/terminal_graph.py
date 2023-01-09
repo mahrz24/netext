@@ -1,6 +1,7 @@
+from collections.abc import Hashable
 from itertools import chain
 from math import ceil
-from typing import Dict, Generic, Hashable, List, Tuple, TypeVar
+from typing import Any, Generic, TypeVar, cast
 
 import networkx as nx
 from rich.console import Console, ConsoleOptions, RenderResult
@@ -17,14 +18,17 @@ G = TypeVar("G", nx.Graph, nx.DiGraph)
 
 class TerminalGraph(Generic[G]):
     def __init__(
-        self, g: G, layout_engine: LayoutEngine[G] = GrandalfSugiyamaLayout[G]()
+        self,
+        g: G,
+        layout_engine: LayoutEngine[G] = GrandalfSugiyamaLayout[G](),
+        console: Console = Console(),
     ):
-        self._nx_graph = g.copy()
+        self._nx_graph: G = cast(G, g.copy())
         # First we create the node buffers, this allows us to pass the sizing information to the
         # layout engine. For each node in the graph we generate a node buffer that contains the
         # segments to render the node and metadata where to place the buffer.
-        node_buffers: Dict[Hashable, NodeBuffer] = {
-            node: rasterize_node(node, data)
+        node_buffers: dict[Hashable, NodeBuffer] = {
+            node: rasterize_node(console, node, cast(dict[Hashable, Any], data))
             for node, data in self._nx_graph.nodes(data=True)
         }
 
@@ -32,7 +36,7 @@ class TerminalGraph(Generic[G]):
         nx.set_node_attributes(self._nx_graph, node_buffers, "_netext_node_buffer")
 
         # Position the nodes and add the position information to the graph
-        node_positions: Dict[Hashable, Tuple[float, float]] = layout_engine(
+        node_positions: dict[Hashable, tuple[float, float]] = layout_engine(
             self._nx_graph
         )
 
@@ -50,15 +54,17 @@ class TerminalGraph(Generic[G]):
             buffer.x = pos[0]
             buffer.y = pos[1]
 
+        # Assign magnets to edges
+
         # Now we rasterize the edges
-        self.edge_buffers: List[EdgeBuffer] = [
-            rasterize_edge(node_buffers[u], node_buffers[v], data)
-            for u, v, data in self._nx_graph.edges(data=True)
+        self.edge_buffers: list[EdgeBuffer] = [
+            rasterize_edge(console, node_buffers[u], node_buffers[v], data)
+            for (u, v, data) in self._nx_graph.edges(data=True)  # type: ignore
         ]
 
     def _transform_node_positions_to_console(
-        self, node_positions: Dict[Hashable, Tuple[float, float]]
-    ) -> Dict[Hashable, Tuple[float, float]]:
+        self, node_positions: dict[Hashable, tuple[float, float]]
+    ) -> dict[Hashable, tuple[float, float]]:
         """Transforms the node positions into console coordinate space.
 
         Right now this assumes sizing from the layout engine is correct and only
@@ -88,7 +94,7 @@ class TerminalGraph(Generic[G]):
         }
 
     def _set_size_from_node_positions(
-        self, node_positions: Dict[Hashable, Tuple[float, float]]
+        self, node_positions: dict[Hashable, tuple[float, float]]
     ):
         """
         Sets the graph size given the node positions & node buffers. Assumes positions

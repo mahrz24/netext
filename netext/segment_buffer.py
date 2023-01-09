@@ -1,23 +1,39 @@
-from typing import Any, List
+from dataclasses import dataclass
+from typing import Tuple
 
-from pydantic import BaseModel, NonNegativeInt
+from rich.segment import Segment
 
 
-class OffsetSegment(BaseModel):
-    segment: Any  # TODO Should be segment, check pydantic arbitrary types or not use pydantic.
+@dataclass
+class Spacer:
+    width: int
 
-    x_offset: NonNegativeInt  # Offset from left x
-    y_offset: NonNegativeInt  # Offset from top y
+    @property
+    def cell_length(self) -> int:
+        return self.width
+
+    def split_cells(self, at: int) -> Tuple["Spacer", "Spacer"]:
+        at = min(max(0, at), self.width)
+        return Spacer(at), Spacer(self.width - at)
+
+
+@dataclass
+class OffsetLine:
+    segments: list[Segment | Spacer]
+
+    x_offset: int  # Offset from left x
+    y_offset: int  # Offset from top y
 
     def __lt__(self, value):
-        if isinstance(value, OffsetSegment):
+        if isinstance(value, OffsetLine):
             return self.x_offset < value.x_offset and self.y_offset == self.y_offset
         return False
 
 
-class SegmentBuffer(BaseModel):
-    segments: List[OffsetSegment]
-    z_index: float = 0
+@dataclass
+class SegmentBuffer:
+    segment_lines: list[OffsetLine]
+    z_index: float
 
     @property
     def left_x(self):
@@ -33,6 +49,14 @@ class SegmentBuffer(BaseModel):
 
     @property
     def bottom_y(self):
+        return NotImplemented
+
+    @property
+    def width(self):
+        return NotImplemented
+
+    @property
+    def height(self):
         return NotImplemented
 
     def __lt__(self, value):
