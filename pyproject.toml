@@ -20,6 +20,7 @@ pre-commit = "^2.20.0"
 pytest-cov = "^3.0.0"
 coverage = {extras = ["toml"], version = "^6.4.2"}
 asv = "^0.5.1"
+pyupgrade = "^3.3.1"
 
 [tool.black]
 preview = true

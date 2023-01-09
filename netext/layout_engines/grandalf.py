@@ -1,4 +1,5 @@
-from typing import Any, Dict, Hashable
+from collections.abc import Hashable
+from typing import Any
 
 from grandalf.graphs import Edge, Vertex, graph_core
 from grandalf.layouts import SugiyamaLayout
@@ -12,7 +13,7 @@ class GrandalfView:
     xy = (0, 0)
 
 
-def _create_vertex(node: Hashable, data: Dict[Hashable, Any]) -> Vertex:
+def _create_vertex(node: Hashable, data: dict[Hashable, Any]) -> Vertex:
     v = Vertex(node)
 
     # The API is a bit weird that it assumes to just add some members externally.

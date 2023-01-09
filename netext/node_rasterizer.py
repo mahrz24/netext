@@ -1,14 +1,16 @@
 import math
+from collections.abc import Hashable
 from dataclasses import dataclass
-from typing import Any, Dict, Hashable
+from typing import Any, cast
 
 from rich import box
 from rich.console import Console, RenderableType
 from rich.panel import Panel
+from rich.segment import Segment
 from rich.style import Style
 from rich.text import Text
 
-from .segment_buffer import OffsetLine, SegmentBuffer
+from netext.segment_buffer import OffsetLine, SegmentBuffer, Spacer
 
 
 @dataclass
@@ -44,13 +46,13 @@ class NodeBuffer(SegmentBuffer):
 
 
 def _default_content_renderer(
-    node_str: str, data: Dict[Hashable, Any], text_style: Style
+    node_str: str, data: dict[Hashable, Any], text_style: Style
 ) -> RenderableType:
     return Text(node_str, style=text_style)
 
 
 def rasterize_node(
-    console: Console, node: Hashable, data: Dict[Hashable, Any]
+    console: Console, node: Hashable, data: dict[Hashable, Any]
 ) -> NodeBuffer:
     shape = data.get("$shape", "box")
     style = data.get("$style", Style())
@@ -68,7 +70,9 @@ def rasterize_node(
 
     segment_lines = list(console.render_lines(node_renderable, pad=False))
     segment_lines = [
-        OffsetLine(x_offset=0, y_offset=i, segments=segments)
+        OffsetLine(
+            x_offset=0, y_offset=i, segments=cast(list[Segment | Spacer], segments)
+        )
         for i, segments in enumerate(segment_lines)
     ]
     width = max(
@@ -77,7 +81,7 @@ def rasterize_node(
         for segment_line in segment_lines
     )
 
-    return NodeBuffer(
+    node_buffer = NodeBuffer(
         x=0,
         y=0,
         z_index=-1,
@@ -85,3 +89,4 @@ def rasterize_node(
         node_height=len(segment_lines),
         segment_lines=segment_lines,
     )
+    return node_buffer

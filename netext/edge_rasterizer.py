@@ -6,8 +6,8 @@ from bitarray import bitarray
 from rich.console import Console
 from rich.segment import Segment
 
-from .node_rasterizer import NodeBuffer
-from .segment_buffer import OffsetLine, SegmentBuffer
+from netext.node_rasterizer import NodeBuffer
+from netext.segment_buffer import OffsetLine, SegmentBuffer, Spacer
 
 
 class EdgeRoutingMode(Enum):
@@ -129,27 +129,15 @@ def rasterize_edge_segments(edge_segments: list[EdgeSegment], sampling) -> Bitma
     return bitmap_buffer
 
 
-def _slice_to_offset_lines(slice: bitarray, y_offset: int) -> list[OffsetLine]:
-    x_offset = 0
-    offset_lines = []
+def _slice_to_offset_line(slice: bitarray, y_offset: int) -> OffsetLine:
     current_segment = []
     for val in slice:
         if not val:
-            if x_offset != 0:
-                offset_lines.append(
-                    OffsetLine(
-                        x_offset=x_offset, y_offset=y_offset, segments=current_segment
-                    )
-                )
-                current_segment = []
-            x_offset += 1
+            current_segment.append(Spacer(width=1))
         else:
             current_segment.append(Segment("*"))
-    if current_segment:
-        offset_lines.append(
-            OffsetLine(x_offset=x_offset, y_offset=y_offset, segments=current_segment)
-        )
-    return offset_lines
+
+    return OffsetLine(x_offset=0, y_offset=y_offset, segments=current_segment)
 
 
 def bitmap_to_segment_lines(
@@ -157,8 +145,8 @@ def bitmap_to_segment_lines(
 ) -> list[OffsetLine]:
     match edge_segment_drawing_mode:
         case EdgeSegmentDrawingMode.single_character:
-            segments = [
-                _slice_to_offset_lines(
+            lines = [
+                _slice_to_offset_line(
                     bitmap_buffer.buffer[
                         y * bitmap_buffer.width : (y + 1) * bitmap_buffer.width
                     ],
@@ -167,9 +155,9 @@ def bitmap_to_segment_lines(
                 for y in range(bitmap_buffer.height)
             ]
         case _:
-            segments = []
+            lines = []
 
-    return [segment for sublist in segments for segment in sublist]
+    return lines
 
 
 def rasterize_edge(
@@ -190,6 +178,7 @@ def rasterize_edge(
 
     edge_segments = route_edge(start, end, routing_mode)
     bitmap_buffer = rasterize_edge_segments(edge_segments, sampling=1)
+
     segment_lines = bitmap_to_segment_lines(
         bitmap_buffer, edge_segment_drawing_mode=edge_segment_drawing_mode
     )
@@ -224,25 +213,24 @@ def _bresenham_line_drawing(edge_segment: EdgeSegment, bitmap_buffer: BitmapBuff
 
 
 def _bresenham_flat(x0: int, y0: int, x1: int, y1: int, bitmap_buffer: BitmapBuffer):
-    segment_lines = []
     dx = x1 - x0
     dy = y1 - y0
-    y = y0
+    yi = 1
 
     if dy < 0:
+        yi = -1
         dy = -dy
-        y = y1
 
+    y = y0
     D = 2 * dy - dx
 
     for x in range(x0, x1 + 1):
         _put_pixel(x, y, bitmap_buffer)
         if D > 0:
-            y += 1
-            D = D - 2 * dx
-        D = D + 2 * dy
-
-    return segment_lines
+            y += yi
+            D = D + (2 * (dy - dx))
+        else:
+            D = D + 2 * dy
 
 
 def _put_pixel(x: int, y: int, bitmap_buffer: BitmapBuffer):

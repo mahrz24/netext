@@ -1,10 +1,10 @@
 from collections import defaultdict
+from collections.abc import Iterable, Iterator
 from heapq import merge
-from typing import Iterable, Iterator, List, Tuple
 
 from rich.segment import Segment
 
-from .segment_buffer import SegmentBuffer
+from netext.segment_buffer import SegmentBuffer, Spacer
 
 
 def render_buffers(
@@ -24,7 +24,7 @@ def render_buffers(
         )
         buffers_by_row[buffer.top_y] = sorted(buffers_by_row[buffer.top_y] + [buffer])
 
-    active_buffers: List[Tuple[int, List[Segment], int, SegmentBuffer]] = []
+    active_buffers: list[tuple[int, list[Segment | Spacer], int, SegmentBuffer]] = []
     for row in range(height):
         # This contains information where the segments for the currently
         # active buffers start (active buffer == intersects with current line)
@@ -38,7 +38,8 @@ def render_buffers(
                 )
                 for _, _, buffer_row, buffer in active_buffers
                 if buffer_row + 1 < buffer.height
-            ]
+            ],
+            key=lambda l: l[0],
         )
 
         new_active_buffers = sorted(
@@ -50,17 +51,19 @@ def render_buffers(
                     buffer,
                 )
                 for buffer in buffers_by_row[row]
-            ]
+            ],
+            key=lambda l: l[0],
         )
 
-        active_buffers = list(merge(active_buffers, new_active_buffers))
+        active_buffers = list(
+            merge(active_buffers, new_active_buffers, key=lambda l: l[0])
+        )
 
         if not active_buffers:
             yield Segment(" " * width + "\n")
             continue
 
         current_x = 0
-
         working_buffers = list(active_buffers)
         while working_buffers:
             line_left_x, segments, buffer_row, buffer = working_buffers.pop(0)
@@ -73,6 +76,9 @@ def render_buffers(
 
             segment_left_x = line_left_x
             skip_remaining_segments = False
+
+            new_buffers = []
+
             for j, segment in enumerate(segments):
                 if skip_remaining_segments:
                     break
@@ -96,12 +102,16 @@ def render_buffers(
                 # intersects with the current buffer & length (and has a smaller z-index), we split the
                 # current buffer segment at that place and add the remaining part after the intersecting
                 # segment.
-                for i, (line_left_x_next, _, _, buffer_next) in enumerate(
+                for i, (line_left_x_next, _, br, buffer_next) in enumerate(
                     working_buffers
                 ):
                     if (
-                        line_left_x_next <= segment_left_x + full_segment_cell_length
-                        and buffer_next.z_index < buffer.z_index
+                        line_left_x_next < segment_left_x + full_segment_cell_length
+                        and (
+                            buffer_next.z_index < buffer.z_index
+                            or isinstance(segment, Spacer)
+                        )
+                        and segment.cell_length > 0
                     ):
                         # We have to account for the case where we are already past
                         # the left of the next buffer due to already previously
@@ -111,21 +121,38 @@ def render_buffers(
                         )
 
                         # In case we already are past the new left x we have
-                        # to adjust the new buffer
-                        working_buffers.insert(
-                            i + 1,
+                        # to adjust the new buffer, but only in case it's not a spacer
+                        if isinstance(segment, Spacer):
+                            new_left_x = (
+                                line_left_x_next
+                                - min(0, line_left_x_next - current_x)
+                                + overflow_segment.cell_length
+                            )
+                            new_segments = segments[j + 1 :]
+                        else:
+                            new_left_x = line_left_x_next - min(
+                                0, line_left_x_next - current_x
+                            )
+                            new_segments = [overflow_segment] + segments[j + 1 :]
+
+                        new_buffers.append(
                             (
-                                line_left_x_next - min(0, line_left_x_next - current_x),
-                                [overflow_segment] + segments[j + 1 :],
+                                new_left_x,
+                                new_segments,
                                 buffer_row,
                                 buffer,
-                            ),
+                            )
                         )
 
                         # We found an overlap and inserted the working buffer again past the overlap
                         # inclduing the remaining segments
                         skip_remaining_segments = True
                         break
+
+                # Use merge
+                working_buffers = list(
+                    merge(working_buffers, new_buffers, key=lambda l: l[0])
+                )
 
                 # Do not render over the right boundary of the canvas
                 if current_x + segment.cell_length > width:
@@ -135,7 +162,10 @@ def render_buffers(
                 # segment (with lower z-index) cut the segment to disappear, nothing
                 # will be yielded.
                 if segment.cell_length > 0:
-                    yield segment
+                    if isinstance(segment, Spacer):
+                        yield Segment(" " * segment.cell_length)
+                    else:
+                        yield segment
                     current_x += segment.cell_length
                 segment_left_x += full_segment_cell_length
 

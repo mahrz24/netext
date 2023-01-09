@@ -337,6 +337,17 @@ pytest = ">=4.6"
 testing = ["fields", "hunter", "process-tests", "six", "pytest-xdist", "virtualenv"]
 
 [[package]]
+name = "pyupgrade"
+version = "3.3.1"
+description = "A tool to automatically upgrade syntax for newer versions."
+category = "dev"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+tokenize-rt = ">=3.2.0"
+
+[[package]]
 name = "pyyaml"
 version = "6.0"
 description = "YAML parser and emitter for Python"
@@ -366,6 +377,14 @@ description = "Python 2 and 3 compatibility utilities"
 category = "dev"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
+
+[[package]]
+name = "tokenize-rt"
+version = "5.0.0"
+description = "A wrapper around the stdlib `tokenize` which roundtrips."
+category = "dev"
+optional = false
+python-versions = ">=3.7"
 
 [[package]]
 name = "toml"
@@ -403,7 +422,7 @@ testing = ["coverage (>=4)", "coverage-enable-subprocess (>=1)", "flaky (>=3)", 
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.10"
-content-hash = "4d0ce5f70d624b8e8fdd1724d5e4730638cf75a66aa42714003060ed1bdc4eb4"
+content-hash = "1f2812efd61eaadab52d60b190b0c4f19966f29dadd1f319820083b0b5ad2c0a"
 
 [metadata.files]
 asv = []
@@ -465,6 +484,7 @@ pygments = []
 pyparsing = []
 pytest = []
 pytest-cov = []
+pyupgrade = []
 pyyaml = [
     {file = "PyYAML-6.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:d4db7c7aef085872ef65a8fd7d6d09a14ae91f691dec3e87ee5ee0539d516f53"},
     {file = "PyYAML-6.0-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:9df7ed3b3d2e0ecfe09e14741b857df43adb5a3ddadc919a2d94fbdf78fea53c"},
@@ -505,6 +525,7 @@ six = [
     {file = "six-1.16.0-py2.py3-none-any.whl", hash = "sha256:8abb2f1d86890a2dfb989f9a77cfcfd3e47c2a354b01111771326f8aa26e0254"},
     {file = "six-1.16.0.tar.gz", hash = "sha256:1e61c37477a1626458e36f7b1d82aa5c9b094fa4802892072e49de9c60c4c926"},
 ]
+tokenize-rt = []
 toml = [
     {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},
     {file = "toml-0.10.2.tar.gz", hash = "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"},
