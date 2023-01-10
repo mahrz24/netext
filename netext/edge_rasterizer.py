@@ -55,6 +55,18 @@ class BitmapBuffer:
     height: int
     buffer: bitarray
 
+    def __rich__(self):
+        markup_str = "[bold green]"
+        for i in range(self.height):
+            markup_str += (
+                self.buffer[i * self.width : (i + 1) * self.width]
+                .unpack(zero=b".", one=b"X")
+                .decode("utf-8")
+                + "\n"
+            )
+        markup_str += f"[/bold green]at (x={self.x}, y={self.y})"
+        return markup_str
+
 
 @dataclass
 class EdgeBuffer(SegmentBuffer):
@@ -98,8 +110,13 @@ def route_edge(
     start: Point, end: Point, routing_mode: EdgeRoutingMode
 ) -> list[EdgeSegment]:
     match routing_mode:
-        case EdgeRoutingMode.straight:
+        case EdgeRoutingMode.direct:
             return [EdgeSegment(start=start, end=end)]
+        case EdgeRoutingMode.straight:
+            return [
+                EdgeSegment(start=start, end=Point(x=start.x, y=end.y)),
+                EdgeSegment(start=Point(x=start.x, y=end.y), end=end),
+            ]
         case _:
             raise NotImplementedError(
                 f"The routing mode {routing_mode} has not been implemented yet."
@@ -170,7 +187,7 @@ def rasterize_edge(
     # label = data.get("$label", None)
 
     routing_mode: EdgeRoutingMode = data.get(
-        "$edge-routing-mode", EdgeRoutingMode.straight
+        "$edge-routing-mode", EdgeRoutingMode.direct
     )
     edge_segment_drawing_mode: EdgeSegmentDrawingMode = data.get(
         "$edge-segment-drawing-mode", EdgeSegmentDrawingMode.single_character
@@ -178,7 +195,6 @@ def rasterize_edge(
 
     edge_segments = route_edge(start, end, routing_mode)
     bitmap_buffer = rasterize_edge_segments(edge_segments, sampling=1)
-
     segment_lines = bitmap_to_segment_lines(
         bitmap_buffer, edge_segment_drawing_mode=edge_segment_drawing_mode
     )
@@ -241,12 +257,12 @@ def _bresenham_steep(x0: int, y0: int, x1: int, y1: int, bitmap_buffer: BitmapBu
     dx = x1 - x0
     dy = y1 - y0
     xi = 1
-    x = 0
     if dx < 0:
         x = x0 - x1
         xi = -1
         dx = -dx
     D = (2 * dx) - dy
+    x = x0
 
     for y in range(y0, y1 + 1):
         _put_pixel(x, y, bitmap_buffer)

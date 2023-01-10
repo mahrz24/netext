@@ -18,7 +18,7 @@
 
 * ~~Tests for buffer renderer~~
 * Tests for edge rasterizer
-* Tests for node erasterizer
+* Tests for node rasterizer
 * ~~Simple tests for terminal graph~~
 * Benchmarks for buffer renderer
 * ~~Bring code coverage to a healthy level~~
@@ -26,8 +26,8 @@
 # Features
 
 * Different edge routing algorithms
-    * Direct connection
-    * Straight lines
+    * ~~ Direct connection ~~
+    * ~~ Straight lines ~~
 * Better line rendering
     * Use magnets on the node border for edge positions
     * Edge routing gives multiple segments of an edge, each segment can be drawn using different algorithms
