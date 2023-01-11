@@ -8,6 +8,7 @@
 * Setup code owners
 * Enable dependabot & codeql
 * Add documentation
+* Switch to mypy
 
 # Refactoring
 

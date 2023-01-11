@@ -46,9 +46,9 @@ class NodeBuffer(SegmentBuffer):
 
 
 def _default_content_renderer(
-    node_str: str, data: dict[Hashable, Any], text_style: Style
+    node_str: str, data: dict[Hashable, Any], content_style: Style
 ) -> RenderableType:
-    return Text(node_str, style=text_style)
+    return Text(node_str, style=content_style)
 
 
 def rasterize_node(
@@ -56,9 +56,9 @@ def rasterize_node(
 ) -> NodeBuffer:
     shape = data.get("$shape", "box")
     style = data.get("$style", Style())
-    text_style = data.get("$text-style", Style())
+    content_style = data.get("$content-style", Style())
     content_renderer = data.get("$node-renderer", _default_content_renderer)
-    content_renderable = content_renderer(str(node), data, text_style)
+    content_renderable = content_renderer(str(node), data, content_style)
 
     if shape == "box":
         box_type = data.get("$box-type", box.ROUNDED)
