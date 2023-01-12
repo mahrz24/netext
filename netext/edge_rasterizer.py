@@ -98,10 +98,6 @@ class EdgeBuffer(SegmentBuffer):
         return self.bottom_y - self.top_y + 1
 
 
-# create_edge (NodeBuffer, NodeBuffer, settings) -> Edge (Start, End, Settings, Label) -> Set[Lines], LabelBuffer,
-# Start, End -> Bitmapbuffer, Mask, LabelBuffer -> EdgeBuffer
-
-
 def get_magnet(buffer: NodeBuffer, magnet: MagnetPosition) -> Point:
     return Point(buffer.x, buffer.y)
 
@@ -172,7 +168,9 @@ def bitmap_to_segment_lines(
                 for y in range(bitmap_buffer.height)
             ]
         case _:
-            lines = []
+            raise NotImplementedError(
+                "The edge segement drawing mode has not yet been implemented"
+            )
 
     return lines
 

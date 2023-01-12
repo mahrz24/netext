@@ -24,11 +24,6 @@ class OffsetLine:
     x_offset: int  # Offset from left x
     y_offset: int  # Offset from top y
 
-    def __lt__(self, value):
-        if isinstance(value, OffsetLine):
-            return self.x_offset < value.x_offset and self.y_offset == self.y_offset
-        return False
-
 
 @dataclass
 class SegmentBuffer:
@@ -37,27 +32,27 @@ class SegmentBuffer:
 
     @property
     def left_x(self):
-        return NotImplemented
+        return NotImplemented  # pragma: no cover
 
     @property
     def right_x(self):
-        return NotImplemented
+        return NotImplemented  # pragma: no cover
 
     @property
     def top_y(self):
-        return NotImplemented
+        return NotImplemented  # pragma: no cover
 
     @property
     def bottom_y(self):
-        return NotImplemented
+        return NotImplemented  # pragma: no cover
 
     @property
     def width(self):
-        return NotImplemented
+        return NotImplemented  # pragma: no cover
 
     @property
     def height(self):
-        return NotImplemented
+        return NotImplemented  # pragma: no cover
 
     def __lt__(self, value):
         if isinstance(value, SegmentBuffer):
