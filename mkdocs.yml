@@ -1,0 +1,16 @@
+site_name: netext Documentation
+
+theme:
+  name: material
+  palette:
+    primary: deep purple
+  features:
+    - navigation.instant
+    - navigation.tabs
+    - navigation.tabs.sticky
+
+plugins:
+  - search:
+      lang: en
+
+repo_url: https://github.com/mahrz24/netext
