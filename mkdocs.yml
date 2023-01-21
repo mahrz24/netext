@@ -1,5 +1,17 @@
 site_name: netext Documentation
 
+nav:
+  - index.md
+  - tutorial.md
+  - 'User Guide':
+    - user-guide/style-edges.md
+    - user-guide/style-nodes.md
+  - 'Reference':
+    - reference/edges.md
+    - reference/nodes.md
+  - 'API':
+    - api/terminal-graph.md
+
 theme:
   name: material
   palette:
@@ -12,5 +24,6 @@ theme:
 plugins:
   - search:
       lang: en
+  - mkdocstrings
 
 repo_url: https://github.com/mahrz24/netext

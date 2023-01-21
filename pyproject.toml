@@ -11,6 +11,7 @@ rich = "^12.5.1"
 networkx = "^2.8.5"
 grandalf = "^0.7"
 bitarray = "^2.6.2"
+mkdocstrings = {extras = ["python"], version = "^0.20.0"}
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
