@@ -23,6 +23,23 @@ class TerminalGraph(Generic[G]):
         layout_engine: LayoutEngine[G] = GrandalfSugiyamaLayout[G](),
         console: Console = Console(),
     ):
+        """
+        A terminal representation of a networkx graph.
+
+        The class conforms to the rich console protocol and can be printed
+        as any other rich renderable. You can pass a layout engine and a
+        specific console that will be used for rendering.
+
+        Rendering of nodes and edges happens on object creation and the
+        object size is determined by the graph (no reactive rendering).
+
+        TODO: Links
+
+        Args:
+            g (G): _description_
+            layout_engine (LayoutEngine[G], optional): _description_. Defaults to GrandalfSugiyamaLayout[G]().
+            console (Console, optional): _description_. Defaults to Console().
+        """
         self._nx_graph: G = cast(G, g.copy())
         # First we create the node buffers, this allows us to pass the sizing information to the
         # layout engine. For each node in the graph we generate a node buffer that contains the
