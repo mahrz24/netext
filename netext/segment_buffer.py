@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Any, Tuple
 
 from rich.segment import Segment
 
@@ -31,30 +31,30 @@ class SegmentBuffer:
     z_index: float
 
     @property
-    def left_x(self):
+    def left_x(self) -> int:
         return NotImplemented  # pragma: no cover
 
     @property
-    def right_x(self):
+    def right_x(self) -> int:
         return NotImplemented  # pragma: no cover
 
     @property
-    def top_y(self):
+    def top_y(self) -> int:
         return NotImplemented  # pragma: no cover
 
     @property
-    def bottom_y(self):
+    def bottom_y(self) -> int:
         return NotImplemented  # pragma: no cover
 
     @property
-    def width(self):
+    def width(self) -> int:
         return NotImplemented  # pragma: no cover
 
     @property
-    def height(self):
+    def height(self) -> int:
         return NotImplemented  # pragma: no cover
 
-    def __lt__(self, value):
+    def __lt__(self, value: Any) -> bool:
         if isinstance(value, SegmentBuffer):
             return self.left_x < value.left_x
         return False

@@ -8,7 +8,7 @@ license = "MIT"
 [tool.poetry.dependencies]
 python = "^3.10"
 rich = "^12.5.1"
-networkx = "^2.8.5"
+networkx = {extras = ["default"], version="^3.0"}
 grandalf = "^0.7"
 bitarray = "^2.6.2"
 mkdocstrings = {extras = ["python"], version = "^0.20.0"}
@@ -16,27 +16,21 @@ mkdocstrings = {extras = ["python"], version = "^0.20.0"}
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
 black = {version = "^22.6.0", allow-prereleases = true}
-isort = "^5.10.1"
 pre-commit = "^2.20.0"
 pytest-cov = "^3.0.0"
 coverage = {extras = ["toml"], version = "^6.4.2"}
 asv = "^0.5.1"
-pyupgrade = "^3.3.1"
 mkdocs-material = "^9.0.5"
 importlib-metadata = "^6.0.0"
+ruff = "^0.0.230"
+mypy = "^0.991"
 
 [tool.black]
 preview = true
 
-[tool.isort]
-profile = "black"
-
-[tool.pyright]
-include = ["netext", "examples", "tests"]
-typeCheckingMode = "basic"
-pythonVersion = "3.10"
-venv = ".venv"
-venv_path = "."
+[tool.ruff]
+line-length = 120
+target-version = "py310"
 
 
 [build-system]

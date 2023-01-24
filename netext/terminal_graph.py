@@ -13,7 +13,9 @@ from .layout_engines.engine import LayoutEngine
 from .layout_engines.grandalf import GrandalfSugiyamaLayout
 from .node_rasterizer import NodeBuffer, rasterize_node
 
-G = TypeVar("G", nx.Graph, nx.DiGraph)
+from networkx.classes.graph import Graph, DiGraph
+
+G = TypeVar("G", Graph, DiGraph)
 
 
 class TerminalGraph(Generic[G]):
@@ -50,7 +52,7 @@ class TerminalGraph(Generic[G]):
         }
 
         # Store the node buffers in the graph itself
-        nx.set_node_attributes(self._nx_graph, node_buffers, "_netext_node_buffer")
+        nx.set_node_attributes(self._nx_graph, node_buffers, "_netext_node_buffer")  # type: ignore
 
         # Position the nodes and add the position information to the graph
         node_positions: dict[Hashable, tuple[float, float]] = layout_engine(
@@ -76,7 +78,7 @@ class TerminalGraph(Generic[G]):
         # Now we rasterize the edges
         self.edge_buffers: list[EdgeBuffer] = [
             rasterize_edge(console, node_buffers[u], node_buffers[v], data)
-            for (u, v, data) in self._nx_graph.edges(data=True)  # type: ignore
+            for (u, v, data) in self._nx_graph.edges(data=True)
         ]
 
     def _transform_node_positions_to_console(
@@ -112,7 +114,7 @@ class TerminalGraph(Generic[G]):
 
     def _set_size_from_node_positions(
         self, node_positions: dict[Hashable, tuple[float, float]]
-    ):
+    ) -> None:
         """
         Sets the graph size given the node positions & node buffers. Assumes positions
         in console coordinate space.
@@ -139,7 +141,7 @@ class TerminalGraph(Generic[G]):
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        node_buffers = nx.get_node_attributes(self._nx_graph, "_netext_node_buffer")
+        node_buffers = nx.get_node_attributes(self._nx_graph, "_netext_node_buffer")  # type: ignore
         all_buffers = chain(node_buffers.values(), self.edge_buffers)
         yield from render_buffers(all_buffers, self.width, self.height)
 

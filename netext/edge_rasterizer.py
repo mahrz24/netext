@@ -55,7 +55,7 @@ class BitmapBuffer:
     height: int
     buffer: bitarray
 
-    def __rich__(self):
+    def __rich__(self) -> str:
         markup_str = "[bold green]"
         for i in range(self.height):
             markup_str += (
@@ -74,27 +74,27 @@ class EdgeBuffer(SegmentBuffer):
     boundary_2: Point
 
     @property
-    def left_x(self):
+    def left_x(self) -> int:
         return min(self.boundary_1.x, self.boundary_2.x)
 
     @property
-    def right_x(self):
+    def right_x(self) -> int:
         return max(self.boundary_1.x, self.boundary_2.x)
 
     @property
-    def top_y(self):
+    def top_y(self) -> int:
         return min(self.boundary_1.y, self.boundary_2.y)
 
     @property
-    def bottom_y(self):
+    def bottom_y(self) -> int:
         return max(self.boundary_1.y, self.boundary_2.y)
 
     @property
-    def width(self):
+    def width(self) -> int:
         return self.right_x - self.left_x + 1
 
     @property
-    def height(self):
+    def height(self) -> int:
         return self.bottom_y - self.top_y + 1
 
 
@@ -105,7 +105,7 @@ def get_magnet(buffer: NodeBuffer, magnet: MagnetPosition) -> Point:
 def route_edge(
     start: Point, end: Point, routing_mode: EdgeRoutingMode
 ) -> list[EdgeSegment]:
-    match routing_mode:
+    match routing_mode:  # noqa: E999
         case EdgeRoutingMode.direct:
             return [EdgeSegment(start=start, end=end)]
         case EdgeRoutingMode.straight:
@@ -119,7 +119,9 @@ def route_edge(
             )
 
 
-def rasterize_edge_segments(edge_segments: list[EdgeSegment], sampling) -> BitmapBuffer:
+def rasterize_edge_segments(
+    edge_segments: list[EdgeSegment], sampling: int
+) -> BitmapBuffer:
     min_point = Point(
         x=min([min([seg.start.x, seg.end.x]) for seg in edge_segments]),
         y=min([min([seg.start.y, seg.end.y]) for seg in edge_segments]),
@@ -143,7 +145,7 @@ def rasterize_edge_segments(edge_segments: list[EdgeSegment], sampling) -> Bitma
 
 
 def _slice_to_offset_line(slice: bitarray, y_offset: int) -> OffsetLine:
-    current_segment = []
+    current_segment: list[Segment | Spacer] = []
     for val in slice:
         if not val:
             current_segment.append(Spacer(width=1))
@@ -207,7 +209,9 @@ def rasterize_edge(
     return edge_buffer
 
 
-def _bresenham_line_drawing(edge_segment: EdgeSegment, bitmap_buffer: BitmapBuffer):
+def _bresenham_line_drawing(
+    edge_segment: EdgeSegment, bitmap_buffer: BitmapBuffer
+) -> None:
     x0 = edge_segment.start.x - bitmap_buffer.x
     x1 = edge_segment.end.x - bitmap_buffer.x
 
@@ -226,7 +230,9 @@ def _bresenham_line_drawing(edge_segment: EdgeSegment, bitmap_buffer: BitmapBuff
         _bresenham_steep(x0, y0, x1, y1, bitmap_buffer)
 
 
-def _bresenham_flat(x0: int, y0: int, x1: int, y1: int, bitmap_buffer: BitmapBuffer):
+def _bresenham_flat(
+    x0: int, y0: int, x1: int, y1: int, bitmap_buffer: BitmapBuffer
+) -> None:
     dx = x1 - x0
     dy = y1 - y0
     yi = 1
@@ -247,11 +253,13 @@ def _bresenham_flat(x0: int, y0: int, x1: int, y1: int, bitmap_buffer: BitmapBuf
             D = D + 2 * dy
 
 
-def _put_pixel(x: int, y: int, bitmap_buffer: BitmapBuffer):
+def _put_pixel(x: int, y: int, bitmap_buffer: BitmapBuffer) -> None:
     bitmap_buffer.buffer[x + y * bitmap_buffer.width] = True
 
 
-def _bresenham_steep(x0: int, y0: int, x1: int, y1: int, bitmap_buffer: BitmapBuffer):
+def _bresenham_steep(
+    x0: int, y0: int, x1: int, y1: int, bitmap_buffer: BitmapBuffer
+) -> None:
     dx = x1 - x0
     dy = y1 - y0
     xi = 1

@@ -21,27 +21,27 @@ class NodeBuffer(SegmentBuffer):
     node_height: int
 
     @property
-    def left_x(self):
+    def left_x(self) -> int:
         return self.x - math.ceil((self.width - 1) / 2.0)
 
     @property
-    def right_x(self):
+    def right_x(self) -> int:
         return self.x + math.floor((self.width - 1) / 2.0)
 
     @property
-    def top_y(self):
+    def top_y(self) -> int:
         return self.y - math.ceil((self.height - 1) / 2.0)
 
     @property
-    def bottom_y(self):
+    def bottom_y(self) -> int:
         return self.y + math.floor((self.height - 1) / 2.0)
 
     @property
-    def width(self):
+    def width(self) -> int:
         return self.node_width
 
     @property
-    def height(self):
+    def height(self) -> int:
         return self.node_height
 
 
@@ -69,16 +69,16 @@ def rasterize_node(
         node_renderable = content_renderable
 
     segment_lines = list(console.render_lines(node_renderable, pad=False))
-    segment_lines = [
+    offset_lines = [
         OffsetLine(
             x_offset=0, y_offset=i, segments=cast(list[Segment | Spacer], segments)
         )
         for i, segments in enumerate(segment_lines)
     ]
     width = max(
-        segment_line.x_offset
-        + sum(segment.cell_length for segment in segment_line.segments)
-        for segment_line in segment_lines
+        offset_line.x_offset
+        + sum(segment.cell_length for segment in offset_line.segments)
+        for offset_line in offset_lines
     )
 
     node_buffer = NodeBuffer(
@@ -86,7 +86,7 @@ def rasterize_node(
         y=0,
         z_index=-1,
         node_width=width,
-        node_height=len(segment_lines),
-        segment_lines=segment_lines,
+        node_height=len(offset_lines),
+        segment_lines=offset_lines,
     )
     return node_buffer

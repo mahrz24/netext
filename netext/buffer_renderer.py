@@ -39,7 +39,7 @@ def render_buffers(
                 for _, _, buffer_row, buffer in active_buffers
                 if buffer_row + 1 < buffer.height
             ],
-            key=lambda l: l[0],
+            key=lambda buffer: buffer[0],
         )
 
         new_active_buffers = sorted(
@@ -52,11 +52,11 @@ def render_buffers(
                 )
                 for buffer in buffers_by_row[row]
             ],
-            key=lambda l: l[0],
+            key=lambda buffer: buffer[0],
         )
 
         active_buffers = list(
-            merge(active_buffers, new_active_buffers, key=lambda l: l[0])
+            merge(active_buffers, new_active_buffers, key=lambda buffer: buffer[0])
         )
 
         if not active_buffers:
@@ -151,7 +151,7 @@ def render_buffers(
 
                 # Use merge
                 working_buffers = list(
-                    merge(working_buffers, new_buffers, key=lambda l: l[0])
+                    merge(working_buffers, new_buffers, key=lambda buffer: buffer[0])
                 )
 
                 # Do not render over the right boundary of the canvas

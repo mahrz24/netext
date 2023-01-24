@@ -12,23 +12,17 @@
 
 # Refactoring
 
-* ~~Extract buffer renderer to own module to make it better testable~~
-* ~~Clean up bresenham line drawing algorithm~~
+* Remove offset and use spacers instead
+* Rename line into strip to algin with textual
+* Use line within edges to distinguish from label and arrows
 
 # Tests & Benchmarks
 
-* ~~Tests for buffer renderer~~
 * Tests for edge rasterizer
-* Tests for node rasterizer
-* ~~Simple tests for terminal graph~~
 * Benchmarks for buffer renderer
-* ~~Bring code coverage to a healthy level~~
 
 # Features
 
-* Different edge routing algorithms
-    * ~~ Direct connection ~~
-    * ~~ Straight lines ~~
 * Better line rendering
     * Use magnets on the node border for edge positions
     * Edge routing gives multiple segments of an edge, each segment can be drawn using different algorithms
@@ -37,9 +31,7 @@
         * General, lines draw into a bitmap buffer, that is turned into segments (makes braille box drawing easier to use)
             * Simple mode (dots along the lines)
             * Braille (not for straight lines)
-* ~~Attributes for nodes~~
 * Attributes for edges
-* ~~Custom node rendering~~
 * Edge labels
 * Node labels (not part of the placement algorithm)
 * Specify attribute on the graph level and propagate to nodes / edges

@@ -1,9 +1,9 @@
 from collections.abc import Hashable
 from typing import Generic, TypeVar
 
-import networkx as nx
+from networkx.classes.graph import Graph, DiGraph
 
-G = TypeVar("G", nx.Graph, nx.DiGraph)
+G = TypeVar("G", Graph, DiGraph)
 
 
 class LayoutEngine(Generic[G]):
