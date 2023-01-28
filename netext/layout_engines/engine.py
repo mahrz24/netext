@@ -1,7 +1,7 @@
 from collections.abc import Hashable
 from typing import Generic, TypeVar
 
-from networkx.classes.graph import Graph, DiGraph
+from networkx import Graph, DiGraph
 
 G = TypeVar("G", Graph, DiGraph)
 

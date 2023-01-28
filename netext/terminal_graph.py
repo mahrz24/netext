@@ -13,7 +13,7 @@ from .layout_engines.engine import LayoutEngine
 from .layout_engines.grandalf import GrandalfSugiyamaLayout
 from .node_rasterizer import NodeBuffer, rasterize_node
 
-from networkx.classes.graph import Graph, DiGraph
+from networkx import Graph, DiGraph
 
 G = TypeVar("G", Graph, DiGraph)
 
