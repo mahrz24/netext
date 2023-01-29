@@ -11,6 +11,8 @@ nav:
     - reference/nodes.md
   - 'API':
     - api/terminal-graph.md
+  - 'Development':
+    - dev/roadmap.md
 
 theme:
   name: material
@@ -25,5 +27,10 @@ plugins:
   - search:
       lang: en
   - mkdocstrings
+
+markdown_extensions:
+  - def_list
+  - pymdownx.tasklist:
+      custom_checkbox: true
 
 repo_url: https://github.com/mahrz24/netext
