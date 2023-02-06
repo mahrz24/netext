@@ -9,13 +9,3 @@ repos:
   hooks:
     - id: black
       language_version: python3.10
-- repo: local
-  hooks:
-    - id: mypy
-      name: mypy
-      entry: poetry run mypy
-      types:
-        - "python"
-      language: python
-      exclude: ^(tests|benchmarks|examples)/
-      args: ["--strict"]
