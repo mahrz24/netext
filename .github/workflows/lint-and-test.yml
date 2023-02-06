@@ -43,7 +43,7 @@ jobs:
           ubuntu-latest-3.10-poetry-${{ steps.poetry-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
     - name: Install dependencies
       run: |
-        poetry install
+        poetry install --with=dev
       if: steps.cache.outputs.cache-hit != 'true'
     - uses: pre-commit/action@v3.0.0
     - name: Test with pytest
