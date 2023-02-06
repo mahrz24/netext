@@ -47,7 +47,7 @@ jobs:
       if: steps.cache.outputs.cache-hit != 'true'
     - uses: pre-commit/action@v3.0.0
     - name: Run mypy
-      run: poetry run mypy
+      run: poetry run mypy netext
     - name: Test with pytest
       run: |
         poetry run pytest --cov=netext --cov-report=xml:coverage.xml
