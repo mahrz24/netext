@@ -137,3 +137,4 @@ typings
 
 # asv published results
 .asv/html
+.DS_Store
