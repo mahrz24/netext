@@ -57,7 +57,7 @@ def rasterize_node(
     shape = data.get("$shape", "box")
     style = data.get("$style", Style())
     content_style = data.get("$content-style", Style())
-    content_renderer = data.get("$node-renderer", _default_content_renderer)
+    content_renderer = data.get("$content-renderer", _default_content_renderer)
     content_renderable = content_renderer(str(node), data, content_style)
 
     if shape == "box":

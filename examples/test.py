@@ -31,7 +31,7 @@ nx.set_node_attributes(g1, _render, "$node-renderer")
 nx.set_node_attributes(g, Style(color="blue"), "$text-style")
 nx.set_node_attributes(g, box.SQUARE, "$box-type")
 
-nx.set_edge_attributes(g, EdgeRoutingMode.straight, "$edge-routing-mode")
+nx.set_edge_attributes(g, EdgeRoutingMode.orthogonal, "$edge-routing-mode")
 
 
 print(Panel(TerminalGraph(g), title="Binomial Tree", expand=False))

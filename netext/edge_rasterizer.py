@@ -11,8 +11,8 @@ from netext.segment_buffer import OffsetLine, SegmentBuffer, Spacer
 
 
 class EdgeRoutingMode(Enum):
-    direct = "direct"
     straight = "straight"
+    orthogonal = "orthogonal"
 
 
 class MagnetPosition(Enum):
@@ -106,9 +106,9 @@ def route_edge(
     start: Point, end: Point, routing_mode: EdgeRoutingMode
 ) -> list[EdgeSegment]:
     match routing_mode:  # noqa: E999
-        case EdgeRoutingMode.direct:
-            return [EdgeSegment(start=start, end=end)]
         case EdgeRoutingMode.straight:
+            return [EdgeSegment(start=start, end=end)]
+        case EdgeRoutingMode.orthogonal:
             return [
                 EdgeSegment(start=start, end=Point(x=start.x, y=end.y)),
                 EdgeSegment(start=Point(x=start.x, y=end.y), end=end),
@@ -187,7 +187,7 @@ def rasterize_edge(
     # label = data.get("$label", None)
 
     routing_mode: EdgeRoutingMode = data.get(
-        "$edge-routing-mode", EdgeRoutingMode.direct
+        "$edge-routing-mode", EdgeRoutingMode.straight
     )
     edge_segment_drawing_mode: EdgeSegmentDrawingMode = data.get(
         "$edge-segment-drawing-mode", EdgeSegmentDrawingMode.single_character
