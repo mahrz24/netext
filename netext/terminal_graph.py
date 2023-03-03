@@ -35,12 +35,10 @@ class TerminalGraph(Generic[G]):
         Rendering of nodes and edges happens on object creation and the
         object size is determined by the graph (no reactive rendering).
 
-        TODO: Links
-
         Args:
-            g (G): _description_
-            layout_engine (LayoutEngine[G], optional): _description_. Defaults to GrandalfSugiyamaLayout[G]().
-            console (Console, optional): _description_. Defaults to Console().
+            g (G): A networkx graph object (see [networkx.Graph][] or [networkx.DiGraph][]).
+            layout_engine (LayoutEngine[G], optional): The layout engine used.
+            console (Console, optional): The rich console driver used to render.
         """
         self._nx_graph: G = cast(G, g.copy())
         # First we create the node buffers, this allows us to pass the sizing information to the

@@ -7,7 +7,7 @@ license = "MIT"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-rich = "^12.5.1"
+rich = "^13"
 networkx = {extras = ["default"], version="^3.0"}
 grandalf = "^0.7"
 bitarray = "^2.6.2"
@@ -21,9 +21,12 @@ pytest-cov = "^3.0.0"
 coverage = {extras = ["toml"], version = "^6.4.2"}
 asv = "^0.5.1"
 mkdocs-material = "^9.0.5"
-importlib-metadata = "^6.0.0"
+importlib-metadata = "*"
 ruff = "^0.0.230"
 mypy = "^0.991"
+
+[tool.poetry.group.dev.dependencies]
+textual = "^0.13.0"
 
 [tool.black]
 preview = true

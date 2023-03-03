@@ -10,8 +10,8 @@ Possible values are:
 
 | Edge Routing Mode |  Value | Description |
 |------|--------|-------------|
-| straight | EdgeRoutingMode.straight | Uses a single edge segment connecting start and endpoint. |
-| orthogonal | EdgeRoutingMode.orthogonal | Uses multiple vertical or horizontal edge segments. |
+| straight | [EdgeRoutingMode.straight][netext.edge_rasterizer.EdgeRoutingMode.straight] | Uses a single edge segment connecting start and endpoint. |
+| orthogonal | [EdgeRoutingMode.orthogonal][netext.edge_rasterizer.EdgeRoutingMode.orthogonal] | Uses multiple vertical or horizontal edge segments. |
 
 
 ## Edge Segment Drawing Mode

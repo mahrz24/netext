@@ -34,7 +34,7 @@ class GrandalfSugiyamaLayout(LayoutEngine[G]):
         graph = graph_core(vertices.values(), edges)
 
         sug = SugiyamaLayout(graph)
-        sug.init_all(roots=[vertices[0]])
+        sug.init_all()
         sug.draw(3)
         # Rescale back, but leave a bit more space to avoid overlaps in the
         # terminal coordinate space.

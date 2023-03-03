@@ -4,13 +4,14 @@ nav:
   - index.md
   - tutorial.md
   - 'User Guide':
-    - user-guide/style-edges.md
-    - user-guide/style-nodes.md
+    - user-guide/styling-graphs.md
   - 'Reference':
     - reference/edges.md
     - reference/nodes.md
   - 'API':
     - api/terminal-graph.md
+    - api/styling.md
+    - api/layout-engines.md
   - 'Development':
     - dev/roadmap.md
 
@@ -22,15 +23,39 @@ theme:
     - navigation.instant
     - navigation.tabs
     - navigation.tabs.sticky
+    - content.code.copy
 
 plugins:
   - search:
       lang: en
-  - mkdocstrings
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_root_heading: true
+            show_root_full_path: false
+            separate_signature: true
+          import:
+            - https://rich.readthedocs.io/en/stable/objects.inv
+            - https://networkx.org/documentation/stable/objects.inv
 
 markdown_extensions:
   - def_list
   - pymdownx.tasklist:
       custom_checkbox: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: rich
+          class: rich
+          format: !!python/name:textual._doc.rich
+  - pymdownx.details
+  - admonition
+  - markdown.extensions.attr_list
 
 repo_url: https://github.com/mahrz24/netext
