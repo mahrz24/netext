@@ -19,9 +19,10 @@
 
 ### Refactoring
 
-* [ ] Remove offset and use spacers instead
-* [ ] Rename line into strip to algin with textual
+* [x] Remove offset and use spacers instead
+* [x] Rename line into strip to algin with textual
 * [ ] Use line within edges to distinguish from label and arrows
+* [ ] Use enums for all styles
 
 ### Tests & Benchmarks
 

@@ -7,11 +7,11 @@ from rich.segment import Segment, Segments
 
 from netext.buffer_renderer import render_buffers
 from netext.node_rasterizer import NodeBuffer
-from netext.segment_buffer import Strip, SegmentBuffer, Spacer
+from netext.segment_buffer import Strip, StripBuffer, Spacer
 
 
 @dataclass
-class LineBuffer(SegmentBuffer):
+class LineBuffer(StripBuffer):
     x: int
     line_width: int
 
@@ -50,7 +50,7 @@ def test_render_trivial(console):
         z_index=0,
         x=0,
         line_width=10,
-        strips=[Strip(segments=[Segment(10 * "X")], y_offset=0)],
+        strips=[Strip(segments=[Segment(10 * "X")])],
     )
 
     with console.capture() as capture:
@@ -64,7 +64,7 @@ def test_render_spacer_trivial(console):
         z_index=0,
         x=0,
         line_width=10,
-        strips=[Strip(segments=[Spacer(width=10)], y_offset=0)],
+        strips=[Strip(segments=[Spacer(width=10)])],
     )
 
     with console.capture() as capture:
@@ -78,12 +78,7 @@ def test_render_trivial_multiple_segments(console):
         z_index=0,
         x=0,
         line_width=10,
-        strips=[
-            Strip(
-                segments=cast(list[Segment | Spacer], 10 * [Segment("X")]),
-                y_offset=0,
-            )
-        ],
+        strips=[Strip(segments=cast(list[Segment | Spacer], 10 * [Segment("X")]))],
     )
 
     with console.capture() as capture:
@@ -100,8 +95,7 @@ def test_render_trivial_multiple_segments_spacers(console):
         strips=[
             Strip(
                 segments=5 * [cast(Segment | Spacer, Segment("X"))]
-                + 5 * [cast(Segment | Spacer, Spacer(width=1))],
-                y_offset=0,
+                + 5 * [cast(Segment | Spacer, Spacer(width=1))]
             )
         ],
     )
@@ -123,7 +117,6 @@ def test_render_multiple_segments_spacers_layered(console):
                     segments=3 * [cast(Segment | Spacer, Spacer(width=1))]
                     + 3 * [cast(Segment | Spacer, Segment("X"))]
                     + 3 * [cast(Segment | Spacer, Spacer(width=1))],
-                    y_offset=0,
                 )
             ],
         ),
@@ -135,7 +128,6 @@ def test_render_multiple_segments_spacers_layered(console):
                 Strip(
                     segments=3 * [cast(Segment | Spacer, Spacer(width=1))]
                     + 3 * [cast(Segment | Spacer, Segment("Y"))],
-                    y_offset=0,
                 )
             ],
         ),
@@ -152,7 +144,7 @@ def test_render_segment_with_offset(console):
         z_index=0,
         x=0,
         line_width=10,
-        strips=[Strip(segments=[Spacer(width=1), Segment(9 * "X")], y_offset=0)],
+        strips=[Strip(segments=[Spacer(width=1), Segment(9 * "X")])],
     )
 
     with console.capture() as capture:
@@ -166,7 +158,7 @@ def test_render_buffer_with_offset(console):
         z_index=0,
         x=1,
         line_width=9,
-        strips=[Strip(segments=[Segment(9 * "X")], y_offset=0)],
+        strips=[Strip(segments=[Segment(9 * "X")])],
     )
 
     with console.capture() as capture:
@@ -180,7 +172,7 @@ def test_render_segment_with_offset_cropped(console):
         z_index=0,
         x=0,
         line_width=11,
-        strips=[Strip(segments=[Spacer(width=1), Segment(9 * "X" + "Y")], y_offset=0)],
+        strips=[Strip(segments=[Spacer(width=1), Segment(9 * "X" + "Y")])],
     )
 
     with console.capture() as capture:
@@ -194,11 +186,7 @@ def test_render_segment_with_offset_cropped_multiple_segments(console):
         z_index=0,
         x=0,
         line_width=11,
-        strips=[
-            Strip(
-                segments=[Spacer(width=1), Segment(9 * "X"), Segment("Y")], y_offset=0
-            )
-        ],
+        strips=[Strip(segments=[Spacer(width=1), Segment(9 * "X"), Segment("Y")])],
     )
 
     with console.capture() as capture:
@@ -212,7 +200,7 @@ def test_render_buffer_with_offset_cropped(console):
         z_index=0,
         x=1,
         line_width=10,
-        strips=[Strip(segments=[Segment(9 * "X" + "Y")], y_offset=0)],
+        strips=[Strip(segments=[Segment(9 * "X" + "Y")])],
     )
 
     with console.capture() as capture:
@@ -226,7 +214,7 @@ def test_render_fill_remaining_buffer(console):
         z_index=0,
         x=0,
         line_width=10,
-        strips=[Strip(segments=[Spacer(width=3), Segment("X")], y_offset=0)],
+        strips=[Strip(segments=[Spacer(width=3), Segment("X")])],
     )
 
     with console.capture() as capture:
@@ -240,7 +228,7 @@ def test_render_buffer_with_offset_and_fill_right(console):
         z_index=0,
         x=3,
         line_width=1,
-        strips=[Strip(segments=[Segment("X")], y_offset=0)],
+        strips=[Strip(segments=[Segment("X")])],
     )
 
     with console.capture() as capture:
@@ -254,7 +242,7 @@ def test_render_segment_empty(console):
         z_index=0,
         x=0,
         line_width=10,
-        strips=[Strip(segments=[Segment("")], y_offset=0)],
+        strips=[Strip(segments=[Segment("")])],
     )
 
     with console.capture() as capture:
@@ -268,12 +256,7 @@ def test_render_segment_empty_with_multiple_segments(console):
         z_index=0,
         x=0,
         line_width=10,
-        strips=[
-            Strip(
-                segments=[Segment(""), Segment("X"), Segment(""), Segment("Y")],
-                y_offset=0,
-            )
-        ],
+        strips=[Strip(segments=[Segment(""), Segment("X"), Segment(""), Segment("Y")])],
     )
 
     with console.capture() as capture:
@@ -289,7 +272,7 @@ def test_render_mutliple_buffers(console):
             x=1,
             line_width=2,
             strips=[
-                Strip(segments=[Segment("XX")], y_offset=0),
+                Strip(segments=[Segment("XX")]),
             ],
         ),
         LineBuffer(
@@ -297,7 +280,7 @@ def test_render_mutliple_buffers(console):
             x=5,
             line_width=2,
             strips=[
-                Strip(segments=[Segment("YY")], y_offset=0),
+                Strip(segments=[Segment("YY")]),
             ],
         ),
     ]
@@ -315,7 +298,7 @@ def test_render_multiple_buffers_with_overlap(console):
             x=1,
             line_width=8,
             strips=[
-                Strip(segments=[Segment("XXXXXXXX")], y_offset=0),
+                Strip(segments=[Segment("XXXXXXXX")]),
             ],
         ),
         LineBuffer(
@@ -323,7 +306,7 @@ def test_render_multiple_buffers_with_overlap(console):
             line_width=2,
             z_index=-1,
             strips=[
-                Strip(segments=[Segment("YY")], y_offset=0),
+                Strip(segments=[Segment("YY")]),
             ],
         ),
     ]
@@ -341,7 +324,7 @@ def test_render_multiple_buffers_with_overlap_and_spacer(console):
             x=1,
             line_width=8,
             strips=[
-                Strip(segments=[Segment("XXXXXXXX")], y_offset=0),
+                Strip(segments=[Segment("XXXXXXXX")]),
             ],
         ),
         LineBuffer(
@@ -351,7 +334,6 @@ def test_render_multiple_buffers_with_overlap_and_spacer(console):
             strips=[
                 Strip(
                     segments=[Segment("Y"), Spacer(width=2), Segment("Y")],
-                    y_offset=0,
                 ),
             ],
         ),
@@ -370,7 +352,7 @@ def test_render_multiple_buffers_with_overlap_and_multiple_segments(console):
             x=1,
             line_width=8,
             strips=[
-                Strip(segments=[Segment("XXXXX"), Segment("ZZZ")], y_offset=0),
+                Strip(segments=[Segment("XXXXX"), Segment("ZZZ")]),
             ],
         ),
         LineBuffer(
@@ -378,7 +360,7 @@ def test_render_multiple_buffers_with_overlap_and_multiple_segments(console):
             line_width=2,
             z_index=-1,
             strips=[
-                Strip(segments=[Segment("YY")], y_offset=0),
+                Strip(segments=[Segment("YY")]),
             ],
         ),
     ]
@@ -396,7 +378,7 @@ def test_render_multiple_buffers_with_overlap_and_multiple_segments_in_overlap(c
             x=1,
             line_width=8,
             strips=[
-                Strip(segments=[Segment("XXXXX"), Segment("ZZZ")], y_offset=0),
+                Strip(segments=[Segment("XXXXX"), Segment("ZZZ")]),
             ],
         ),
         LineBuffer(
@@ -404,7 +386,7 @@ def test_render_multiple_buffers_with_overlap_and_multiple_segments_in_overlap(c
             line_width=2,
             z_index=-1,
             strips=[
-                Strip(segments=[Segment("Y"), Segment("Y")], y_offset=0),
+                Strip(segments=[Segment("Y"), Segment("Y")]),
             ],
         ),
     ]
@@ -422,7 +404,7 @@ def test_render_multiple_buffers_with_overlap_hidden(console):
             x=1,
             line_width=8,
             strips=[
-                Strip(segments=[Segment("XXXXXXXX")], y_offset=0),
+                Strip(segments=[Segment("XXXXXXXX")]),
             ],
         ),
         LineBuffer(
@@ -430,7 +412,7 @@ def test_render_multiple_buffers_with_overlap_hidden(console):
             line_width=2,
             z_index=1,
             strips=[
-                Strip(segments=[Segment("YY")], y_offset=0),
+                Strip(segments=[Segment("YY")]),
             ],
         ),
     ]
@@ -448,7 +430,7 @@ def test_render_multiple_buffers_with_overlap_hidden_multiple_segments(console):
             x=1,
             line_width=8,
             strips=[
-                Strip(segments=[Segment("XXX"), Segment("XXXXX")], y_offset=0),
+                Strip(segments=[Segment("XXX"), Segment("XXXXX")]),
             ],
         ),
         LineBuffer(
@@ -456,7 +438,7 @@ def test_render_multiple_buffers_with_overlap_hidden_multiple_segments(console):
             line_width=2,
             z_index=1,
             strips=[
-                Strip(segments=[Segment("YY")], y_offset=0),
+                Strip(segments=[Segment("YY")]),
             ],
         ),
     ]
@@ -474,7 +456,7 @@ def test_render_multiple_buffers_with_nested_overlap(console):
             x=1,
             line_width=8,
             strips=[
-                Strip(segments=[Segment("ABCDEFGH")], y_offset=0),
+                Strip(segments=[Segment("ABCDEFGH")]),
             ],
         ),
         LineBuffer(
@@ -482,7 +464,7 @@ def test_render_multiple_buffers_with_nested_overlap(console):
             line_width=4,
             z_index=-1,
             strips=[
-                Strip(segments=[Segment("XYZW")], y_offset=0),
+                Strip(segments=[Segment("XYZW")]),
             ],
         ),
         LineBuffer(
@@ -490,7 +472,7 @@ def test_render_multiple_buffers_with_nested_overlap(console):
             line_width=2,
             z_index=-2,
             strips=[
-                Strip(segments=[Segment("12")], y_offset=0),
+                Strip(segments=[Segment("12")]),
             ],
         ),
     ]
@@ -508,7 +490,7 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments(console):
             line_width=4,
             z_index=-1,
             strips=[
-                Strip(segments=[Segment("XYZ"), Segment("W")], y_offset=0),
+                Strip(segments=[Segment("XYZ"), Segment("W")]),
             ],
         ),
         LineBuffer(
@@ -516,7 +498,7 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments(console):
             x=1,
             line_width=8,
             strips=[
-                Strip(segments=[Segment("ABCD"), Segment("EFGH")], y_offset=0),
+                Strip(segments=[Segment("ABCD"), Segment("EFGH")]),
             ],
         ),
         LineBuffer(
@@ -524,7 +506,7 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments(console):
             line_width=2,
             z_index=-2,
             strips=[
-                Strip(segments=[Segment("1"), Segment("2")], y_offset=0),
+                Strip(segments=[Segment("1"), Segment("2")]),
             ],
         ),
     ]
@@ -544,7 +526,7 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_different
             line_width=4,
             z_index=0,
             strips=[
-                Strip(segments=[Segment("XYZ"), Segment("W")], y_offset=0),
+                Strip(segments=[Segment("XYZ"), Segment("W")]),
             ],
         ),
         LineBuffer(
@@ -552,7 +534,7 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_different
             x=1,
             line_width=8,
             strips=[
-                Strip(segments=[Segment("ABCD"), Segment("EFGH")], y_offset=0),
+                Strip(segments=[Segment("ABCD"), Segment("EFGH")]),
             ],
         ),
         LineBuffer(
@@ -560,7 +542,7 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_different
             line_width=2,
             z_index=-2,
             strips=[
-                Strip(segments=[Segment("1"), Segment("2")], y_offset=0),
+                Strip(segments=[Segment("1"), Segment("2")]),
             ],
         ),
     ]
@@ -580,7 +562,7 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_and_space
             x=1,
             line_width=8,
             strips=[
-                Strip(segments=[Segment("ABCD"), Segment("EFGH")], y_offset=0),
+                Strip(segments=[Segment("ABCD"), Segment("EFGH")]),
             ],
         ),
         LineBuffer(
@@ -588,7 +570,7 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_and_space
             line_width=4,
             z_index=-1,
             strips=[
-                Strip(segments=[Segment("XYZ"), Segment("W")], y_offset=0),
+                Strip(segments=[Segment("XYZ"), Segment("W")]),
             ],
         ),
         LineBuffer(
@@ -598,7 +580,6 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_and_space
             strips=[
                 Strip(
                     segments=[Segment("1"), Spacer(width=1), Segment("2")],
-                    y_offset=0,
                 ),
             ],
         ),
@@ -617,7 +598,7 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden(console):
             x=1,
             line_width=8,
             strips=[
-                Strip(segments=[Segment("ABCDEFGH")], y_offset=0),
+                Strip(segments=[Segment("ABCDEFGH")]),
             ],
         ),
         LineBuffer(
@@ -625,7 +606,7 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden(console):
             line_width=4,
             z_index=-2,
             strips=[
-                Strip(segments=[Segment("XYZW")], y_offset=0),
+                Strip(segments=[Segment("XYZW")]),
             ],
         ),
         LineBuffer(
@@ -633,7 +614,7 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden(console):
             line_width=2,
             z_index=-1,
             strips=[
-                Strip(segments=[Segment("12")], y_offset=0),
+                Strip(segments=[Segment("12")]),
             ],
         ),
     ]
@@ -651,7 +632,7 @@ def test_render_multiple_buffers_with_multiple_overlaps(console):
             x=0,
             line_width=8,
             strips=[
-                Strip(segments=[Segment("ABCDE")], y_offset=0),
+                Strip(segments=[Segment("ABCDE")]),
             ],
         ),
         LineBuffer(
@@ -659,7 +640,7 @@ def test_render_multiple_buffers_with_multiple_overlaps(console):
             line_width=4,
             z_index=-1,
             strips=[
-                Strip(segments=[Segment("XYZW")], y_offset=0),
+                Strip(segments=[Segment("XYZW")]),
             ],
         ),
         LineBuffer(
@@ -667,7 +648,7 @@ def test_render_multiple_buffers_with_multiple_overlaps(console):
             line_width=4,
             z_index=-2,
             strips=[
-                Strip(segments=[Segment("1234")], y_offset=0),
+                Strip(segments=[Segment("1234")]),
             ],
         ),
     ]
@@ -689,7 +670,6 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden_multiple_spacers
             strips=[
                 Strip(
                     segments=[Segment("A"), Spacer(width=1), Segment("CDEFGH")],
-                    y_offset=0,
                 ),
             ],
         ),
@@ -700,7 +680,6 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden_multiple_spacers
             strips=[
                 Strip(
                     segments=[Segment("X"), Spacer(width=2), Segment("W")],
-                    y_offset=0,
                 ),
             ],
         ),
@@ -709,7 +688,7 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden_multiple_spacers
             line_width=2,
             z_index=-1,
             strips=[
-                Strip(segments=[Segment("12")], y_offset=0),
+                Strip(segments=[Segment("12")]),
             ],
         ),
     ]
@@ -727,7 +706,7 @@ def test_render_multiple_buffers_with_multiple_overlaps_middle_in_front(console)
             x=0,
             line_width=8,
             strips=[
-                Strip(segments=[Segment("ABCDE")], y_offset=0),
+                Strip(segments=[Segment("ABCDE")]),
             ],
         ),
         LineBuffer(
@@ -735,7 +714,7 @@ def test_render_multiple_buffers_with_multiple_overlaps_middle_in_front(console)
             line_width=4,
             z_index=-2,
             strips=[
-                Strip(segments=[Segment("XYZW")], y_offset=0),
+                Strip(segments=[Segment("XYZW")]),
             ],
         ),
         LineBuffer(
@@ -743,7 +722,7 @@ def test_render_multiple_buffers_with_multiple_overlaps_middle_in_front(console)
             line_width=4,
             z_index=-1,
             strips=[
-                Strip(segments=[Segment("1234")], y_offset=0),
+                Strip(segments=[Segment("1234")]),
             ],
         ),
     ]
@@ -761,7 +740,7 @@ def test_render_multiple_buffers_with_empty_segment(console):
             x=1,
             line_width=8,
             strips=[
-                Strip(segments=[Segment("ABCDEFGH")], y_offset=0),
+                Strip(segments=[Segment("ABCDEFGH")]),
             ],
         ),
         LineBuffer(
@@ -769,7 +748,7 @@ def test_render_multiple_buffers_with_empty_segment(console):
             line_width=4,
             z_index=-1,
             strips=[
-                Strip(segments=[Segment("")], y_offset=0),
+                Strip(segments=[Segment("")]),
             ],
         ),
         LineBuffer(
@@ -777,7 +756,7 @@ def test_render_multiple_buffers_with_empty_segment(console):
             line_width=2,
             z_index=-2,
             strips=[
-                Strip(segments=[Segment("")], y_offset=0),
+                Strip(segments=[Segment("")]),
             ],
         ),
     ]
@@ -796,9 +775,9 @@ def test_render_node_buffer(console):
         node_width=3,
         node_height=3,
         strips=[
-            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=0),
-            Strip(segments=[Segment("X X")], y_offset=1),
-            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=2),
+            Strip(segments=[Spacer(width=1), Segment("X")]),
+            Strip(segments=[Segment("X X")]),
+            Strip(segments=[Spacer(width=1), Segment("X")]),
         ],
     )
 
@@ -816,17 +795,12 @@ def test_render_node_buffer_with_spacers(console):
         node_width=3,
         node_height=3,
         strips=[
-            Strip(
-                segments=[Segment("X"), Spacer(width=1), Spacer(width=1)],
-                y_offset=0,
-            ),
+            Strip(segments=[Segment("X"), Spacer(width=1), Spacer(width=1)]),
             Strip(
                 segments=[Spacer(width=1), Segment("X"), Spacer(width=1)],
-                y_offset=1,
             ),
             Strip(
                 segments=[Spacer(width=1), Spacer(width=1), Segment("X")],
-                y_offset=2,
             ),
         ],
     )
@@ -848,15 +822,12 @@ def test_render_node_buffers_with_spacers(console):
             strips=[
                 Strip(
                     segments=[Segment("X"), Spacer(width=1), Spacer(width=1)],
-                    y_offset=0,
                 ),
                 Strip(
                     segments=[Spacer(width=1), Segment("X"), Spacer(width=1)],
-                    y_offset=1,
                 ),
                 Strip(
                     segments=[Spacer(width=1), Spacer(width=1), Segment("X")],
-                    y_offset=2,
                 ),
             ],
         ),
@@ -869,15 +840,12 @@ def test_render_node_buffers_with_spacers(console):
             strips=[
                 Strip(
                     segments=[Spacer(width=1), Segment("Y"), Spacer(width=1)],
-                    y_offset=0,
                 ),
                 Strip(
                     segments=[Spacer(width=1), Segment("Y"), Segment("Y")],
-                    y_offset=1,
                 ),
                 Strip(
                     segments=[Spacer(width=1), Segment("Y"), Spacer(width=1)],
-                    y_offset=2,
                 ),
             ],
         ),
@@ -897,9 +865,9 @@ def test_render_node_buffer_with_empty_line(console):
         node_width=3,
         node_height=3,
         strips=[
-            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=0),
-            Strip(segments=[Segment("")], y_offset=1),
-            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=2),
+            Strip(segments=[Spacer(width=1), Segment("X")]),
+            Strip(segments=[Segment("")]),
+            Strip(segments=[Spacer(width=1), Segment("X")]),
         ],
     )
 
@@ -917,9 +885,9 @@ def test_render_node_buffer_with_empty_line_and_no_buffer(console):
         node_width=3,
         node_height=3,
         strips=[
-            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=0),
-            Strip(segments=[Segment("")], y_offset=1),
-            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=2),
+            Strip(segments=[Spacer(width=1), Segment("X")]),
+            Strip(segments=[Segment("")]),
+            Strip(segments=[Spacer(width=1), Segment("X")]),
         ],
     )
 
@@ -929,46 +897,6 @@ def test_render_node_buffer_with_empty_line_and_no_buffer(console):
     assert capture.get() == " X \n   \n X \n   \n"
 
 
-def test_render_node_buffer_with_duplicate_y_offset_fails(console):
-    test_buffer = NodeBuffer(
-        z_index=0,
-        x=1,
-        y=1,
-        node_width=3,
-        node_height=2,
-        strips=[
-            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=0),
-            Strip(segments=[Segment("")], y_offset=0),
-            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=1),
-        ],
-    )
-
-    with pytest.raises(
-        AssertionError,
-        match="Duplicate segments with same y offsets in buffers are not allowed",
-    ):
-        list(render_buffers([test_buffer], 3, 4))
-
-
-def test_render_node_buffer_with_missing_y_offset_fails(console):
-    test_buffer = NodeBuffer(
-        z_index=0,
-        x=1,
-        y=1,
-        node_width=3,
-        node_height=3,
-        strips=[
-            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=0),
-            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=2),
-        ],
-    )
-
-    with pytest.raises(
-        AssertionError, match="Buffer does not contain a segment for all rows"
-    ):
-        list(render_buffers([test_buffer], 3, 4))
-
-
 def test_render_buffer_with_overflow_segment_fails(console):
     test_buffers = [
         LineBuffer(
@@ -976,7 +904,7 @@ def test_render_buffer_with_overflow_segment_fails(console):
             x=1,
             line_width=1,
             strips=[
-                Strip(segments=[Segment("AB")], y_offset=0),
+                Strip(segments=[Segment("AB")]),
             ],
         ),
     ]

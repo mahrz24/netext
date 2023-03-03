@@ -4,27 +4,17 @@ from heapq import merge
 
 from rich.segment import Segment
 
-from netext.segment_buffer import SegmentBuffer, Spacer
+from netext.segment_buffer import StripBuffer, Spacer
 
 
 def render_buffers(
-    buffers: Iterable[SegmentBuffer], width: int, height: int
+    buffers: Iterable[StripBuffer], width: int, height: int
 ) -> Iterator[Segment]:
-    buffers_by_row: dict[int, list[SegmentBuffer]] = defaultdict(list)
+    buffers_by_row: dict[int, list[StripBuffer]] = defaultdict(list)
     for buffer in buffers:
-        y_offsets = [segment.y_offset for segment in buffer.strips]
-        assert len(set(y_offsets)) == len(
-            y_offsets
-        ), "Duplicate segments with same y offsets in buffers are not allowed."
-        buffer_y_span = list(range(0, buffer.bottom_y - buffer.top_y + 1))
-        assert y_offsets == buffer_y_span, (
-            "Buffer does not contain a segment for all rows or segments are not"
-            " ordered."
-            f" {buffer.top_y} {buffer.bottom_y} {buffer} {y_offsets} {buffer_y_span}"
-        )
         buffers_by_row[buffer.top_y] = sorted(buffers_by_row[buffer.top_y] + [buffer])
 
-    active_buffers: list[tuple[int, list[Segment | Spacer], int, SegmentBuffer]] = []
+    active_buffers: list[tuple[int, list[Segment | Spacer], int, StripBuffer]] = []
     for row in range(height):
         # This contains information where the segments for the currently
         # active buffers start (active buffer == intersects with current line)

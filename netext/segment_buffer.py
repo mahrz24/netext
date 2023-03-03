@@ -21,11 +21,9 @@ class Spacer:
 class Strip:
     segments: list[Segment | Spacer]
 
-    y_offset: int  # Offset from top y
-
 
 @dataclass
-class SegmentBuffer:
+class StripBuffer:
     strips: list[Strip]
     z_index: float
 
@@ -54,6 +52,6 @@ class SegmentBuffer:
         return NotImplemented  # pragma: no cover
 
     def __lt__(self, value: Any) -> bool:
-        if isinstance(value, SegmentBuffer):
+        if isinstance(value, StripBuffer):
             return self.left_x < value.left_x
         return False
