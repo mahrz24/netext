@@ -18,16 +18,15 @@ class Spacer:
 
 
 @dataclass
-class OffsetLine:
+class Strip:
     segments: list[Segment | Spacer]
 
-    x_offset: int  # Offset from left x
     y_offset: int  # Offset from top y
 
 
 @dataclass
 class SegmentBuffer:
-    segment_lines: list[OffsetLine]
+    strips: list[Strip]
     z_index: float
 
     @property

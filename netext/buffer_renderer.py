@@ -12,7 +12,7 @@ def render_buffers(
 ) -> Iterator[Segment]:
     buffers_by_row: dict[int, list[SegmentBuffer]] = defaultdict(list)
     for buffer in buffers:
-        y_offsets = [segment.y_offset for segment in buffer.segment_lines]
+        y_offsets = [segment.y_offset for segment in buffer.strips]
         assert len(set(y_offsets)) == len(
             y_offsets
         ), "Duplicate segments with same y offsets in buffers are not allowed."
@@ -31,8 +31,8 @@ def render_buffers(
         active_buffers = sorted(
             [
                 (
-                    buffer.left_x + buffer.segment_lines[buffer_row + 1].x_offset,
-                    buffer.segment_lines[buffer_row + 1].segments,
+                    buffer.left_x,
+                    buffer.strips[buffer_row + 1].segments,
                     buffer_row + 1,
                     buffer,
                 )
@@ -45,8 +45,8 @@ def render_buffers(
         new_active_buffers = sorted(
             [
                 (
-                    buffer.left_x + buffer.segment_lines[0].x_offset,
-                    buffer.segment_lines[0].segments,
+                    buffer.left_x,
+                    buffer.strips[0].segments,
                     0,
                     buffer,
                 )

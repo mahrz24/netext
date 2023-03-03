@@ -8,11 +8,13 @@
 * [ ] Setup code owners
 * [ ] Enable dependabot & codeql
 * Add documentation
-    * [ ] Automatic rendering of examples as svgs
-    * [ ] Document all style attributes
-    * [ ] First tutorial
-    * [ ] How to style nodes
-    * [ ] How to style edges
+    * [x] Automatic rendering of examples as svgs
+    * [x] Document all style attributes
+    * [x] First tutorial
+    * [x] How to style nodes
+    * [x] How to style edges
+    * [ ] Clean up all crosslinks
+    * [ ] Add now missing
 * [x] Switch to mypy
 
 ### Refactoring

@@ -17,7 +17,7 @@ def test_trivial_node(console: Console) -> None:
 
     assert node_buffer.node_width == 7
     assert node_buffer.node_height == 3
-    assert Segment("foo") in node_buffer.segment_lines[1].segments
+    assert Segment("foo") in node_buffer.strips[1].segments
 
 
 def test_trivial_node_with_style(console: Console) -> None:
@@ -27,10 +27,7 @@ def test_trivial_node_with_style(console: Console) -> None:
 
     assert node_buffer.node_width == 7
     assert node_buffer.node_height == 3
-    assert (
-        Segment("foo", style=Style(color="red"))
-        in node_buffer.segment_lines[1].segments
-    )
+    assert Segment("foo", style=Style(color="red")) in node_buffer.strips[1].segments
 
 
 def test_trivial_node_with_style_and_text_style(console: Console) -> None:
@@ -42,10 +39,7 @@ def test_trivial_node_with_style_and_text_style(console: Console) -> None:
 
     assert node_buffer.node_width == 7
     assert node_buffer.node_height == 3
-    assert (
-        Segment("foo", style=Style(color="green"))
-        in node_buffer.segment_lines[1].segments
-    )
+    assert Segment("foo", style=Style(color="green")) in node_buffer.strips[1].segments
 
 
 def test_trivial_node_with_style_and_custom_renderer(console: Console) -> None:
@@ -54,16 +48,13 @@ def test_trivial_node_with_style_and_custom_renderer(console: Console) -> None:
         node="foo",
         data={
             "$style": Style(color="red"),
-            "$node-renderer": lambda str, _, __: Text(str.upper()),
+            "$content-renderer": lambda str, _, __: Text(str.upper()),
         },
     )
 
     assert node_buffer.node_width == 7
     assert node_buffer.node_height == 3
-    assert (
-        Segment("FOO", style=Style(color="red"))
-        in node_buffer.segment_lines[1].segments
-    )
+    assert Segment("FOO", style=Style(color="red")) in node_buffer.strips[1].segments
 
 
 def test_plain_shape(console: Console) -> None:
@@ -71,4 +62,4 @@ def test_plain_shape(console: Console) -> None:
 
     assert node_buffer.node_width == 3
     assert node_buffer.node_height == 1
-    assert Segment("foo") in node_buffer.segment_lines[0].segments
+    assert Segment("foo") in node_buffer.strips[0].segments

@@ -7,7 +7,7 @@ from rich.segment import Segment, Segments
 
 from netext.buffer_renderer import render_buffers
 from netext.node_rasterizer import NodeBuffer
-from netext.segment_buffer import OffsetLine, SegmentBuffer, Spacer
+from netext.segment_buffer import Strip, SegmentBuffer, Spacer
 
 
 @dataclass
@@ -50,9 +50,7 @@ def test_render_trivial(console):
         z_index=0,
         x=0,
         line_width=10,
-        segment_lines=[
-            OffsetLine(segments=[Segment(10 * "X")], x_offset=0, y_offset=0)
-        ],
+        strips=[Strip(segments=[Segment(10 * "X")], y_offset=0)],
     )
 
     with console.capture() as capture:
@@ -66,7 +64,7 @@ def test_render_spacer_trivial(console):
         z_index=0,
         x=0,
         line_width=10,
-        segment_lines=[OffsetLine(segments=[Spacer(width=10)], x_offset=0, y_offset=0)],
+        strips=[Strip(segments=[Spacer(width=10)], y_offset=0)],
     )
 
     with console.capture() as capture:
@@ -80,10 +78,9 @@ def test_render_trivial_multiple_segments(console):
         z_index=0,
         x=0,
         line_width=10,
-        segment_lines=[
-            OffsetLine(
+        strips=[
+            Strip(
                 segments=cast(list[Segment | Spacer], 10 * [Segment("X")]),
-                x_offset=0,
                 y_offset=0,
             )
         ],
@@ -100,11 +97,10 @@ def test_render_trivial_multiple_segments_spacers(console):
         z_index=0,
         x=0,
         line_width=10,
-        segment_lines=[
-            OffsetLine(
+        strips=[
+            Strip(
                 segments=5 * [cast(Segment | Spacer, Segment("X"))]
                 + 5 * [cast(Segment | Spacer, Spacer(width=1))],
-                x_offset=0,
                 y_offset=0,
             )
         ],
@@ -122,12 +118,11 @@ def test_render_multiple_segments_spacers_layered(console):
             z_index=0,
             x=0,
             line_width=9,
-            segment_lines=[
-                OffsetLine(
+            strips=[
+                Strip(
                     segments=3 * [cast(Segment | Spacer, Spacer(width=1))]
                     + 3 * [cast(Segment | Spacer, Segment("X"))]
                     + 3 * [cast(Segment | Spacer, Spacer(width=1))],
-                    x_offset=0,
                     y_offset=0,
                 )
             ],
@@ -136,11 +131,10 @@ def test_render_multiple_segments_spacers_layered(console):
             z_index=0,
             x=2,
             line_width=6,
-            segment_lines=[
-                OffsetLine(
+            strips=[
+                Strip(
                     segments=3 * [cast(Segment | Spacer, Spacer(width=1))]
                     + 3 * [cast(Segment | Spacer, Segment("Y"))],
-                    x_offset=0,
                     y_offset=0,
                 )
             ],
@@ -158,7 +152,7 @@ def test_render_segment_with_offset(console):
         z_index=0,
         x=0,
         line_width=10,
-        segment_lines=[OffsetLine(segments=[Segment(9 * "X")], x_offset=1, y_offset=0)],
+        strips=[Strip(segments=[Spacer(width=1), Segment(9 * "X")], y_offset=0)],
     )
 
     with console.capture() as capture:
@@ -172,7 +166,7 @@ def test_render_buffer_with_offset(console):
         z_index=0,
         x=1,
         line_width=9,
-        segment_lines=[OffsetLine(segments=[Segment(9 * "X")], x_offset=0, y_offset=0)],
+        strips=[Strip(segments=[Segment(9 * "X")], y_offset=0)],
     )
 
     with console.capture() as capture:
@@ -186,9 +180,7 @@ def test_render_segment_with_offset_cropped(console):
         z_index=0,
         x=0,
         line_width=11,
-        segment_lines=[
-            OffsetLine(segments=[Segment(9 * "X" + "Y")], x_offset=1, y_offset=0)
-        ],
+        strips=[Strip(segments=[Spacer(width=1), Segment(9 * "X" + "Y")], y_offset=0)],
     )
 
     with console.capture() as capture:
@@ -202,9 +194,9 @@ def test_render_segment_with_offset_cropped_multiple_segments(console):
         z_index=0,
         x=0,
         line_width=11,
-        segment_lines=[
-            OffsetLine(
-                segments=[Segment(9 * "X"), Segment("Y")], x_offset=1, y_offset=0
+        strips=[
+            Strip(
+                segments=[Spacer(width=1), Segment(9 * "X"), Segment("Y")], y_offset=0
             )
         ],
     )
@@ -220,9 +212,7 @@ def test_render_buffer_with_offset_cropped(console):
         z_index=0,
         x=1,
         line_width=10,
-        segment_lines=[
-            OffsetLine(segments=[Segment(9 * "X" + "Y")], x_offset=0, y_offset=0)
-        ],
+        strips=[Strip(segments=[Segment(9 * "X" + "Y")], y_offset=0)],
     )
 
     with console.capture() as capture:
@@ -236,7 +226,7 @@ def test_render_fill_remaining_buffer(console):
         z_index=0,
         x=0,
         line_width=10,
-        segment_lines=[OffsetLine(segments=[Segment("X")], x_offset=3, y_offset=0)],
+        strips=[Strip(segments=[Spacer(width=3), Segment("X")], y_offset=0)],
     )
 
     with console.capture() as capture:
@@ -250,7 +240,7 @@ def test_render_buffer_with_offset_and_fill_right(console):
         z_index=0,
         x=3,
         line_width=1,
-        segment_lines=[OffsetLine(segments=[Segment("X")], x_offset=0, y_offset=0)],
+        strips=[Strip(segments=[Segment("X")], y_offset=0)],
     )
 
     with console.capture() as capture:
@@ -264,7 +254,7 @@ def test_render_segment_empty(console):
         z_index=0,
         x=0,
         line_width=10,
-        segment_lines=[OffsetLine(segments=[Segment("")], x_offset=0, y_offset=0)],
+        strips=[Strip(segments=[Segment("")], y_offset=0)],
     )
 
     with console.capture() as capture:
@@ -278,10 +268,9 @@ def test_render_segment_empty_with_multiple_segments(console):
         z_index=0,
         x=0,
         line_width=10,
-        segment_lines=[
-            OffsetLine(
+        strips=[
+            Strip(
                 segments=[Segment(""), Segment("X"), Segment(""), Segment("Y")],
-                x_offset=0,
                 y_offset=0,
             )
         ],
@@ -299,16 +288,16 @@ def test_render_mutliple_buffers(console):
             z_index=0,
             x=1,
             line_width=2,
-            segment_lines=[
-                OffsetLine(segments=[Segment("XX")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("XX")], y_offset=0),
             ],
         ),
         LineBuffer(
             z_index=0,
             x=5,
             line_width=2,
-            segment_lines=[
-                OffsetLine(segments=[Segment("YY")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("YY")], y_offset=0),
             ],
         ),
     ]
@@ -325,16 +314,16 @@ def test_render_multiple_buffers_with_overlap(console):
             z_index=0,
             x=1,
             line_width=8,
-            segment_lines=[
-                OffsetLine(segments=[Segment("XXXXXXXX")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("XXXXXXXX")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=5,
             line_width=2,
             z_index=-1,
-            segment_lines=[
-                OffsetLine(segments=[Segment("YY")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("YY")], y_offset=0),
             ],
         ),
     ]
@@ -351,18 +340,17 @@ def test_render_multiple_buffers_with_overlap_and_spacer(console):
             z_index=0,
             x=1,
             line_width=8,
-            segment_lines=[
-                OffsetLine(segments=[Segment("XXXXXXXX")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("XXXXXXXX")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=5,
             line_width=4,
             z_index=-1,
-            segment_lines=[
-                OffsetLine(
+            strips=[
+                Strip(
                     segments=[Segment("Y"), Spacer(width=2), Segment("Y")],
-                    x_offset=0,
                     y_offset=0,
                 ),
             ],
@@ -381,18 +369,16 @@ def test_render_multiple_buffers_with_overlap_and_multiple_segments(console):
             z_index=0,
             x=1,
             line_width=8,
-            segment_lines=[
-                OffsetLine(
-                    segments=[Segment("XXXXX"), Segment("ZZZ")], x_offset=0, y_offset=0
-                ),
+            strips=[
+                Strip(segments=[Segment("XXXXX"), Segment("ZZZ")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=5,
             line_width=2,
             z_index=-1,
-            segment_lines=[
-                OffsetLine(segments=[Segment("YY")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("YY")], y_offset=0),
             ],
         ),
     ]
@@ -409,20 +395,16 @@ def test_render_multiple_buffers_with_overlap_and_multiple_segments_in_overlap(c
             z_index=0,
             x=1,
             line_width=8,
-            segment_lines=[
-                OffsetLine(
-                    segments=[Segment("XXXXX"), Segment("ZZZ")], x_offset=0, y_offset=0
-                ),
+            strips=[
+                Strip(segments=[Segment("XXXXX"), Segment("ZZZ")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=5,
             line_width=2,
             z_index=-1,
-            segment_lines=[
-                OffsetLine(
-                    segments=[Segment("Y"), Segment("Y")], x_offset=0, y_offset=0
-                ),
+            strips=[
+                Strip(segments=[Segment("Y"), Segment("Y")], y_offset=0),
             ],
         ),
     ]
@@ -439,16 +421,16 @@ def test_render_multiple_buffers_with_overlap_hidden(console):
             z_index=0,
             x=1,
             line_width=8,
-            segment_lines=[
-                OffsetLine(segments=[Segment("XXXXXXXX")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("XXXXXXXX")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=5,
             line_width=2,
             z_index=1,
-            segment_lines=[
-                OffsetLine(segments=[Segment("YY")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("YY")], y_offset=0),
             ],
         ),
     ]
@@ -465,18 +447,16 @@ def test_render_multiple_buffers_with_overlap_hidden_multiple_segments(console):
             z_index=0,
             x=1,
             line_width=8,
-            segment_lines=[
-                OffsetLine(
-                    segments=[Segment("XXX"), Segment("XXXXX")], x_offset=0, y_offset=0
-                ),
+            strips=[
+                Strip(segments=[Segment("XXX"), Segment("XXXXX")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=5,
             line_width=2,
             z_index=1,
-            segment_lines=[
-                OffsetLine(segments=[Segment("YY")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("YY")], y_offset=0),
             ],
         ),
     ]
@@ -493,24 +473,24 @@ def test_render_multiple_buffers_with_nested_overlap(console):
             z_index=0,
             x=1,
             line_width=8,
-            segment_lines=[
-                OffsetLine(segments=[Segment("ABCDEFGH")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("ABCDEFGH")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=2,
             line_width=4,
             z_index=-1,
-            segment_lines=[
-                OffsetLine(segments=[Segment("XYZW")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("XYZW")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=3,
             line_width=2,
             z_index=-2,
-            segment_lines=[
-                OffsetLine(segments=[Segment("12")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("12")], y_offset=0),
             ],
         ),
     ]
@@ -527,30 +507,24 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments(console):
             x=2,
             line_width=4,
             z_index=-1,
-            segment_lines=[
-                OffsetLine(
-                    segments=[Segment("XYZ"), Segment("W")], x_offset=0, y_offset=0
-                ),
+            strips=[
+                Strip(segments=[Segment("XYZ"), Segment("W")], y_offset=0),
             ],
         ),
         LineBuffer(
             z_index=0,
             x=1,
             line_width=8,
-            segment_lines=[
-                OffsetLine(
-                    segments=[Segment("ABCD"), Segment("EFGH")], x_offset=0, y_offset=0
-                ),
+            strips=[
+                Strip(segments=[Segment("ABCD"), Segment("EFGH")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=3,
             line_width=2,
             z_index=-2,
-            segment_lines=[
-                OffsetLine(
-                    segments=[Segment("1"), Segment("2")], x_offset=0, y_offset=0
-                ),
+            strips=[
+                Strip(segments=[Segment("1"), Segment("2")], y_offset=0),
             ],
         ),
     ]
@@ -569,30 +543,24 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_different
             x=2,
             line_width=4,
             z_index=0,
-            segment_lines=[
-                OffsetLine(
-                    segments=[Segment("XYZ"), Segment("W")], x_offset=0, y_offset=0
-                ),
+            strips=[
+                Strip(segments=[Segment("XYZ"), Segment("W")], y_offset=0),
             ],
         ),
         LineBuffer(
             z_index=-1,
             x=1,
             line_width=8,
-            segment_lines=[
-                OffsetLine(
-                    segments=[Segment("ABCD"), Segment("EFGH")], x_offset=0, y_offset=0
-                ),
+            strips=[
+                Strip(segments=[Segment("ABCD"), Segment("EFGH")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=3,
             line_width=2,
             z_index=-2,
-            segment_lines=[
-                OffsetLine(
-                    segments=[Segment("1"), Segment("2")], x_offset=0, y_offset=0
-                ),
+            strips=[
+                Strip(segments=[Segment("1"), Segment("2")], y_offset=0),
             ],
         ),
     ]
@@ -611,30 +579,25 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_and_space
             z_index=0,
             x=1,
             line_width=8,
-            segment_lines=[
-                OffsetLine(
-                    segments=[Segment("ABCD"), Segment("EFGH")], x_offset=0, y_offset=0
-                ),
+            strips=[
+                Strip(segments=[Segment("ABCD"), Segment("EFGH")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=2,
             line_width=4,
             z_index=-1,
-            segment_lines=[
-                OffsetLine(
-                    segments=[Segment("XYZ"), Segment("W")], x_offset=0, y_offset=0
-                ),
+            strips=[
+                Strip(segments=[Segment("XYZ"), Segment("W")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=3,
             line_width=3,
             z_index=-2,
-            segment_lines=[
-                OffsetLine(
+            strips=[
+                Strip(
                     segments=[Segment("1"), Spacer(width=1), Segment("2")],
-                    x_offset=0,
                     y_offset=0,
                 ),
             ],
@@ -653,24 +616,24 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden(console):
             z_index=0,
             x=1,
             line_width=8,
-            segment_lines=[
-                OffsetLine(segments=[Segment("ABCDEFGH")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("ABCDEFGH")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=2,
             line_width=4,
             z_index=-2,
-            segment_lines=[
-                OffsetLine(segments=[Segment("XYZW")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("XYZW")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=3,
             line_width=2,
             z_index=-1,
-            segment_lines=[
-                OffsetLine(segments=[Segment("12")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("12")], y_offset=0),
             ],
         ),
     ]
@@ -687,24 +650,24 @@ def test_render_multiple_buffers_with_multiple_overlaps(console):
             z_index=0,
             x=0,
             line_width=8,
-            segment_lines=[
-                OffsetLine(segments=[Segment("ABCDE")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("ABCDE")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=1,
             line_width=4,
             z_index=-1,
-            segment_lines=[
-                OffsetLine(segments=[Segment("XYZW")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("XYZW")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=4,
             line_width=4,
             z_index=-2,
-            segment_lines=[
-                OffsetLine(segments=[Segment("1234")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("1234")], y_offset=0),
             ],
         ),
     ]
@@ -723,10 +686,9 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden_multiple_spacers
             z_index=0,
             x=1,
             line_width=8,
-            segment_lines=[
-                OffsetLine(
+            strips=[
+                Strip(
                     segments=[Segment("A"), Spacer(width=1), Segment("CDEFGH")],
-                    x_offset=0,
                     y_offset=0,
                 ),
             ],
@@ -735,10 +697,9 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden_multiple_spacers
             x=2,
             line_width=4,
             z_index=-2,
-            segment_lines=[
-                OffsetLine(
+            strips=[
+                Strip(
                     segments=[Segment("X"), Spacer(width=2), Segment("W")],
-                    x_offset=0,
                     y_offset=0,
                 ),
             ],
@@ -747,8 +708,8 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden_multiple_spacers
             x=3,
             line_width=2,
             z_index=-1,
-            segment_lines=[
-                OffsetLine(segments=[Segment("12")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("12")], y_offset=0),
             ],
         ),
     ]
@@ -765,24 +726,24 @@ def test_render_multiple_buffers_with_multiple_overlaps_middle_in_front(console)
             z_index=0,
             x=0,
             line_width=8,
-            segment_lines=[
-                OffsetLine(segments=[Segment("ABCDE")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("ABCDE")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=1,
             line_width=4,
             z_index=-2,
-            segment_lines=[
-                OffsetLine(segments=[Segment("XYZW")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("XYZW")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=4,
             line_width=4,
             z_index=-1,
-            segment_lines=[
-                OffsetLine(segments=[Segment("1234")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("1234")], y_offset=0),
             ],
         ),
     ]
@@ -799,24 +760,24 @@ def test_render_multiple_buffers_with_empty_segment(console):
             z_index=0,
             x=1,
             line_width=8,
-            segment_lines=[
-                OffsetLine(segments=[Segment("ABCDEFGH")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("ABCDEFGH")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=1,
             line_width=4,
             z_index=-1,
-            segment_lines=[
-                OffsetLine(segments=[Segment("")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("")], y_offset=0),
             ],
         ),
         LineBuffer(
             x=2,
             line_width=2,
             z_index=-2,
-            segment_lines=[
-                OffsetLine(segments=[Segment("")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("")], y_offset=0),
             ],
         ),
     ]
@@ -834,10 +795,10 @@ def test_render_node_buffer(console):
         y=1,
         node_width=3,
         node_height=3,
-        segment_lines=[
-            OffsetLine(segments=[Segment("X")], x_offset=1, y_offset=0),
-            OffsetLine(segments=[Segment("X X")], x_offset=0, y_offset=1),
-            OffsetLine(segments=[Segment("X")], x_offset=1, y_offset=2),
+        strips=[
+            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=0),
+            Strip(segments=[Segment("X X")], y_offset=1),
+            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=2),
         ],
     )
 
@@ -854,20 +815,17 @@ def test_render_node_buffer_with_spacers(console):
         y=1,
         node_width=3,
         node_height=3,
-        segment_lines=[
-            OffsetLine(
+        strips=[
+            Strip(
                 segments=[Segment("X"), Spacer(width=1), Spacer(width=1)],
-                x_offset=0,
                 y_offset=0,
             ),
-            OffsetLine(
+            Strip(
                 segments=[Spacer(width=1), Segment("X"), Spacer(width=1)],
-                x_offset=0,
                 y_offset=1,
             ),
-            OffsetLine(
+            Strip(
                 segments=[Spacer(width=1), Spacer(width=1), Segment("X")],
-                x_offset=0,
                 y_offset=2,
             ),
         ],
@@ -887,20 +845,17 @@ def test_render_node_buffers_with_spacers(console):
             y=1,
             node_width=3,
             node_height=3,
-            segment_lines=[
-                OffsetLine(
+            strips=[
+                Strip(
                     segments=[Segment("X"), Spacer(width=1), Spacer(width=1)],
-                    x_offset=0,
                     y_offset=0,
                 ),
-                OffsetLine(
+                Strip(
                     segments=[Spacer(width=1), Segment("X"), Spacer(width=1)],
-                    x_offset=0,
                     y_offset=1,
                 ),
-                OffsetLine(
+                Strip(
                     segments=[Spacer(width=1), Spacer(width=1), Segment("X")],
-                    x_offset=0,
                     y_offset=2,
                 ),
             ],
@@ -911,20 +866,17 @@ def test_render_node_buffers_with_spacers(console):
             y=1,
             node_width=3,
             node_height=3,
-            segment_lines=[
-                OffsetLine(
+            strips=[
+                Strip(
                     segments=[Spacer(width=1), Segment("Y"), Spacer(width=1)],
-                    x_offset=0,
                     y_offset=0,
                 ),
-                OffsetLine(
+                Strip(
                     segments=[Spacer(width=1), Segment("Y"), Segment("Y")],
-                    x_offset=0,
                     y_offset=1,
                 ),
-                OffsetLine(
+                Strip(
                     segments=[Spacer(width=1), Segment("Y"), Spacer(width=1)],
-                    x_offset=0,
                     y_offset=2,
                 ),
             ],
@@ -944,10 +896,10 @@ def test_render_node_buffer_with_empty_line(console):
         y=1,
         node_width=3,
         node_height=3,
-        segment_lines=[
-            OffsetLine(segments=[Segment("X")], x_offset=1, y_offset=0),
-            OffsetLine(segments=[Segment("")], x_offset=0, y_offset=1),
-            OffsetLine(segments=[Segment("X")], x_offset=1, y_offset=2),
+        strips=[
+            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=0),
+            Strip(segments=[Segment("")], y_offset=1),
+            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=2),
         ],
     )
 
@@ -964,10 +916,10 @@ def test_render_node_buffer_with_empty_line_and_no_buffer(console):
         y=1,
         node_width=3,
         node_height=3,
-        segment_lines=[
-            OffsetLine(segments=[Segment("X")], x_offset=1, y_offset=0),
-            OffsetLine(segments=[Segment("")], x_offset=0, y_offset=1),
-            OffsetLine(segments=[Segment("X")], x_offset=1, y_offset=2),
+        strips=[
+            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=0),
+            Strip(segments=[Segment("")], y_offset=1),
+            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=2),
         ],
     )
 
@@ -984,10 +936,10 @@ def test_render_node_buffer_with_duplicate_y_offset_fails(console):
         y=1,
         node_width=3,
         node_height=2,
-        segment_lines=[
-            OffsetLine(segments=[Segment("X")], x_offset=1, y_offset=0),
-            OffsetLine(segments=[Segment("")], x_offset=0, y_offset=0),
-            OffsetLine(segments=[Segment("X")], x_offset=1, y_offset=1),
+        strips=[
+            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=0),
+            Strip(segments=[Segment("")], y_offset=0),
+            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=1),
         ],
     )
 
@@ -1005,9 +957,9 @@ def test_render_node_buffer_with_missing_y_offset_fails(console):
         y=1,
         node_width=3,
         node_height=3,
-        segment_lines=[
-            OffsetLine(segments=[Segment("X")], x_offset=1, y_offset=0),
-            OffsetLine(segments=[Segment("X")], x_offset=1, y_offset=2),
+        strips=[
+            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=0),
+            Strip(segments=[Spacer(width=1), Segment("X")], y_offset=2),
         ],
     )
 
@@ -1023,8 +975,8 @@ def test_render_buffer_with_overflow_segment_fails(console):
             z_index=0,
             x=1,
             line_width=1,
-            segment_lines=[
-                OffsetLine(segments=[Segment("AB")], x_offset=0, y_offset=0),
+            strips=[
+                Strip(segments=[Segment("AB")], y_offset=0),
             ],
         ),
     ]

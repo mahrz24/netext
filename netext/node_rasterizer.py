@@ -10,7 +10,7 @@ from rich.segment import Segment
 from rich.style import Style
 from rich.text import Text
 
-from netext.segment_buffer import OffsetLine, SegmentBuffer, Spacer
+from netext.segment_buffer import Strip, SegmentBuffer, Spacer
 
 
 @dataclass
@@ -68,17 +68,13 @@ def rasterize_node(
     else:
         node_renderable = content_renderable
 
-    segment_lines = list(console.render_lines(node_renderable, pad=False))
-    offset_lines = [
-        OffsetLine(
-            x_offset=0, y_offset=i, segments=cast(list[Segment | Spacer], segments)
-        )
-        for i, segments in enumerate(segment_lines)
+    strips = list(console.render_lines(node_renderable, pad=False))
+    strips = [
+        Strip(y_offset=i, segments=cast(list[Segment | Spacer], segments))
+        for i, segments in enumerate(strips)
     ]
     width = max(
-        offset_line.x_offset
-        + sum(segment.cell_length for segment in offset_line.segments)
-        for offset_line in offset_lines
+        sum(segment.cell_length for segment in strip.segments) for strip in strips
     )
 
     node_buffer = NodeBuffer(
@@ -86,7 +82,7 @@ def rasterize_node(
         y=0,
         z_index=-1,
         node_width=width,
-        node_height=len(offset_lines),
-        segment_lines=offset_lines,
+        node_height=len(strips),
+        strips=strips,
     )
     return node_buffer

@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.segment import Segment
 
 from netext.node_rasterizer import NodeBuffer
-from netext.segment_buffer import OffsetLine, SegmentBuffer, Spacer
+from netext.segment_buffer import Strip, SegmentBuffer, Spacer
 
 
 class EdgeRoutingMode(Enum):
@@ -144,7 +144,7 @@ def rasterize_edge_segments(
     return bitmap_buffer
 
 
-def _slice_to_offset_line(slice: bitarray, y_offset: int) -> OffsetLine:
+def _slice_to_strip(slice: bitarray, y_offset: int) -> Strip:
     current_segment: list[Segment | Spacer] = []
     for val in slice:
         if not val:
@@ -152,16 +152,16 @@ def _slice_to_offset_line(slice: bitarray, y_offset: int) -> OffsetLine:
         else:
             current_segment.append(Segment("*"))
 
-    return OffsetLine(x_offset=0, y_offset=y_offset, segments=current_segment)
+    return Strip(y_offset=y_offset, segments=current_segment)
 
 
-def bitmap_to_segment_lines(
+def bitmap_to_strips(
     bitmap_buffer: BitmapBuffer, edge_segment_drawing_mode: EdgeSegmentDrawingMode
-) -> list[OffsetLine]:
+) -> list[Strip]:
     match edge_segment_drawing_mode:
         case EdgeSegmentDrawingMode.single_character:
             lines = [
-                _slice_to_offset_line(
+                _slice_to_strip(
                     bitmap_buffer.buffer[
                         y * bitmap_buffer.width : (y + 1) * bitmap_buffer.width
                     ],
@@ -195,7 +195,7 @@ def rasterize_edge(
 
     edge_segments = route_edge(start, end, routing_mode)
     bitmap_buffer = rasterize_edge_segments(edge_segments, sampling=1)
-    segment_lines = bitmap_to_segment_lines(
+    strips = bitmap_to_strips(
         bitmap_buffer, edge_segment_drawing_mode=edge_segment_drawing_mode
     )
 
@@ -203,7 +203,7 @@ def rasterize_edge(
         z_index=0,
         boundary_1=start,
         boundary_2=end,
-        segment_lines=segment_lines,
+        strips=strips,
     )
 
     return edge_buffer
