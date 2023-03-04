@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
@@ -33,18 +33,36 @@ class Point:
 
 
 @dataclass
-class Edge:
+class EdgeInput:
     start: Point
     end: Point
     label: str | None
     routing_mode: EdgeRoutingMode
     edge_segment_drawing_mode: EdgeSegmentDrawingMode
 
+    # Filled to avoid conflicts data from external routing algorithms
+    routing_hints: list[Point] = field(default_factory=list)
+
 
 @dataclass
 class EdgeSegment:
     start: Point
     end: Point
+
+
+@dataclass
+class EdgeLayout:
+    input: EdgeInput
+    segments: list[EdgeSegment]
+
+    label_position: Point
+    start_tip_position: Point
+    end_tip_position: Point
+
+    routing_points: list[Point] = field(default_factory=list)
+
+
+
 
 
 @dataclass
@@ -175,10 +193,11 @@ def bitmap_to_strips(
 
     return lines
 
-
+# TODO: Should return an edge buffer (the edge and tips), the edge layout (to be used as optional input) and a list
+# of node buffers, the labels
 def rasterize_edge(
     console: Console, u_buffer: NodeBuffer, v_buffer: NodeBuffer, data: Any
-) -> EdgeBuffer:
+) -> tuple[EdgeBuffer, EdgeLayout, list[NodeBuffer]]:
     # TODO: In the first prototype we just support straight lines from
     # center point to center point
     start = get_magnet(u_buffer, data.get("$magnet", MagnetPosition.center))
@@ -197,6 +216,8 @@ def rasterize_edge(
     strips = bitmap_to_strips(
         bitmap_buffer, edge_segment_drawing_mode=edge_segment_drawing_mode
     )
+
+
 
     edge_buffer = EdgeBuffer(
         z_index=0,
