@@ -9,6 +9,7 @@ from rich.table import Table
 
 from netext import TerminalGraph
 from netext.edge_rasterizer import EdgeRoutingMode
+from netext.node_rasterizer import JustContent
 
 g = cast(nx.Graph, nx.binomial_tree(5))
 g1 = cast(nx.DiGraph, nx.paley_graph(5))
@@ -26,12 +27,12 @@ def _render(n, d, s):
     return t
 
 
-nx.set_node_attributes(g1, "none", "$shape")
-nx.set_node_attributes(g1, _render, "$node-renderer")
-nx.set_node_attributes(g, Style(color="blue"), "$text-style")
-nx.set_node_attributes(g, box.SQUARE, "$box-type")
+nx.set_node_attributes(g1, JustContent(), "$shape")
+nx.set_node_attributes(g1, _render, "$content-renderer")
 
-nx.set_edge_attributes(g, EdgeRoutingMode.orthogonal, "$edge-routing-mode")
+nx.set_node_attributes(g, Style(color="blue"), "$content-style")
+nx.set_node_attributes(g, box.SQUARE, "$box-type")
+nx.set_edge_attributes(g, EdgeRoutingMode.straight, "$edge-routing-mode")
 
 
 print(Panel(TerminalGraph(g), title="Binomial Tree", expand=False))

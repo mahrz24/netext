@@ -1,8 +1,7 @@
-import abc
 import math
 from collections.abc import Hashable
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 from rich import box
 from rich.console import Console, RenderableType
@@ -11,13 +10,16 @@ from rich.segment import Segment
 from rich.style import Style
 from rich.text import Text
 from netext.geometry import Magnet, Point
+from shapely import LineString, Polygon
 
 from netext.segment_buffer import Strip, StripBuffer, Spacer
 
 
-class Shape(abc.ABC):
-    def get_magnet_position(self, magnet: Magnet) -> Point:
-        pass
+class Shape(Protocol):
+    def get_magnet_position(
+        self, node_buffer: "NodeBuffer", target_point: Point, magnet: Magnet
+    ) -> Point:
+        return NotImplemented
 
     def render_shape(
         self,
@@ -25,13 +27,46 @@ class Shape(abc.ABC):
         style: Style,
         data: dict[Hashable, Any],
     ) -> RenderableType:
-        pass
+        return NotImplemented
 
 
-class JustContent(Shape):
-    def get_magnet_position(self, magnet: Magnet) -> Point:
-        pass
+class RectangularShapeMixin:
+    def get_magnet_position(
+        self, node_buffer: "NodeBuffer", target_point: Point, magnet: Magnet
+    ) -> Point:
+        match magnet:  # noqa
+            case Magnet.TOP:
+                return Point(x=node_buffer.center.x, y=node_buffer.top_y)
+            case Magnet.LEFT:
+                return Point(x=node_buffer.left_x, y=node_buffer.center.y)
+            case Magnet.BOTTOM:
+                return Point(x=node_buffer.center.x, y=node_buffer.bottom_y)
+            case Magnet.RIGHT:
+                return Point(x=node_buffer.right_x, y=node_buffer.center.y)
+            case Magnet.CENTER:
+                direct_line = LineString(
+                    [node_buffer.center.shapely_point(), target_point.shapely_point()]
+                )
+                node_polygon = Polygon(
+                    [
+                        (node_buffer.left_x, node_buffer.top_y),
+                        (node_buffer.right_x, node_buffer.top_y),
+                        (node_buffer.right_x, node_buffer.bottom_y),
+                        (node_buffer.left_x, node_buffer.bottom_y),
+                    ]
+                )
 
+                intersection = direct_line.intersection(node_polygon)
+                intersection_point = intersection.line_interpolate_point(
+                    1.0, normalized=True
+                )
+                return Point(
+                    x=round(intersection_point.x), y=round(intersection_point.y)
+                )
+        raise RuntimeError(magnet)
+
+
+class JustContent(RectangularShapeMixin):
     def render_shape(
         self,
         content_renderable: RenderableType,
@@ -41,10 +76,7 @@ class JustContent(Shape):
         return content_renderable
 
 
-class Box(Shape):
-    def get_magnet_position(self, magnet: Magnet) -> Point:
-        pass
-
+class Box(RectangularShapeMixin):
     def render_shape(
         self,
         content_renderable: RenderableType,
@@ -103,6 +135,7 @@ def rasterize_node(
     content_renderer = data.get("$content-renderer", _default_content_renderer)
     content_renderable = content_renderer(str(node), data, content_style)
 
+    # TODO render shape needs to return a strip as it could have spacers
     node_renderable = shape.render_shape(content_renderable, style=style, data=data)
 
     segment_lists = list(console.render_lines(node_renderable, pad=False))

@@ -5,7 +5,7 @@ from typing import Any, Iterable, Sequence
 from bitarray import bitarray
 from rich.console import Console
 from rich.segment import Segment
-from netext.geometry import Point
+from netext.geometry import Point, Magnet
 
 from netext.node_rasterizer import NodeBuffer
 from netext.segment_buffer import Strip, StripBuffer, Spacer
@@ -14,10 +14,6 @@ from netext.segment_buffer import Strip, StripBuffer, Spacer
 class EdgeRoutingMode(Enum):
     straight = "straight"
     orthogonal = "orthogonal"
-
-
-class MagnetPosition(Enum):
-    center = "center"
 
 
 class EdgeSegmentDrawingMode(Enum):
@@ -108,10 +104,6 @@ class EdgeBuffer(StripBuffer):
         return self.bottom_y - self.top_y + 1
 
 
-def get_magnet(buffer: NodeBuffer, magnet: MagnetPosition) -> Point:
-    return Point(buffer.center.x, buffer.center.y)
-
-
 def route_edge(
     start: Point, end: Point, routing_mode: EdgeRoutingMode
 ) -> list[EdgeSegment]:
@@ -196,8 +188,12 @@ def rasterize_edge(
     routed_edges: Iterable[EdgeLayout],
     data: Any,
 ) -> tuple[EdgeBuffer, EdgeLayout, list[NodeBuffer]]:
-    start = get_magnet(u_buffer, data.get("$magnet", MagnetPosition.center))
-    end = get_magnet(v_buffer, data.get("$magnet", MagnetPosition.center))
+    start = u_buffer.shape.get_magnet_position(
+        u_buffer, v_buffer.center, data.get("$magnet", Magnet.CENTER)
+    )
+    end = v_buffer.shape.get_magnet_position(
+        v_buffer, u_buffer.center, data.get("$magnet", Magnet.CENTER)
+    )
 
     routing_mode: EdgeRoutingMode = data.get(
         "$edge-routing-mode", EdgeRoutingMode.straight
