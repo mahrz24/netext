@@ -4,7 +4,7 @@ from rich.segment import Segment
 from rich.style import Style
 from rich.text import Text
 
-from netext.node_rasterizer import rasterize_node
+from netext.node_rasterizer import JustContent, rasterize_node
 
 
 @pytest.fixture
@@ -58,7 +58,7 @@ def test_trivial_node_with_style_and_custom_renderer(console: Console) -> None:
 
 
 def test_plain_shape(console: Console) -> None:
-    node_buffer = rasterize_node(console, node="foo", data={"$shape": "plain"})
+    node_buffer = rasterize_node(console, node="foo", data={"$shape": JustContent()})
 
     assert node_buffer.node_width == 3
     assert node_buffer.node_height == 1

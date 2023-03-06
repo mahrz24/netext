@@ -1,10 +1,11 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from typing import Any, Iterable, Sequence
 
 from bitarray import bitarray
 from rich.console import Console
 from rich.segment import Segment
+from netext.geometry import Point
 
 from netext.node_rasterizer import NodeBuffer
 from netext.segment_buffer import Strip, StripBuffer, Spacer
@@ -25,22 +26,18 @@ class EdgeSegmentDrawingMode(Enum):
     braille = "braille"
 
 
-# TODO: Use also in node buffer
-@dataclass
-class Point:
-    x: int
-    y: int
-
-
 @dataclass
 class EdgeInput:
     start: Point
     end: Point
-    label: str | None
+
+    # label: str | None
+
     routing_mode: EdgeRoutingMode
     edge_segment_drawing_mode: EdgeSegmentDrawingMode
 
-    # Filled to avoid conflicts data from external routing algorithms
+    # This is used by the edge rasterizer to use data from
+    # external layout engines where to route along.
     routing_hints: list[Point] = field(default_factory=list)
 
 
@@ -55,14 +52,9 @@ class EdgeLayout:
     input: EdgeInput
     segments: list[EdgeSegment]
 
-    label_position: Point
-    start_tip_position: Point
-    end_tip_position: Point
-
-    routing_points: list[Point] = field(default_factory=list)
-
-
-
+    # label_position: Point | None
+    # start_tip_position: Point | None
+    # end_tip_position: Point | None
 
 
 @dataclass
@@ -117,7 +109,7 @@ class EdgeBuffer(StripBuffer):
 
 
 def get_magnet(buffer: NodeBuffer, magnet: MagnetPosition) -> Point:
-    return Point(buffer.x, buffer.y)
+    return Point(buffer.center.x, buffer.center.y)
 
 
 def route_edge(
@@ -193,16 +185,19 @@ def bitmap_to_strips(
 
     return lines
 
+
 # TODO: Should return an edge buffer (the edge and tips), the edge layout (to be used as optional input) and a list
 # of node buffers, the labels
 def rasterize_edge(
-    console: Console, u_buffer: NodeBuffer, v_buffer: NodeBuffer, data: Any
+    console: Console,
+    u_buffer: NodeBuffer,
+    v_buffer: NodeBuffer,
+    all_nodes: Iterable[NodeBuffer],
+    routed_edges: Iterable[EdgeLayout],
+    data: Any,
 ) -> tuple[EdgeBuffer, EdgeLayout, list[NodeBuffer]]:
-    # TODO: In the first prototype we just support straight lines from
-    # center point to center point
     start = get_magnet(u_buffer, data.get("$magnet", MagnetPosition.center))
     end = get_magnet(v_buffer, data.get("$magnet", MagnetPosition.center))
-    # label = data.get("$label", None)
 
     routing_mode: EdgeRoutingMode = data.get(
         "$edge-routing-mode", EdgeRoutingMode.straight
@@ -211,13 +206,23 @@ def rasterize_edge(
         "$edge-segment-drawing-mode", EdgeSegmentDrawingMode.single_character
     )
 
+    edge_input = EdgeInput(
+        start=start,
+        end=end,
+        routing_mode=routing_mode,
+        edge_segment_drawing_mode=edge_segment_drawing_mode,
+        routing_hints=[],
+    )
+
+    # label = data.get("$label", None)
+
     edge_segments = route_edge(start, end, routing_mode)
     bitmap_buffer = rasterize_edge_segments(edge_segments, sampling=1)
     strips = bitmap_to_strips(
         bitmap_buffer, edge_segment_drawing_mode=edge_segment_drawing_mode
     )
 
-
+    edge_layout = EdgeLayout(input=edge_input, segments=edge_segments)
 
     edge_buffer = EdgeBuffer(
         z_index=0,
@@ -226,7 +231,7 @@ def rasterize_edge(
         strips=strips,
     )
 
-    return edge_buffer
+    return edge_buffer, edge_layout, []
 
 
 def _bresenham_line_drawing(

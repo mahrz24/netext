@@ -1201,6 +1201,24 @@ extra = ["lxml (>=4.6)", "pydot (>=1.4.2)", "pygraphviz (>=1.10)", "sympy (>=1.1
 test = ["codecov (>=2.1)", "pytest (>=7.2)", "pytest-cov (>=4.0)"]
 
 [[package]]
+name = "networkx-stubs"
+version = "0.0.1"
+description = "Typing stubs for NetworkX"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "networkx-stubs-0.0.1.tar.gz", hash = "sha256:1751cbc87898328f89d79476ec6363174c05f9e48592f0953cc1077188717a21"},
+    {file = "networkx_stubs-0.0.1-py3-none-any.whl", hash = "sha256:ce58dff9b9dcbfdf895d0fce20fa8a73f2e82e581004596b7552086b5bb91366"},
+]
+
+[package.dependencies]
+networkx = "*"
+
+[package.extras]
+dev = ["black", "flake8", "flake8-black", "flake8-pyi", "mypy", "setuptools", "wheel"]
+
+[[package]]
 name = "nodeenv"
 version = "1.7.0"
 description = "Node.js virtual environment builder"
@@ -2039,4 +2057,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "7ea46700f3e91cb0c3dbd93a7e12ce947c36cabfab197abc7fdb7023e768d6fb"
+content-hash = "780c0bb869fea6b994a2688fd10caf24d40f9561ee71c4631d7beb85b40f665a"

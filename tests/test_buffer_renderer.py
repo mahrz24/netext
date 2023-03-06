@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.segment import Segment, Segments
 
 from netext.buffer_renderer import render_buffers
+from netext.geometry import Point
 from netext.node_rasterizer import NodeBuffer
 from netext.segment_buffer import Strip, StripBuffer, Spacer
 
@@ -770,8 +771,7 @@ def test_render_multiple_buffers_with_empty_segment(console):
 def test_render_node_buffer(console):
     test_buffer = NodeBuffer(
         z_index=0,
-        x=1,
-        y=1,
+        center=Point(x=1, y=1),
         node_width=3,
         node_height=3,
         strips=[
@@ -790,8 +790,7 @@ def test_render_node_buffer(console):
 def test_render_node_buffer_with_spacers(console):
     test_buffer = NodeBuffer(
         z_index=0,
-        x=1,
-        y=1,
+        center=Point(x=1, y=1),
         node_width=3,
         node_height=3,
         strips=[
@@ -815,8 +814,7 @@ def test_render_node_buffers_with_spacers(console):
     test_buffers = [
         NodeBuffer(
             z_index=0,
-            x=1,
-            y=1,
+            center=Point(x=1, y=1),
             node_width=3,
             node_height=3,
             strips=[
@@ -833,8 +831,7 @@ def test_render_node_buffers_with_spacers(console):
         ),
         NodeBuffer(
             z_index=1,
-            x=1,
-            y=1,
+            center=Point(x=1, y=1),
             node_width=3,
             node_height=3,
             strips=[
@@ -860,8 +857,7 @@ def test_render_node_buffers_with_spacers(console):
 def test_render_node_buffer_with_empty_line(console):
     test_buffer = NodeBuffer(
         z_index=0,
-        x=1,
-        y=1,
+        center=Point(x=1, y=1),
         node_width=3,
         node_height=3,
         strips=[
@@ -880,8 +876,7 @@ def test_render_node_buffer_with_empty_line(console):
 def test_render_node_buffer_with_empty_line_and_no_buffer(console):
     test_buffer = NodeBuffer(
         z_index=0,
-        x=1,
-        y=1,
+        center=Point(x=1, y=1),
         node_width=3,
         node_height=3,
         strips=[

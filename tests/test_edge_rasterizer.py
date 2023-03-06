@@ -20,13 +20,20 @@ def test_trivial_edge(console: Console) -> None:
     node_buffer_u = rasterize_node(console, node="A", data=dict())
     node_buffer_v = rasterize_node(console, node="B", data=dict())
 
-    node_buffer_u.x = 1
-    node_buffer_u.y = 1
+    node_buffer_u.center.x = 1
+    node_buffer_u.center.y = 1
 
-    node_buffer_v.x = 9
-    node_buffer_v.y = 9
+    node_buffer_v.center.x = 9
+    node_buffer_v.center.y = 9
 
-    edge = rasterize_edge(console, node_buffer_u, node_buffer_v, data=dict())
+    edge, _, _ = rasterize_edge(
+        console,
+        node_buffer_u,
+        node_buffer_v,
+        [node_buffer_u, node_buffer_u],
+        [],
+        data=dict(),
+    )
 
     assert edge.width == 9
     assert edge.height == 9

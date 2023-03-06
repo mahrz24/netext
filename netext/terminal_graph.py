@@ -1,7 +1,7 @@
 from collections.abc import Hashable
 from itertools import chain
 from math import ceil
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, Generic, cast
 
 import networkx as nx
 from rich.console import Console, ConsoleOptions, RenderResult
@@ -9,20 +9,17 @@ from rich.measure import Measurement
 
 from .buffer_renderer import render_buffers
 from .edge_rasterizer import EdgeBuffer, EdgeLayout, rasterize_edge
-from .layout_engines.engine import LayoutEngine
+from .layout_engines.engine import LayoutEngine, G
 from .layout_engines.grandalf import GrandalfSugiyamaLayout
 from .node_rasterizer import NodeBuffer, rasterize_node
-
-from networkx import Graph, DiGraph
-
-G = TypeVar("G", Graph, DiGraph)
 
 
 class TerminalGraph(Generic[G]):
     def __init__(
         self,
         g: G,
-        layout_engine: LayoutEngine[G] = GrandalfSugiyamaLayout[G](),
+        # see https://github.com/python/mypy/issues/3737
+        layout_engine: LayoutEngine[G] = GrandalfSugiyamaLayout[G](),  # type: ignore
         console: Console = Console(),
     ):
         """
@@ -67,9 +64,9 @@ class TerminalGraph(Generic[G]):
 
         # Store the node positions in the node buffers
         for node, pos in node_positions.items():
-            buffer = self._nx_graph.nodes[node]["_netext_node_buffer"]
-            buffer.x = pos[0]
-            buffer.y = pos[1]
+            buffer: NodeBuffer = self._nx_graph.nodes[node]["_netext_node_buffer"]
+            buffer.center.x = round(pos[0])
+            buffer.center.y = round(pos[1])
 
         # Assign magnets to edges
 
@@ -77,15 +74,22 @@ class TerminalGraph(Generic[G]):
 
         self.edge_buffers: list[EdgeBuffer] = []
         self.edge_layouts: list[EdgeLayout] = []
+        self.label_buffers: list[NodeBuffer] = []
 
         # Iterate over all edges (so far in no particular order)
         for u, v, data in self._nx_graph.edges(data=True):
             edge_buffer, edge_layout, label_nodes = rasterize_edge(
-                console, node_buffers[u], node_buffers[v], data
+                console,
+                node_buffers[u],
+                node_buffers[v],
+                node_buffers.values(),
+                self.edge_layouts,
+                data,
             )
 
             self.edge_buffers.append(edge_buffer)
             self.edge_layouts.append(edge_layout)
+            self.label_buffers.extend(label_nodes)
 
     def _transform_node_positions_to_console(
         self, node_positions: dict[Hashable, tuple[float, float]]
@@ -148,7 +152,9 @@ class TerminalGraph(Generic[G]):
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
         node_buffers = nx.get_node_attributes(self._nx_graph, "_netext_node_buffer")  # type: ignore
-        all_buffers = chain(node_buffers.values(), self.edge_buffers)
+        all_buffers = chain(
+            node_buffers.values(), self.edge_buffers, self.label_buffers
+        )
         yield from render_buffers(all_buffers, self.width, self.height)
 
     def __rich_measure__(
