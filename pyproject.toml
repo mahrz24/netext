@@ -24,7 +24,7 @@ coverage = {extras = ["toml"], version = "^6.4.2"}
 asv = "^0.5.1"
 mkdocs-material = "^9.0.5"
 importlib-metadata = "*"
-ruff = "^0.0.230"
+ruff = "^0.0.254"
 mypy = "^0.991"
 
 [tool.poetry.group.dev.dependencies]

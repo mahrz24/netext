@@ -1,13 +1,14 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable
 
 from bitarray import bitarray
 from rich.console import Console
 from rich.segment import Segment
+from rich.style import Style
 from netext.geometry import Point, Magnet
 
-from netext.node_rasterizer import NodeBuffer
+from netext.node_rasterizer import JustContent, NodeBuffer
 from netext.segment_buffer import Strip, StripBuffer, Spacer
 
 
@@ -188,11 +189,11 @@ def rasterize_edge(
     routed_edges: Iterable[EdgeLayout],
     data: Any,
 ) -> tuple[EdgeBuffer, EdgeLayout, list[NodeBuffer]]:
-    start = u_buffer.shape.get_magnet_position(
-        u_buffer, v_buffer.center, data.get("$magnet", Magnet.CENTER)
+    start = u_buffer.get_magnet_position(
+        v_buffer.center, data.get("$magnet", Magnet.CENTER)
     )
-    end = v_buffer.shape.get_magnet_position(
-        v_buffer, u_buffer.center, data.get("$magnet", Magnet.CENTER)
+    end = v_buffer.get_magnet_position(
+        u_buffer.center, data.get("$magnet", Magnet.CENTER)
     )
 
     routing_mode: EdgeRoutingMode = data.get(
@@ -210,7 +211,23 @@ def rasterize_edge(
         routing_hints=[],
     )
 
-    # label = data.get("$label", None)
+    label_buffers = []
+    label = data.get("$label", None)
+    # TODO Think about this, shape and node buffer are bound
+    # so maybe use the shape to create the node buffer
+    # and link it to the creating shape?
+    if label is not None:
+        shape = JustContent()
+        label_strips = shape.render_shape(console, label, style=Style(), data={})
+        label_buffer = NodeBuffer.from_strips(
+            label_strips,
+            z_index=1,
+            shape=shape,
+            center=Point(
+                x=round((start.x + end.x) / 2), y=round((start.y + end.y) / 2)
+            ),
+        )
+        label_buffers.append(label_buffer)
 
     edge_segments = route_edge(start, end, routing_mode)
     bitmap_buffer = rasterize_edge_segments(edge_segments, sampling=1)
@@ -227,7 +244,7 @@ def rasterize_edge(
         strips=strips,
     )
 
-    return edge_buffer, edge_layout, []
+    return edge_buffer, edge_layout, label_buffers
 
 
 def _bresenham_line_drawing(

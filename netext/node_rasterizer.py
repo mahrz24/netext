@@ -23,18 +23,28 @@ class Shape(Protocol):
 
     def render_shape(
         self,
+        console: Console,
         content_renderable: RenderableType,
         style: Style,
         data: dict[Hashable, Any],
-    ) -> RenderableType:
+    ) -> list[Strip]:
         return NotImplemented
 
 
 class RectangularShapeMixin:
+    def _renderable_type_to_strips(
+        self, console: Console, node_renderable: RenderableType
+    ) -> list[Strip]:
+        segment_lists = list(console.render_lines(node_renderable, pad=False))
+        return [
+            Strip(segments=cast(list[Segment | Spacer], segments))
+            for segments in segment_lists
+        ]
+
     def get_magnet_position(
         self, node_buffer: "NodeBuffer", target_point: Point, magnet: Magnet
     ) -> Point:
-        match magnet:  # noqa
+        match magnet:
             case Magnet.TOP:
                 return Point(x=node_buffer.center.x, y=node_buffer.top_y)
             case Magnet.LEFT:
@@ -55,11 +65,14 @@ class RectangularShapeMixin:
                         (node_buffer.left_x, node_buffer.bottom_y),
                     ]
                 )
-
+                print(node_polygon)
+                print(direct_line)
                 intersection = direct_line.intersection(node_polygon)
                 intersection_point = intersection.line_interpolate_point(
                     1.0, normalized=True
                 )
+                if intersection_point.is_empty:
+                    return node_buffer.center
                 return Point(
                     x=round(intersection_point.x), y=round(intersection_point.y)
                 )
@@ -69,22 +82,26 @@ class RectangularShapeMixin:
 class JustContent(RectangularShapeMixin):
     def render_shape(
         self,
+        console: Console,
         content_renderable: RenderableType,
         style: Style,
         data: dict[Hashable, Any],
-    ) -> RenderableType:
-        return content_renderable
+    ) -> list[Strip]:
+        return self._renderable_type_to_strips(console, content_renderable)
 
 
 class Box(RectangularShapeMixin):
     def render_shape(
         self,
+        console: Console,
         content_renderable: RenderableType,
         style: Style,
         data: dict[Hashable, Any],
-    ) -> RenderableType:
+    ) -> list[Strip]:
         box_type = data.get("$box-type", box.ROUNDED)
-        return Panel(content_renderable, expand=False, style=style, box=box_type)
+        return self._renderable_type_to_strips(
+            console, Panel(content_renderable, expand=False, style=style, box=box_type)
+        )
 
 
 @dataclass
@@ -94,6 +111,32 @@ class NodeBuffer(StripBuffer):
     node_height: int
 
     shape: Shape = JustContent()
+
+    @classmethod
+    def from_strips(
+        cls,
+        strips: list[Strip],
+        center: Point,
+        shape: Shape,
+        z_index=0,
+    ) -> "NodeBuffer":
+        width = max(
+            sum(segment.cell_length for segment in strip.segments) for strip in strips
+        )
+
+        return cls(
+            shape=shape,
+            center=center,
+            z_index=-1,
+            node_width=width,
+            node_height=len(strips),
+            strips=strips,
+        )
+
+    def get_magnet_position(self, target_point: Point, magnet: Magnet) -> Point:
+        return self.shape.get_magnet_position(
+            self, target_point=target_point, magnet=magnet
+        )
 
     @property
     def left_x(self) -> int:
@@ -136,23 +179,8 @@ def rasterize_node(
     content_renderable = content_renderer(str(node), data, content_style)
 
     # TODO render shape needs to return a strip as it could have spacers
-    node_renderable = shape.render_shape(content_renderable, style=style, data=data)
+    strips = shape.render_shape(console, content_renderable, style=style, data=data)
 
-    segment_lists = list(console.render_lines(node_renderable, pad=False))
-    strips = [
-        Strip(segments=cast(list[Segment | Spacer], segments))
-        for segments in segment_lists
-    ]
-    width = max(
-        sum(segment.cell_length for segment in strip.segments) for strip in strips
+    return NodeBuffer.from_strips(
+        strips, center=Point(x=0, y=0), z_index=-1, shape=shape
     )
-
-    node_buffer = NodeBuffer(
-        shape=shape,
-        center=Point(x=0, y=0),
-        z_index=-1,
-        node_width=width,
-        node_height=len(strips),
-        strips=strips,
-    )
-    return node_buffer
