@@ -14,15 +14,14 @@
     * [x] How to style nodes
     * [x] How to style edges
     * [ ] Clean up all crosslinks
-    * [ ] Add now missing
+    * [ ] Add now missing attributes
 * [x] Switch to mypy
 
 ### Refactoring
 
 * [x] Remove offset and use spacers instead
 * [x] Rename line into strip to algin with textual
-* [ ] Use line within edges to distinguish from label and arrows
-* [ ] Use enums for all styles
+* [x] Use enums for all styles
 
 ### Tests & Benchmarks
 
@@ -39,7 +38,7 @@
 ### Features
 
 * Better line rendering
-    * [ ] Use magnets on the node border for edge positions
+    * [x] Use magnets on the node border for edge positions
     * Multiple line segment rendering mechanisms
         * [ ] Box characters (straight lines only) with corner connection (only for straight lines)
         * [x] Single character mode
@@ -49,7 +48,7 @@
     * [ ] Arrow tips
     * [ ] Dash patterns
     * [ ] Thickness (only certain modes)
-* [ ] Edge labels
+* [x] Edge labels
 * [ ] Node labels (as labels separate to the node itself)
 * [ ] Specify attribute on the graph level and propagate to nodes / edges
 * [ ] Partial rendering, clipping and adaptive sizing

@@ -65,13 +65,12 @@ class RectangularShapeMixin:
                         (node_buffer.left_x, node_buffer.bottom_y),
                     ]
                 )
-                print(node_polygon)
-                print(direct_line)
                 intersection = direct_line.intersection(node_polygon)
                 intersection_point = intersection.line_interpolate_point(
                     1.0, normalized=True
                 )
                 if intersection_point.is_empty:
+                    print("EMPTY")
                     return node_buffer.center
                 return Point(
                     x=round(intersection_point.x), y=round(intersection_point.y)

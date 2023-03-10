@@ -123,7 +123,7 @@ def route_edge(
 
 
 def rasterize_edge_segments(
-    edge_segments: list[EdgeSegment], sampling: int
+    edge_segments: list[EdgeSegment], scaling: int
 ) -> BitmapBuffer:
     min_point = Point(
         x=min([min([seg.start.x, seg.end.x]) for seg in edge_segments]),
@@ -133,16 +133,24 @@ def rasterize_edge_segments(
         x=max([max([seg.start.x, seg.end.x]) for seg in edge_segments]),
         y=max([max([seg.start.y, seg.end.y]) for seg in edge_segments]),
     )
-    width = max_point.x - min_point.x + 1
-    height = max_point.y - min_point.y + 1
+    width = (max_point.x - min_point.x + 1) * scaling
+    height = (max_point.y - min_point.y + 1) * scaling
     buffer = bitarray(width * height)
     buffer.setall(0)
     bitmap_buffer = BitmapBuffer(
-        x=min_point.x, y=min_point.y, width=width, height=height, buffer=buffer
+        x=min_point.x * scaling,
+        y=min_point.y * scaling,
+        width=width,
+        height=height,
+        buffer=buffer,
     )
 
     for edge_segment in edge_segments:
-        _bresenham_line_drawing(edge_segment, bitmap_buffer=bitmap_buffer)
+        scaled_segment = EdgeSegment(
+            start=Point(edge_segment.start.x * scaling, edge_segment.start.y * scaling),
+            end=Point(edge_segment.end.x * scaling, edge_segment.end.y * scaling),
+        )
+        _bresenham_line_drawing(scaled_segment, bitmap_buffer=bitmap_buffer)
 
     return bitmap_buffer
 
@@ -154,6 +162,46 @@ def _slice_to_strip(slice: bitarray) -> Strip:
             current_segment.append(Spacer(width=1))
         else:
             current_segment.append(Segment("*"))
+
+    return Strip(segments=current_segment)
+
+
+def _infinite_canvas_access(slice: bitarray, x: int, y: int, width: int) -> int:
+    index = width * y + x
+    if index < 0:
+        return 0
+    elif index >= len(slice):
+        return 0
+    else:
+        return slice[index]
+
+
+def _slice_to_box_strip(slice: bitarray, width: int) -> Strip:
+    current_segment: list[Segment | Spacer] = []
+    for x in range(0, width, 2):
+        lookup = (
+            (
+                _infinite_canvas_access(slice, x, 0, width),
+                _infinite_canvas_access(slice, x + 1, 0, width),
+            ),
+            (
+                _infinite_canvas_access(slice, x, 1, width),
+                _infinite_canvas_access(slice, x + 1, 1, width),
+            ),
+        )
+        match lookup:
+            case ((0, 0), (0, 0)):
+                current_segment.append(Spacer(width=1))
+            case ((0, 1), (0, 1)) | ((1, 0), (1, 0)):
+                current_segment.append(Segment("│"))
+            case ((1, 1), (0, 0)) | ((0, 0), (1, 1)):
+                current_segment.append(Segment("─"))
+            case ((1, 0), (0, 1)):
+                current_segment.append(Segment("╲"))
+            case ((0, 1), (1, 0)):
+                current_segment.append(Segment("╱"))
+            case _:
+                current_segment.append(Spacer(width=1))
 
     return Strip(segments=current_segment)
 
@@ -170,6 +218,16 @@ def bitmap_to_strips(
                     ]
                 )
                 for y in range(bitmap_buffer.height)
+            ]
+        case EdgeSegmentDrawingMode.box:
+            lines = [
+                _slice_to_box_strip(
+                    bitmap_buffer.buffer[
+                        y * bitmap_buffer.width : (y + 2) * bitmap_buffer.width
+                    ],
+                    bitmap_buffer.width,
+                )
+                for y in range(0, bitmap_buffer.height, 2)
             ]
         case _:
             raise NotImplementedError(
@@ -230,10 +288,21 @@ def rasterize_edge(
         label_buffers.append(label_buffer)
 
     edge_segments = route_edge(start, end, routing_mode)
-    bitmap_buffer = rasterize_edge_segments(edge_segments, sampling=1)
-    strips = bitmap_to_strips(
-        bitmap_buffer, edge_segment_drawing_mode=edge_segment_drawing_mode
-    )
+
+    if edge_segment_drawing_mode == EdgeSegmentDrawingMode.box:
+        assert (
+            routing_mode == EdgeRoutingMode.orthogonal
+        ), "Box characters are only supported on orthogonal lines"
+        # Use a character buffer draw line for line into it with joins
+    else:
+        # In case of pixel / braille we scale and then map character per character
+        x_scaling = 1  # noqa
+        y_scaling = 1  # noqa
+
+        bitmap_buffer = rasterize_edge_segments(edge_segments, scaling=1)
+        strips = bitmap_to_strips(
+            bitmap_buffer, edge_segment_drawing_mode=edge_segment_drawing_mode
+        )
 
     edge_layout = EdgeLayout(input=edge_input, segments=edge_segments)
 
