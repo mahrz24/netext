@@ -237,6 +237,54 @@ def bitmap_to_strips(
     return lines
 
 
+def orthogonal_segments_to_strips_with_box_characters(
+    edge_segments: list[EdgeSegment],
+) -> list[Strip]:
+    min_point = Point(
+        x=min([min([seg.start.x, seg.end.x]) for seg in edge_segments]),
+        y=min([min([seg.start.y, seg.end.y]) for seg in edge_segments]),
+    )
+    max_point = Point(
+        x=max([max([seg.start.x, seg.end.x]) for seg in edge_segments]),
+        y=max([max([seg.start.y, seg.end.y]) for seg in edge_segments]),
+    )
+    width = max_point.x - min_point.x + 1
+    height = max_point.y - min_point.y + 1
+    char_buffer = [[None] * width] * height
+
+    offset_edge_segments = [
+        EdgeSegment(
+            start=Point(
+                edge_segment.start.x - min_point.x, edge_segment.start.y - min_point.y
+            ),
+            end=Point(
+                edge_segment.end.x - min_point.x, edge_segment.end.y - min_point.y
+            ),
+        )
+        for edge_segment in edge_segments
+    ]
+
+    for edge_segment, next_segment in zip(
+        offset_edge_segments, offset_edge_segments[1:] + [None]
+    ):
+        if edge_segment.start.x == edge_segment.end.x:
+            for y in range(edge_segment.start.y, edge_segment.end.y):
+                char_buffer[y][edge_segment.start.x] = "│"
+        else:
+            for x in range(edge_segment.start.x, edge_segment.end.x):
+                char_buffer[edge_segment.start.y][x] = "─"
+
+    return [
+        Strip(
+            [
+                Segment(text=character) if character is not None else Spacer(width=1)
+                for character in line
+            ]
+        )
+        for line in char_buffer
+    ]
+
+
 # TODO: Should return an edge buffer (the edge and tips), the edge layout (to be used as optional input) and a list
 # of node buffers, the labels
 def rasterize_edge(
@@ -293,7 +341,7 @@ def rasterize_edge(
         assert (
             routing_mode == EdgeRoutingMode.orthogonal
         ), "Box characters are only supported on orthogonal lines"
-        # Use a character buffer draw line for line into it with joins
+        strips = orthogonal_segments_to_strips_with_box_characters(edge_segments)
     else:
         # In case of pixel / braille we scale and then map character per character
         x_scaling = 1  # noqa
