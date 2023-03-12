@@ -72,9 +72,29 @@ class RectangularShapeMixin:
                 if intersection_point.is_empty:
                     print("EMPTY")
                     return node_buffer.center
-                return Point(
-                    x=round(intersection_point.x), y=round(intersection_point.y)
+
+                closest_magnet = Magnet.TOP
+                closest_point = self.get_magnet_position(
+                    node_buffer=node_buffer,
+                    target_point=target_point,
+                    magnet=closest_magnet,
                 )
+                closest_distance = intersection_point.distance(
+                    closest_point.shapely_point()
+                )
+
+                for magnet in [Magnet.LEFT, Magnet.RIGHT, Magnet.BOTTOM]:
+                    point = self.get_magnet_position(
+                        node_buffer=node_buffer,
+                        target_point=target_point,
+                        magnet=magnet,
+                    )
+                    distance = intersection_point.distance(point.shapely_point())
+                    if distance < closest_distance:
+                        closest_point = point
+                        closest_distance = distance
+
+                return closest_point
         raise RuntimeError(magnet)
 
 

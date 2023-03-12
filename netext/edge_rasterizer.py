@@ -106,16 +106,46 @@ class EdgeBuffer(StripBuffer):
 
 
 def route_edge(
-    start: Point, end: Point, routing_mode: EdgeRoutingMode
+    start: Point,
+    start_direction: Point,
+    end: Point,
+    end_direction: Point,
+    routing_mode: EdgeRoutingMode,
 ) -> list[EdgeSegment]:
-    match routing_mode:  # noqa: E999
+    match routing_mode:
         case EdgeRoutingMode.straight:
             return [EdgeSegment(start=start, end=end)]
         case EdgeRoutingMode.orthogonal:
-            return [
-                EdgeSegment(start=start, end=Point(x=start.x, y=end.y)),
-                EdgeSegment(start=Point(x=start.x, y=end.y), end=end),
-            ]
+            if abs(start_direction.x) < abs(start_direction.y):
+                if abs(end_direction.x) < abs(end_direction.y):
+                    mid = start + ((end - start) * 0.5)
+                    return [
+                        EdgeSegment(start=start, end=Point(x=start.x, y=mid.y)),
+                        EdgeSegment(
+                            start=Point(x=start.x, y=mid.y), end=Point(x=end.x, y=mid.y)
+                        ),
+                        EdgeSegment(start=Point(x=end.x, y=mid.y), end=end),
+                    ]
+                else:
+                    return [
+                        EdgeSegment(start=start, end=Point(x=start.x, y=end.y)),
+                        EdgeSegment(start=Point(x=start.x, y=end.y), end=end),
+                    ]
+            else:
+                if abs(end_direction.x) > abs(end_direction.y):
+                    mid = start + ((end - start) * 0.5)
+                    return [
+                        EdgeSegment(start=start, end=Point(x=mid.x, y=start.y)),
+                        EdgeSegment(
+                            start=Point(x=mid.x, y=start.y), end=Point(x=mid.x, y=end.y)
+                        ),
+                        EdgeSegment(start=Point(x=mid.x, y=end.y), end=end),
+                    ]
+                else:
+                    return [
+                        EdgeSegment(start=start, end=Point(x=end.x, y=start.y)),
+                        EdgeSegment(start=Point(x=end.x, y=start.y), end=end),
+                    ]
         case _:
             raise NotImplementedError(
                 f"The routing mode {routing_mode} has not been implemented yet."
@@ -250,10 +280,9 @@ def orthogonal_segments_to_strips_with_box_characters(
     )
     width = max_point.x - min_point.x + 1
     height = max_point.y - min_point.y + 1
-    char_buffer: list[list[int | None]] = list()
+    char_buffer: list[list[str | None]] = list()
     for y in range(height):
         char_buffer.append(list([None] * width))
-    print(char_buffer)
     offset_edge_segments = [
         EdgeSegment(
             start=Point(
@@ -281,7 +310,7 @@ def orthogonal_segments_to_strips_with_box_characters(
                 max(edge_segment.start.x, edge_segment.end.x),
             ):
                 char_buffer[edge_segment.start.y][x] = "─"
-    print(char_buffer)
+
     return [
         Strip(
             [
@@ -306,9 +335,13 @@ def rasterize_edge(
     start = u_buffer.get_magnet_position(
         v_buffer.center, data.get("$magnet", Magnet.CENTER)
     )
+
+    start_direction = start - u_buffer.center
+
     end = v_buffer.get_magnet_position(
         u_buffer.center, data.get("$magnet", Magnet.CENTER)
     )
+    end_direction = end - v_buffer.center
 
     routing_mode: EdgeRoutingMode = data.get(
         "$edge-routing-mode", EdgeRoutingMode.straight
@@ -343,15 +376,13 @@ def rasterize_edge(
         )
         label_buffers.append(label_buffer)
 
-    edge_segments = route_edge(start, end, routing_mode)
+    edge_segments = route_edge(start, start_direction, end, end_direction, routing_mode)
 
     if edge_segment_drawing_mode == EdgeSegmentDrawingMode.box:
         assert (
             routing_mode == EdgeRoutingMode.orthogonal
         ), "Box characters are only supported on orthogonal lines"
         strips = orthogonal_segments_to_strips_with_box_characters(edge_segments)
-        print(edge_segments)
-        print(strips)
     else:
         # In case of pixel / braille we scale and then map character per character
         x_scaling = 1  # noqa
