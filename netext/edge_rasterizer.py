@@ -250,8 +250,10 @@ def orthogonal_segments_to_strips_with_box_characters(
     )
     width = max_point.x - min_point.x + 1
     height = max_point.y - min_point.y + 1
-    char_buffer = [[None] * width] * height
-
+    char_buffer: list[list[int | None]] = list()
+    for y in range(height):
+        char_buffer.append(list([None] * width))
+    print(char_buffer)
     offset_edge_segments = [
         EdgeSegment(
             start=Point(
@@ -268,12 +270,18 @@ def orthogonal_segments_to_strips_with_box_characters(
         offset_edge_segments, offset_edge_segments[1:] + [None]
     ):
         if edge_segment.start.x == edge_segment.end.x:
-            for y in range(edge_segment.start.y, edge_segment.end.y):
+            for y in range(
+                min(edge_segment.start.y, edge_segment.end.y),
+                max(edge_segment.start.y, edge_segment.end.y),
+            ):
                 char_buffer[y][edge_segment.start.x] = "│"
-        else:
-            for x in range(edge_segment.start.x, edge_segment.end.x):
+        elif edge_segment.start.y == edge_segment.end.y:
+            for x in range(
+                min(edge_segment.start.x, edge_segment.end.x),
+                max(edge_segment.start.x, edge_segment.end.x),
+            ):
                 char_buffer[edge_segment.start.y][x] = "─"
-
+    print(char_buffer)
     return [
         Strip(
             [
@@ -342,6 +350,8 @@ def rasterize_edge(
             routing_mode == EdgeRoutingMode.orthogonal
         ), "Box characters are only supported on orthogonal lines"
         strips = orthogonal_segments_to_strips_with_box_characters(edge_segments)
+        print(edge_segments)
+        print(strips)
     else:
         # In case of pixel / braille we scale and then map character per character
         x_scaling = 1  # noqa
