@@ -54,6 +54,8 @@ class RectangularShapeMixin:
             case Magnet.RIGHT:
                 return Point(x=node_buffer.right_x, y=node_buffer.center.y)
             case Magnet.CENTER:
+                return node_buffer.center
+            case Magnet.CLOSEST:
                 direct_line = LineString(
                     [node_buffer.center.shapely_point(), target_point.shapely_point()]
                 )
@@ -70,7 +72,6 @@ class RectangularShapeMixin:
                     1.0, normalized=True
                 )
                 if intersection_point.is_empty:
-                    print("EMPTY")
                     return node_buffer.center
 
                 closest_magnet = Magnet.TOP

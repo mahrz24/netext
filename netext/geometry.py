@@ -27,3 +27,4 @@ class Magnet(Enum):
     LEFT = 2
     BOTTOM = 3
     RIGHT = 4
+    CLOSEST = 5

@@ -7,9 +7,11 @@ from rich.console import Console
 from rich.segment import Segment
 from rich.style import Style
 from netext.geometry import Point, Magnet
+from shapely import LineString, Polygon
 
 from netext.node_rasterizer import JustContent, NodeBuffer
 from netext.segment_buffer import Strip, StripBuffer, Spacer
+from rich import print
 
 
 class EdgeRoutingMode(Enum):
@@ -42,6 +44,19 @@ class EdgeInput:
 class EdgeSegment:
     start: Point
     end: Point
+
+    def intersects_with_node(self, node_buffer: NodeBuffer) -> bool:
+        direct_line = LineString([self.start.shapely_point(), self.end.shapely_point()])
+        node_polygon = Polygon(
+            [
+                (node_buffer.left_x, node_buffer.top_y),
+                (node_buffer.right_x + 1, node_buffer.top_y),
+                (node_buffer.right_x + 1, node_buffer.bottom_y + 1),
+                (node_buffer.left_x, node_buffer.bottom_y + 1),
+            ]
+        )
+        intersection = direct_line.intersection(node_polygon)
+        return not intersection.is_empty
 
 
 @dataclass
@@ -107,49 +122,140 @@ class EdgeBuffer(StripBuffer):
 
 def route_edge(
     start: Point,
-    start_direction: Point,
     end: Point,
-    end_direction: Point,
     routing_mode: EdgeRoutingMode,
+    non_start_end_nodes: Iterable[NodeBuffer],
+    routed_edges: Iterable[EdgeLayout],
 ) -> list[EdgeSegment]:
     match routing_mode:
         case EdgeRoutingMode.straight:
             return [EdgeSegment(start=start, end=end)]
         case EdgeRoutingMode.orthogonal:
-            if abs(start_direction.x) < abs(start_direction.y):
-                if abs(end_direction.x) < abs(end_direction.y):
-                    mid = start + ((end - start) * 0.5)
-                    return [
-                        EdgeSegment(start=start, end=Point(x=start.x, y=mid.y)),
-                        EdgeSegment(
-                            start=Point(x=start.x, y=mid.y), end=Point(x=end.x, y=mid.y)
-                        ),
-                        EdgeSegment(start=Point(x=end.x, y=mid.y), end=end),
-                    ]
-                else:
-                    return [
-                        EdgeSegment(start=start, end=Point(x=start.x, y=end.y)),
-                        EdgeSegment(start=Point(x=start.x, y=end.y), end=end),
-                    ]
-            else:
-                if abs(end_direction.x) > abs(end_direction.y):
-                    mid = start + ((end - start) * 0.5)
-                    return [
-                        EdgeSegment(start=start, end=Point(x=mid.x, y=start.y)),
-                        EdgeSegment(
-                            start=Point(x=mid.x, y=start.y), end=Point(x=mid.x, y=end.y)
-                        ),
-                        EdgeSegment(start=Point(x=mid.x, y=end.y), end=end),
-                    ]
-                else:
-                    return [
-                        EdgeSegment(start=start, end=Point(x=end.x, y=start.y)),
-                        EdgeSegment(start=Point(x=end.x, y=start.y), end=end),
-                    ]
+            return route_orthogonal_edge(
+                start=start,
+                end=end,
+                non_start_end_nodes=non_start_end_nodes,
+            )
         case _:
             raise NotImplementedError(
                 f"The routing mode {routing_mode} has not been implemented yet."
             )
+
+
+def route_orthogonal_edge(
+    start: Point,
+    end: Point,
+    non_start_end_nodes: Iterable[NodeBuffer],
+) -> list[EdgeSegment]:
+    # Create an orthogonal line from start to end.
+    # Decide whether to go horizontal first or vertical first by looking at the other nodes.
+    routed_horizontal, intersects_horizontal = route_orthogonal_edge_horizontal_first(
+        start=start, end=end, non_start_end_nodes=non_start_end_nodes
+    )
+    routed_vertical, intersections_vertical = route_orthogonal_edge_vertical_first(
+        start=start, end=end, non_start_end_nodes=non_start_end_nodes
+    )
+
+    print("[red]NEW ROUTE[/red]")
+    print(routed_horizontal, intersects_horizontal)
+    print(routed_vertical, intersections_vertical)
+
+    if intersects_horizontal < intersections_vertical:
+        return routed_horizontal
+    else:
+        return routed_vertical
+
+
+def intersection_count(
+    route: list[EdgeSegment], non_start_end_nodes: Iterable[NodeBuffer]
+) -> int:
+    return sum(
+        [
+            segment.intersects_with_node(node)
+            for segment in route
+            for node in non_start_end_nodes
+        ]
+    )
+
+
+def route_with_subdivision(
+    routed_segments: list[EdgeSegment], non_start_end_nodes: Iterable[NodeBuffer]
+) -> tuple[list[EdgeSegment], int]:
+    intersections = intersection_count(routed_segments, non_start_end_nodes)
+    new_routed_segments = routed_segments
+    new_intersections = intersections
+
+    # if intersections > 0:
+    #     # Iterate tuples of two segments and subdivide them.
+    #     for i in range(len(routed_segments) - 1):
+    #         prefix_segments = routed_segments[:i]
+    #         segment_1 = routed_segments[i]
+    #         segment_2 = routed_segments[i + 1]
+    #         suffix_segments = routed_segments[i + 2 :]
+
+    #         # Subdivide the segments.
+    #         midpoint = (segment_1.start + segment_2.end) * 0.5
+    #         # TODO: Make this more efficient by reusing intersection counts
+    #         # TODO: Also try all combinations of horizontal and vertical.
+    #         new_segments_1, _ = route_orthogonal_edge_horizontal_first(
+    #             segment_1.start, midpoint, non_start_end_nodes
+    #         )
+    #         new_segments_2, _ = route_orthogonal_edge_horizontal_first(
+    #             midpoint, segment_2.end, non_start_end_nodes
+    #         )
+
+    #         # Replace the two segments with the new ones.
+    #         combined_segments = (
+    #             prefix_segments + new_segments_1 + new_segments_2 + suffix_segments
+    #         )
+    #         combined_intersections = intersection_count(
+    #             combined_segments, non_start_end_nodes
+    #         )
+    #         if combined_intersections < new_intersections:
+    #             new_routed_segments = combined_segments
+    #             new_intersections = combined_intersections
+
+    return new_routed_segments, new_intersections
+
+
+def route_orthogonal_edge_horizontal_first(
+    start: Point,
+    end: Point,
+    non_start_end_nodes: Iterable[NodeBuffer],
+) -> tuple[list[EdgeSegment], int]:
+    if start == end:
+        routed_horizontal = []
+    elif start.x == end.x or start.y == end.y:
+        routed_horizontal = [EdgeSegment(start=start, end=end)]
+    else:
+        routed_horizontal = [
+            EdgeSegment(
+                start=Point(x=start.x, y=start.y), end=Point(x=end.x, y=start.y)
+            ),
+            EdgeSegment(start=Point(x=end.x, y=start.y), end=Point(x=end.x, y=end.y)),
+        ]
+
+    return route_with_subdivision(routed_horizontal, non_start_end_nodes)
+
+
+def route_orthogonal_edge_vertical_first(
+    start: Point,
+    end: Point,
+    non_start_end_nodes: Iterable[NodeBuffer],
+) -> tuple[list[EdgeSegment], int]:
+    if start == end:
+        routed_vertical = []
+    elif start.x == end.x or start.y == end.y:
+        routed_vertical = [EdgeSegment(start=start, end=end)]
+    else:
+        routed_vertical = [
+            EdgeSegment(
+                start=Point(x=start.x, y=start.y), end=Point(x=start.x, y=end.y)
+            ),
+            EdgeSegment(start=Point(x=start.x, y=end.y), end=Point(x=end.x, y=end.y)),
+        ]
+
+    return route_with_subdivision(routed_vertical, non_start_end_nodes)
 
 
 def rasterize_edge_segments(
@@ -196,44 +302,44 @@ def _slice_to_strip(slice: bitarray) -> Strip:
     return Strip(segments=current_segment)
 
 
-def _infinite_canvas_access(slice: bitarray, x: int, y: int, width: int) -> int:
-    index = width * y + x
-    if index < 0:
-        return 0
-    elif index >= len(slice):
-        return 0
-    else:
-        return slice[index]
+# def _infinite_canvas_access(slice: bitarray, x: int, y: int, width: int) -> int:
+#     index = width * y + x
+#     if index < 0:
+#         return 0
+#     elif index >= len(slice):
+#         return 0
+#     else:
+#         return slice[index]
 
 
-def _slice_to_box_strip(slice: bitarray, width: int) -> Strip:
-    current_segment: list[Segment | Spacer] = []
-    for x in range(0, width, 2):
-        lookup = (
-            (
-                _infinite_canvas_access(slice, x, 0, width),
-                _infinite_canvas_access(slice, x + 1, 0, width),
-            ),
-            (
-                _infinite_canvas_access(slice, x, 1, width),
-                _infinite_canvas_access(slice, x + 1, 1, width),
-            ),
-        )
-        match lookup:
-            case ((0, 0), (0, 0)):
-                current_segment.append(Spacer(width=1))
-            case ((0, 1), (0, 1)) | ((1, 0), (1, 0)):
-                current_segment.append(Segment("│"))
-            case ((1, 1), (0, 0)) | ((0, 0), (1, 1)):
-                current_segment.append(Segment("─"))
-            case ((1, 0), (0, 1)):
-                current_segment.append(Segment("╲"))
-            case ((0, 1), (1, 0)):
-                current_segment.append(Segment("╱"))
-            case _:
-                current_segment.append(Spacer(width=1))
+# def _slice_to_box_strip(slice: bitarray, width: int) -> Strip:
+#     current_segment: list[Segment | Spacer] = []
+#     for x in range(0, width, 2):
+#         lookup = (
+#             (
+#                 _infinite_canvas_access(slice, x, 0, width),
+#                 _infinite_canvas_access(slice, x + 1, 0, width),
+#             ),
+#             (
+#                 _infinite_canvas_access(slice, x, 1, width),
+#                 _infinite_canvas_access(slice, x + 1, 1, width),
+#             ),
+#         )
+#         match lookup:
+#             case ((0, 0), (0, 0)):
+#                 current_segment.append(Spacer(width=1))
+#             case ((0, 1), (0, 1)) | ((1, 0), (1, 0)):
+#                 current_segment.append(Segment("│"))
+#             case ((1, 1), (0, 0)) | ((0, 0), (1, 1)):
+#                 current_segment.append(Segment("─"))
+#             case ((1, 0), (0, 1)):
+#                 current_segment.append(Segment("╲"))
+#             case ((0, 1), (1, 0)):
+#                 current_segment.append(Segment("╱"))
+#             case _:
+#                 current_segment.append(Spacer(width=1))
 
-    return Strip(segments=current_segment)
+#     return Strip(segments=current_segment)
 
 
 def bitmap_to_strips(
@@ -249,16 +355,16 @@ def bitmap_to_strips(
                 )
                 for y in range(bitmap_buffer.height)
             ]
-        case EdgeSegmentDrawingMode.box:
-            lines = [
-                _slice_to_box_strip(
-                    bitmap_buffer.buffer[
-                        y * bitmap_buffer.width : (y + 2) * bitmap_buffer.width
-                    ],
-                    bitmap_buffer.width,
-                )
-                for y in range(0, bitmap_buffer.height, 2)
-            ]
+        # case EdgeSegmentDrawingMode.box:
+        #     lines = [
+        #         _slice_to_box_strip(
+        #             bitmap_buffer.buffer[
+        #                 y * bitmap_buffer.width : (y + 2) * bitmap_buffer.width
+        #             ],
+        #             bitmap_buffer.width,
+        #         )
+        #         for y in range(0, bitmap_buffer.height, 2)
+        #     ]
         case _:
             raise NotImplementedError(
                 "The edge segement drawing mode has not yet been implemented"
@@ -270,6 +376,9 @@ def bitmap_to_strips(
 def orthogonal_segments_to_strips_with_box_characters(
     edge_segments: list[EdgeSegment],
 ) -> list[Strip]:
+    if not edge_segments:
+        return []
+
     min_point = Point(
         x=min([min([seg.start.x, seg.end.x]) for seg in edge_segments]),
         y=min([min([seg.start.y, seg.end.y]) for seg in edge_segments]),
@@ -322,8 +431,6 @@ def orthogonal_segments_to_strips_with_box_characters(
     ]
 
 
-# TODO: Should return an edge buffer (the edge and tips), the edge layout (to be used as optional input) and a list
-# of node buffers, the labels
 def rasterize_edge(
     console: Console,
     u_buffer: NodeBuffer,
@@ -336,12 +443,9 @@ def rasterize_edge(
         v_buffer.center, data.get("$magnet", Magnet.CENTER)
     )
 
-    start_direction = start - u_buffer.center
-
     end = v_buffer.get_magnet_position(
         u_buffer.center, data.get("$magnet", Magnet.CENTER)
     )
-    end_direction = end - v_buffer.center
 
     routing_mode: EdgeRoutingMode = data.get(
         "$edge-routing-mode", EdgeRoutingMode.straight
@@ -360,7 +464,8 @@ def rasterize_edge(
 
     label_buffers = []
     label = data.get("$label", None)
-    # TODO Think about this, shape and node buffer are bound
+
+    # TODO Think about this: Shape and node buffer are bound
     # so maybe use the shape to create the node buffer
     # and link it to the creating shape?
     if label is not None:
@@ -376,7 +481,25 @@ def rasterize_edge(
         )
         label_buffers.append(label_buffer)
 
-    edge_segments = route_edge(start, start_direction, end, end_direction, routing_mode)
+    # We perform a two pass routing here.
+
+    # First we route the edge with allowing the center magnet as start and end
+    # This routing already tries to avoid other nodes.
+
+    non_start_end_nodes = [
+        node_buffer
+        for node_buffer in all_nodes
+        if node_buffer is not u_buffer and node_buffer is not v_buffer
+    ]
+
+    edge_segments = route_edge(
+        start, end, routing_mode, non_start_end_nodes, routed_edges
+    )
+
+    # Then we cut the edge with the node boundaries.
+    # edge_segments = cut_edge_segments_with_start_and_end_nodes(
+    #     edge_segments, u_buffer, v_buffer
+    # )
 
     if edge_segment_drawing_mode == EdgeSegmentDrawingMode.box:
         assert (

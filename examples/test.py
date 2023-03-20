@@ -34,6 +34,7 @@ nx.set_node_attributes(g1, _render, "$content-renderer")
 # def _render2(n, d, s):
 #     return "Fo"
 
+g.add_edge(0, 22)
 
 nx.set_node_attributes(g, Style(color="blue"), "$content-style")
 nx.set_node_attributes(g, box.SQUARE, "$box-type")
