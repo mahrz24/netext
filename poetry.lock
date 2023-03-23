@@ -1931,6 +1931,17 @@ docs = ["matplotlib", "numpydoc (>=1.1.0,<1.2.0)", "sphinx", "sphinx-book-theme"
 test = ["pytest", "pytest-cov"]
 
 [[package]]
+name = "shapely-stubs"
+version = "0.0a0"
+description = "A dummy placeholder for the `shapely-stubs` package"
+category = "main"
+optional = false
+python-versions = "*"
+files = [
+    {file = "shapely-stubs-0.0a0.tar.gz", hash = "sha256:8f4c20e1fd146adaa825bc9216bc625006d04f068758c33429e576a99289f95f"},
+]
+
+[[package]]
 name = "six"
 version = "1.16.0"
 description = "Python 2 and 3 compatibility utilities"
@@ -2101,4 +2112,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "88583b2de502194d2cd220e863b64a3c4d85b9e8459ecb11103f50e149122a5f"
+content-hash = "20c937d7fd6504e05843e13222f4ae8e0656154401aab3bae52ac07918fdca22"

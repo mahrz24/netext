@@ -144,7 +144,7 @@ class NodeBuffer(StripBuffer):
         strips: list[Strip],
         center: Point,
         shape: Shape,
-        z_index=0,
+        z_index: int = 0,
     ) -> "NodeBuffer":
         width = max(
             sum(segment.cell_length for segment in strip.segments) for strip in strips

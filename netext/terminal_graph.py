@@ -47,7 +47,7 @@ class TerminalGraph(Generic[G]):
         }
 
         # Store the node buffers in the graph itself
-        nx.set_node_attributes(self._nx_graph, node_buffers, "_netext_node_buffer")  # type: ignore
+        nx.set_node_attributes(self._nx_graph, node_buffers, "_netext_node_buffer")
 
         # Position the nodes and add the position information to the graph
         node_positions: dict[Hashable, tuple[float, float]] = layout_engine(
