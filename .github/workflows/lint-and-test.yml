@@ -55,4 +55,3 @@ jobs:
       with:
         files: ./coverage.xml
         verbose: true # optional (default = false)
-å
