@@ -7,11 +7,10 @@ from rich.console import Console
 from rich.segment import Segment
 from rich.style import Style
 from netext.geometry import Point, Magnet
-from shapely import LineString, Polygon
+from shapely import LineString
 
 from netext.node_rasterizer import JustContent, NodeBuffer
 from netext.segment_buffer import Strip, StripBuffer, Spacer
-from rich import print
 
 
 class EdgeRoutingMode(Enum):
@@ -45,18 +44,80 @@ class EdgeSegment:
     start: Point
     end: Point
 
+    def length(self) -> float:
+        return self.start.distance_to(self.end)
+
     def intersects_with_node(self, node_buffer: NodeBuffer) -> bool:
         direct_line = LineString([self.start.shapely_point(), self.end.shapely_point()])
-        node_polygon = Polygon(
-            [
-                (node_buffer.left_x, node_buffer.top_y),
-                (node_buffer.right_x + 1, node_buffer.top_y),
-                (node_buffer.right_x + 1, node_buffer.bottom_y + 1),
-                (node_buffer.left_x, node_buffer.bottom_y + 1),
-            ]
-        )
+        node_polygon = node_buffer.shape.bounding_box(node_buffer)
         intersection = direct_line.intersection(node_polygon)
         return not intersection.is_empty
+
+    def count_node_intersections(self, node_buffers: Iterable[NodeBuffer]) -> int:
+        return sum(
+            1 for node_buffer in node_buffers if self.intersects_with_node(node_buffer)
+        )
+
+    def ortho_split_x(self) -> list["EdgeSegment"]:
+        if self.start.x == self.end.x or self.start.y == self.end.y:
+            return [self]
+        else:
+            return [
+                EdgeSegment(start=self.start, end=Point(x=self.start.x, y=self.end.y)),
+                EdgeSegment(start=Point(x=self.start.x, y=self.end.y), end=self.end),
+            ]
+
+    def ortho_split_y(self) -> list["EdgeSegment"]:
+        if self.start.x == self.end.x or self.start.y == self.end.y:
+            return [self]
+        else:
+            return [
+                EdgeSegment(start=self.start, end=Point(x=self.end.x, y=self.start.y)),
+                EdgeSegment(start=Point(x=self.end.x, y=self.start.y), end=self.end),
+            ]
+
+    @property
+    def midpoint(self) -> Point:
+        return (self.start + self.end) / 2
+
+    @property
+    def start_y_mid(self) -> Point:
+        return Point(x=self.midpoint.x, y=self.start.y)
+
+    @property
+    def end_y_mid(self) -> Point:
+        return Point(x=self.midpoint.x, y=self.end.y)
+
+    @property
+    def start_x_mid(self) -> Point:
+        return Point(x=self.start.x, y=self.midpoint.y)
+
+    @property
+    def end_x_mid(self) -> Point:
+        return Point(x=self.end.x, y=self.midpoint.y)
+
+
+@dataclass
+class RoutedEdgeSegments:
+    segments: list[EdgeSegment]
+    intersections: int
+
+    @classmethod
+    def from_segments(
+        cls, segments: list[EdgeSegment], node_buffers: Iterable[NodeBuffer]
+    ) -> "RoutedEdgeSegments":
+        return cls(
+            segments=segments,
+            intersections=sum(
+                segment.count_node_intersections(node_buffers) for segment in segments
+            ),
+        )
+
+    def concat(self, other: "RoutedEdgeSegments") -> "RoutedEdgeSegments":
+        return RoutedEdgeSegments(
+            segments=self.segments + other.segments,
+            intersections=self.intersections + other.intersections,
+        )
 
 
 @dataclass
@@ -135,7 +196,7 @@ def route_edge(
                 start=start,
                 end=end,
                 non_start_end_nodes=non_start_end_nodes,
-            )
+            ).segments
         case _:
             raise NotImplementedError(
                 f"The routing mode {routing_mode} has not been implemented yet."
@@ -146,116 +207,39 @@ def route_orthogonal_edge(
     start: Point,
     end: Point,
     non_start_end_nodes: Iterable[NodeBuffer],
-) -> list[EdgeSegment]:
+) -> RoutedEdgeSegments:
     # Create an orthogonal line from start to end.
     # Decide whether to go horizontal first or vertical first by looking at the other nodes.
-    routed_horizontal, intersects_horizontal = route_orthogonal_edge_horizontal_first(
-        start=start, end=end, non_start_end_nodes=non_start_end_nodes
-    )
-    routed_vertical, intersections_vertical = route_orthogonal_edge_vertical_first(
-        start=start, end=end, non_start_end_nodes=non_start_end_nodes
-    )
+    candidates = [
+        RoutedEdgeSegments.from_segments(
+            EdgeSegment(start=start, end=end).ortho_split_x(),
+            node_buffers=non_start_end_nodes,
+        ),
+        RoutedEdgeSegments.from_segments(
+            EdgeSegment(start=start, end=end).ortho_split_y(),
+            node_buffers=non_start_end_nodes,
+        ),
+    ]
 
-    print("[red]NEW ROUTE[/red]")
-    print(routed_horizontal, intersects_horizontal)
-    print(routed_vertical, intersections_vertical)
+    if (
+        all([candidate.intersections > 0 for candidate in candidates])
+        and start.distance_to(end) >= 2
+    ):
+        candidates.append(
+            route_orthogonal_edge(
+                start=start,
+                end=EdgeSegment(start=start, end=end).midpoint,
+                non_start_end_nodes=non_start_end_nodes,
+            ).concat(
+                route_orthogonal_edge(
+                    start=EdgeSegment(start=start, end=end).midpoint,
+                    end=end,
+                    non_start_end_nodes=non_start_end_nodes,
+                )
+            )
+        )
 
-    if intersects_horizontal < intersections_vertical:
-        return routed_horizontal
-    else:
-        return routed_vertical
-
-
-def intersection_count(
-    route: list[EdgeSegment], non_start_end_nodes: Iterable[NodeBuffer]
-) -> int:
-    return sum(
-        [
-            segment.intersects_with_node(node)
-            for segment in route
-            for node in non_start_end_nodes
-        ]
-    )
-
-
-def route_with_subdivision(
-    routed_segments: list[EdgeSegment], non_start_end_nodes: Iterable[NodeBuffer]
-) -> tuple[list[EdgeSegment], int]:
-    intersections = intersection_count(routed_segments, non_start_end_nodes)
-    new_routed_segments = routed_segments
-    new_intersections = intersections
-
-    # if intersections > 0:
-    #     # Iterate tuples of two segments and subdivide them.
-    #     for i in range(len(routed_segments) - 1):
-    #         prefix_segments = routed_segments[:i]
-    #         segment_1 = routed_segments[i]
-    #         segment_2 = routed_segments[i + 1]
-    #         suffix_segments = routed_segments[i + 2 :]
-
-    #         # Subdivide the segments.
-    #         midpoint = (segment_1.start + segment_2.end) * 0.5
-    #         # TODO: Make this more efficient by reusing intersection counts
-    #         # TODO: Also try all combinations of horizontal and vertical.
-    #         new_segments_1, _ = route_orthogonal_edge_horizontal_first(
-    #             segment_1.start, midpoint, non_start_end_nodes
-    #         )
-    #         new_segments_2, _ = route_orthogonal_edge_horizontal_first(
-    #             midpoint, segment_2.end, non_start_end_nodes
-    #         )
-
-    #         # Replace the two segments with the new ones.
-    #         combined_segments = (
-    #             prefix_segments + new_segments_1 + new_segments_2 + suffix_segments
-    #         )
-    #         combined_intersections = intersection_count(
-    #             combined_segments, non_start_end_nodes
-    #         )
-    #         if combined_intersections < new_intersections:
-    #             new_routed_segments = combined_segments
-    #             new_intersections = combined_intersections
-
-    return new_routed_segments, new_intersections
-
-
-def route_orthogonal_edge_horizontal_first(
-    start: Point,
-    end: Point,
-    non_start_end_nodes: Iterable[NodeBuffer],
-) -> tuple[list[EdgeSegment], int]:
-    if start == end:
-        routed_horizontal = []
-    elif start.x == end.x or start.y == end.y:
-        routed_horizontal = [EdgeSegment(start=start, end=end)]
-    else:
-        routed_horizontal = [
-            EdgeSegment(
-                start=Point(x=start.x, y=start.y), end=Point(x=end.x, y=start.y)
-            ),
-            EdgeSegment(start=Point(x=end.x, y=start.y), end=Point(x=end.x, y=end.y)),
-        ]
-
-    return route_with_subdivision(routed_horizontal, non_start_end_nodes)
-
-
-def route_orthogonal_edge_vertical_first(
-    start: Point,
-    end: Point,
-    non_start_end_nodes: Iterable[NodeBuffer],
-) -> tuple[list[EdgeSegment], int]:
-    if start == end:
-        routed_vertical = []
-    elif start.x == end.x or start.y == end.y:
-        routed_vertical = [EdgeSegment(start=start, end=end)]
-    else:
-        routed_vertical = [
-            EdgeSegment(
-                start=Point(x=start.x, y=start.y), end=Point(x=start.x, y=end.y)
-            ),
-            EdgeSegment(start=Point(x=start.x, y=end.y), end=Point(x=end.x, y=end.y)),
-        ]
-
-    return route_with_subdivision(routed_vertical, non_start_end_nodes)
+    return min(candidates, key=lambda candidate: candidate.intersections)
 
 
 def rasterize_edge_segments(

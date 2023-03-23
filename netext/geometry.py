@@ -20,6 +20,15 @@ class Point:
     def __mul__(self, scalar: float | int) -> "Point":
         return Point(x=round(self.x * scalar), y=round(self.y * scalar))
 
+    def __div__(self, scalar: float | int) -> "Point":
+        return Point(x=round(self.x / scalar), y=round(self.y / scalar))
+
+    def __truediv__(self, scalar: float | int) -> "Point":
+        return Point(x=round(self.x / scalar), y=round(self.y / scalar))
+
+    def distance_to(self, other: "Point") -> float:
+        return self.shapely_point().distance(other.shapely_point())
+
 
 class Magnet(Enum):
     CENTER = 0

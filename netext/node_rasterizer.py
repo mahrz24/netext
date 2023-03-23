@@ -21,6 +21,9 @@ class Shape(Protocol):
     ) -> Point:
         return NotImplemented
 
+    def bounding_box(self, node_buffer: "NodeBuffer", margin: int = 0) -> Polygon:
+        return NotImplemented
+
     def render_shape(
         self,
         console: Console,
@@ -41,6 +44,16 @@ class RectangularShapeMixin:
             for segments in segment_lists
         ]
 
+    def bounding_box(self, node_buffer: "NodeBuffer", margin: int = 0) -> Polygon:
+        return Polygon(
+            [
+                (node_buffer.left_x - margin, node_buffer.top_y - margin),
+                (node_buffer.right_x + 1 + margin, node_buffer.top_y - margin),
+                (node_buffer.right_x + 1 + margin, node_buffer.bottom_y + 1 + margin),
+                (node_buffer.left_x - margin, node_buffer.bottom_y + 1 + margin),
+            ]
+        )
+
     def get_magnet_position(
         self, node_buffer: "NodeBuffer", target_point: Point, magnet: Magnet
     ) -> Point:
@@ -59,14 +72,7 @@ class RectangularShapeMixin:
                 direct_line = LineString(
                     [node_buffer.center.shapely_point(), target_point.shapely_point()]
                 )
-                node_polygon = Polygon(
-                    [
-                        (node_buffer.left_x, node_buffer.top_y),
-                        (node_buffer.right_x, node_buffer.top_y),
-                        (node_buffer.right_x, node_buffer.bottom_y),
-                        (node_buffer.left_x, node_buffer.bottom_y),
-                    ]
-                )
+                node_polygon = self.bounding_box(node_buffer)
                 intersection = direct_line.intersection(node_polygon)
                 intersection_point = intersection.line_interpolate_point(
                     1.0, normalized=True
