@@ -11,7 +11,7 @@ from netext import TerminalGraph
 from netext.edge_rasterizer import EdgeRoutingMode, EdgeSegmentDrawingMode
 from netext.node_rasterizer import JustContent
 
-g = cast(nx.Graph, nx.binomial_tree(5))
+g = cast(nx.Graph, nx.binomial_tree(4))
 g1 = cast(nx.DiGraph, nx.paley_graph(5))
 
 
@@ -32,11 +32,11 @@ nx.set_node_attributes(g1, _render, "$content-renderer")
 
 
 def _render2(n, d, s):
-    return f"FoO {n} Bar"
+    return f"#N{n}"
 
 
-g.add_edge(0, 22)
-g.add_edge(16, 30)
+# g.add_edge(0, 22)
+# g.add_edge(16, 30)
 
 nx.set_node_attributes(g, Style(color="blue"), "$content-style")
 nx.set_node_attributes(g, box.SQUARE, "$box-type")

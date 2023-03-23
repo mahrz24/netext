@@ -208,8 +208,14 @@ def route_orthogonal_edge(
     end: Point,
     non_start_end_nodes: Iterable[NodeBuffer],
 ) -> RoutedEdgeSegments:
-    # Create an orthogonal line from start to end.
-    # Decide whether to go horizontal first or vertical first by looking at the other nodes.
+    """
+    Route an edge from start to end using orthogonal segments.
+
+    The edge will be routed in a way that minimizes the number of intersections with other nodes.
+
+    """
+    # TODO: Also check intersections with other edges.
+    # TODO: Add different midpoints as candidates.
     candidates = [
         RoutedEdgeSegments.from_segments(
             EdgeSegment(start=start, end=end).ortho_split_x(),
@@ -387,22 +393,48 @@ def orthogonal_segments_to_strips_with_box_characters(
         )
         for edge_segment in edge_segments
     ]
-
-    for edge_segment, next_segment in zip(
-        offset_edge_segments, offset_edge_segments[1:] + [None]
-    ):
-        if edge_segment.start.x == edge_segment.end.x:
+    print(offset_edge_segments)
+    last_segment: EdgeSegment | None = None
+    for edge_segment in offset_edge_segments:
+        start, end = edge_segment.start, edge_segment.end
+        if start.x == end.x:
             for y in range(
-                min(edge_segment.start.y, edge_segment.end.y),
-                max(edge_segment.start.y, edge_segment.end.y),
+                min(start.y, end.y),
+                max(start.y, end.y) + 1,
             ):
-                char_buffer[y][edge_segment.start.x] = "│"
-        elif edge_segment.start.y == edge_segment.end.y:
+                if char_buffer[y][start.x] == "─" and last_segment is not None:
+                    if last_segment.end.y < end.y:
+                        if last_segment.start.x < start.x:
+                            char_buffer[y][start.x] = "╮"
+                        else:
+                            char_buffer[y][start.x] = "╭"
+                    else:
+                        if last_segment.start.x < start.x:
+                            char_buffer[y][start.x] = "╯"
+                        else:
+                            char_buffer[y][start.x] = "╰"
+                else:
+                    char_buffer[y][start.x] = "│"
+        elif start.y == end.y:
             for x in range(
-                min(edge_segment.start.x, edge_segment.end.x),
-                max(edge_segment.start.x, edge_segment.end.x),
+                min(start.x, end.x),
+                max(start.x, end.x) + 1,
             ):
-                char_buffer[edge_segment.start.y][x] = "─"
+                if char_buffer[start.y][x] == "│" and last_segment is not None:
+                    if last_segment.end.y < end.y:
+                        if last_segment.start.x < start.x:
+                            char_buffer[start.y][x] = "╮"
+                        else:
+                            char_buffer[start.y][x] = "╭"
+                    else:
+                        if last_segment.start.x < start.x:
+                            char_buffer[start.y][x] = "╯"
+                        else:
+                            char_buffer[start.y][x] = "╰"
+                else:
+                    char_buffer[start.y][x] = "─"
+
+        last_segment = edge_segment
 
     return [
         Strip(
