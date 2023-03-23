@@ -40,8 +40,8 @@ def _render2(n, d, s):
 
 nx.set_node_attributes(g, Style(color="blue"), "$content-style")
 nx.set_node_attributes(g, box.SQUARE, "$box-type")
-nx.set_edge_attributes(g, EdgeRoutingMode.orthogonal, "$edge-routing-mode")
-nx.set_edge_attributes(g, EdgeSegmentDrawingMode.box, "$edge-segment-drawing-mode")
+nx.set_edge_attributes(g, EdgeRoutingMode.straight, "$edge-routing-mode")
+nx.set_edge_attributes(g, EdgeSegmentDrawingMode.braille, "$edge-segment-drawing-mode")
 # nx.set_edge_attributes(g, "foo", "$label")
 nx.set_node_attributes(g, _render2, "$content-renderer")
 

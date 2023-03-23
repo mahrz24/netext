@@ -185,8 +185,8 @@ def route_edge(
     start: Point,
     end: Point,
     routing_mode: EdgeRoutingMode,
-    non_start_end_nodes: Iterable[NodeBuffer],
-    routed_edges: Iterable[EdgeLayout],
+    non_start_end_nodes: Iterable[NodeBuffer] = [],
+    routed_edges: Iterable[EdgeLayout] = [],
 ) -> list[EdgeSegment]:
     match routing_mode:
         case EdgeRoutingMode.straight:
@@ -249,7 +249,7 @@ def route_orthogonal_edge(
 
 
 def rasterize_edge_segments(
-    edge_segments: list[EdgeSegment], scaling: int
+    edge_segments: list[EdgeSegment], x_scaling: int, y_scaling: int
 ) -> BitmapBuffer:
     min_point = Point(
         x=min([min([seg.start.x, seg.end.x]) for seg in edge_segments]),
@@ -259,13 +259,13 @@ def rasterize_edge_segments(
         x=max([max([seg.start.x, seg.end.x]) for seg in edge_segments]),
         y=max([max([seg.start.y, seg.end.y]) for seg in edge_segments]),
     )
-    width = (max_point.x - min_point.x + 1) * scaling
-    height = (max_point.y - min_point.y + 1) * scaling
+    width = (max_point.x - min_point.x + 1) * x_scaling
+    height = (max_point.y - min_point.y + 1) * y_scaling
     buffer = bitarray(width * height)
     buffer.setall(0)
     bitmap_buffer = BitmapBuffer(
-        x=min_point.x * scaling,
-        y=min_point.y * scaling,
+        x=min_point.x * x_scaling,
+        y=min_point.y * y_scaling,
         width=width,
         height=height,
         buffer=buffer,
@@ -273,8 +273,10 @@ def rasterize_edge_segments(
 
     for edge_segment in edge_segments:
         scaled_segment = EdgeSegment(
-            start=Point(edge_segment.start.x * scaling, edge_segment.start.y * scaling),
-            end=Point(edge_segment.end.x * scaling, edge_segment.end.y * scaling),
+            start=Point(
+                edge_segment.start.x * x_scaling, edge_segment.start.y * y_scaling
+            ),
+            end=Point(edge_segment.end.x * x_scaling, edge_segment.end.y * y_scaling),
         )
         _bresenham_line_drawing(scaled_segment, bitmap_buffer=bitmap_buffer)
 
@@ -292,44 +294,34 @@ def _slice_to_strip(slice: bitarray) -> Strip:
     return Strip(segments=current_segment)
 
 
-# def _infinite_canvas_access(slice: bitarray, x: int, y: int, width: int) -> int:
-#     index = width * y + x
-#     if index < 0:
-#         return 0
-#     elif index >= len(slice):
-#         return 0
-#     else:
-#         return slice[index]
+def _infinite_canvas_access(slice: bitarray, x: int, y: int, width: int) -> int:
+    index = width * y + x
+    if index < 0:
+        return 0
+    elif index >= len(slice):
+        return 0
+    else:
+        return slice[index]
 
 
-# def _slice_to_box_strip(slice: bitarray, width: int) -> Strip:
-#     current_segment: list[Segment | Spacer] = []
-#     for x in range(0, width, 2):
-#         lookup = (
-#             (
-#                 _infinite_canvas_access(slice, x, 0, width),
-#                 _infinite_canvas_access(slice, x + 1, 0, width),
-#             ),
-#             (
-#                 _infinite_canvas_access(slice, x, 1, width),
-#                 _infinite_canvas_access(slice, x + 1, 1, width),
-#             ),
-#         )
-#         match lookup:
-#             case ((0, 0), (0, 0)):
-#                 current_segment.append(Spacer(width=1))
-#             case ((0, 1), (0, 1)) | ((1, 0), (1, 0)):
-#                 current_segment.append(Segment("│"))
-#             case ((1, 1), (0, 0)) | ((0, 0), (1, 1)):
-#                 current_segment.append(Segment("─"))
-#             case ((1, 0), (0, 1)):
-#                 current_segment.append(Segment("╲"))
-#             case ((0, 1), (1, 0)):
-#                 current_segment.append(Segment("╱"))
-#             case _:
-#                 current_segment.append(Spacer(width=1))
+def _slice_to_braille_strip(slice: bitarray, width: int) -> Strip:
+    current_segment: list[Segment | Spacer] = []
+    for x in range(0, width, 4):
+        lookup = (
+            _infinite_canvas_access(slice, x, 0, width),
+            _infinite_canvas_access(slice, x, 1, width),
+            _infinite_canvas_access(slice, x, 2, width),
+            _infinite_canvas_access(slice, x + 1, 0, width),
+            _infinite_canvas_access(slice, x + 1, 1, width),
+            _infinite_canvas_access(slice, x + 1, 2, width),
+            _infinite_canvas_access(slice, x, 3, width),
+            _infinite_canvas_access(slice, x + 1, 3, width),
+        )
+        current_segment.append(
+            Segment(chr(0x2800 + sum([2**i for i, val in enumerate(lookup) if val])))
+        )
 
-#     return Strip(segments=current_segment)
+    return Strip(segments=current_segment)
 
 
 def bitmap_to_strips(
@@ -345,16 +337,16 @@ def bitmap_to_strips(
                 )
                 for y in range(bitmap_buffer.height)
             ]
-        # case EdgeSegmentDrawingMode.box:
-        #     lines = [
-        #         _slice_to_box_strip(
-        #             bitmap_buffer.buffer[
-        #                 y * bitmap_buffer.width : (y + 2) * bitmap_buffer.width
-        #             ],
-        #             bitmap_buffer.width,
-        #         )
-        #         for y in range(0, bitmap_buffer.height, 2)
-        #     ]
+        case EdgeSegmentDrawingMode.braille:
+            lines = [
+                _slice_to_braille_strip(
+                    bitmap_buffer.buffer[
+                        y * bitmap_buffer.width : (y + 4) * bitmap_buffer.width
+                    ],
+                    bitmap_buffer.width,
+                )
+                for y in range(0, bitmap_buffer.height, 4)
+            ]
         case _:
             raise NotImplementedError(
                 "The edge segement drawing mode has not yet been implemented"
@@ -393,7 +385,6 @@ def orthogonal_segments_to_strips_with_box_characters(
         )
         for edge_segment in edge_segments
     ]
-    print(offset_edge_segments)
     last_segment: EdgeSegment | None = None
     for edge_segment in offset_edge_segments:
         start, end = edge_segment.start, edge_segment.end
@@ -524,10 +515,17 @@ def rasterize_edge(
         strips = orthogonal_segments_to_strips_with_box_characters(edge_segments)
     else:
         # In case of pixel / braille we scale and then map character per character
-        x_scaling = 1  # noqa
-        y_scaling = 1  # noqa
+        match edge_segment_drawing_mode:
+            case EdgeSegmentDrawingMode.single_character:
+                x_scaling = 1
+                y_scaling = 1
+            case EdgeSegmentDrawingMode.braille:
+                x_scaling = 2
+                y_scaling = 4
 
-        bitmap_buffer = rasterize_edge_segments(edge_segments, scaling=1)
+        bitmap_buffer = rasterize_edge_segments(
+            edge_segments, x_scaling=x_scaling, y_scaling=y_scaling
+        )
         strips = bitmap_to_strips(
             bitmap_buffer, edge_segment_drawing_mode=edge_segment_drawing_mode
         )
