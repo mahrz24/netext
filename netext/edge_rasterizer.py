@@ -22,6 +22,7 @@ class EdgeSegmentDrawingMode(Enum):
     box = "box"
     single_character = "single_character"
     braille = "braille"
+    block = "block"
 
 
 @dataclass
@@ -306,7 +307,7 @@ def _infinite_canvas_access(slice: bitarray, x: int, y: int, width: int) -> int:
 
 def _slice_to_braille_strip(slice: bitarray, width: int) -> Strip:
     current_segment: list[Segment | Spacer] = []
-    for x in range(0, width, 4):
+    for x in range(0, width, 2):
         lookup = (
             _infinite_canvas_access(slice, x, 0, width),
             _infinite_canvas_access(slice, x, 1, width),
@@ -317,10 +318,61 @@ def _slice_to_braille_strip(slice: bitarray, width: int) -> Strip:
             _infinite_canvas_access(slice, x, 3, width),
             _infinite_canvas_access(slice, x + 1, 3, width),
         )
+        if all([val == 0 for val in lookup]):
+            current_segment.append(Spacer(width=1))
+            continue
         current_segment.append(
             Segment(chr(0x2800 + sum([2**i for i, val in enumerate(lookup) if val])))
         )
 
+    return Strip(segments=current_segment)
+
+
+def _slice_to_block_strip(slice: bitarray, width: int) -> Strip:
+    current_segment: list[Segment | Spacer] = []
+    for x in range(0, width, 2):
+        lookup = (
+            _infinite_canvas_access(slice, x, 0, width),
+            _infinite_canvas_access(slice, x + 1, 0, width),
+            _infinite_canvas_access(slice, x, 1, width),
+            _infinite_canvas_access(slice, x + 1, 1, width),
+        )
+        if all([val == 0 for val in lookup]):
+            current_segment.append(Spacer(width=1))
+            continue
+
+        block = sum([2**i for i, val in enumerate(lookup) if val])
+        match block:
+            case 1:
+                current_segment.append(Segment("▘"))
+            case 2:
+                current_segment.append(Segment("▝"))
+            case 3:
+                current_segment.append(Segment("▀"))
+            case 4:
+                current_segment.append(Segment("▖"))
+            case 5:
+                current_segment.append(Segment("▌"))
+            case 6:
+                current_segment.append(Segment("▞"))
+            case 7:
+                current_segment.append(Segment("▛"))
+            case 8:
+                current_segment.append(Segment("▗"))
+            case 9:
+                current_segment.append(Segment("▚"))
+            case 10:
+                current_segment.append(Segment("▐"))
+            case 11:
+                current_segment.append(Segment("▜"))
+            case 12:
+                current_segment.append(Segment("▄"))
+            case 13:
+                current_segment.append(Segment("▙"))
+            case 14:
+                current_segment.append(Segment("▟"))
+            case 15:
+                current_segment.append(Segment("█"))
     return Strip(segments=current_segment)
 
 
@@ -346,6 +398,16 @@ def bitmap_to_strips(
                     bitmap_buffer.width,
                 )
                 for y in range(0, bitmap_buffer.height, 4)
+            ]
+        case EdgeSegmentDrawingMode.block:
+            lines = [
+                _slice_to_block_strip(
+                    bitmap_buffer.buffer[
+                        y * bitmap_buffer.width : (y + 2) * bitmap_buffer.width
+                    ],
+                    bitmap_buffer.width,
+                )
+                for y in range(0, bitmap_buffer.height, 2)
             ]
         case _:
             raise NotImplementedError(
@@ -522,6 +584,9 @@ def rasterize_edge(
             case EdgeSegmentDrawingMode.braille:
                 x_scaling = 2
                 y_scaling = 4
+            case EdgeSegmentDrawingMode.block:
+                x_scaling = 2
+                y_scaling = 2
 
         bitmap_buffer = rasterize_edge_segments(
             edge_segments, x_scaling=x_scaling, y_scaling=y_scaling
