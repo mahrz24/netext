@@ -54,6 +54,30 @@ class EdgeSegment:
         intersection = direct_line.intersection(node_polygon)
         return not intersection.is_empty
 
+    def cut(self, node_buffer: NodeBuffer) -> "EdgeSegment":
+        start = self.start.shapely_point()
+        end = self.end.shapely_point()
+        direct_line = LineString([start, end])
+        node_polygon = node_buffer.shape.bounding_box(node_buffer)
+        node_polygon_boundary = node_polygon.boundary
+        intersection = direct_line.intersection(node_polygon_boundary)
+        if isinstance(intersection, LineString):
+            intersection = intersection.interpolate(1)
+        intersection_start = start.intersection(node_polygon)
+        if intersection.is_empty:
+            return self
+        else:
+            if intersection_start.is_empty:
+                return EdgeSegment(
+                    start=self.start,
+                    end=Point.from_shapely_point(intersection),
+                )
+            else:
+                return EdgeSegment(
+                    start=Point.from_shapely_point(intersection),
+                    end=self.end,
+                )
+
     def count_node_intersections(self, node_buffers: Iterable[NodeBuffer]) -> int:
         return sum(
             1 for node_buffer in node_buffers if self.intersects_with_node(node_buffer)
@@ -96,6 +120,14 @@ class EdgeSegment:
     @property
     def end_x_mid(self) -> Point:
         return Point(x=self.end.x, y=self.midpoint.y)
+
+    @property
+    def min_bound(self) -> Point:
+        return Point(x=min(self.start.x, self.end.x), y=min(self.start.y, self.end.y))
+
+    @property
+    def max_bound(self) -> Point:
+        return Point(x=max(self.start.x, self.end.x), y=max(self.start.y, self.end.y))
 
 
 @dataclass
@@ -373,6 +405,7 @@ def _slice_to_block_strip(slice: bitarray, width: int) -> Strip:
                 current_segment.append(Segment("▟"))
             case 15:
                 current_segment.append(Segment("█"))
+
     return Strip(segments=current_segment)
 
 
@@ -500,6 +533,14 @@ def orthogonal_segments_to_strips_with_box_characters(
     ]
 
 
+def cut_edge_segments_with_start_and_end_nodes(
+    edge_segments: list[EdgeSegment],
+    start_node: NodeBuffer,
+    end_node: NodeBuffer,
+) -> list[EdgeSegment]:
+    return [segment.cut(start_node).cut(end_node) for segment in edge_segments]
+
+
 def rasterize_edge(
     console: Console,
     u_buffer: NodeBuffer,
@@ -554,7 +595,6 @@ def rasterize_edge(
 
     # First we route the edge with allowing the center magnet as start and end
     # This routing already tries to avoid other nodes.
-
     non_start_end_nodes = [
         node_buffer
         for node_buffer in all_nodes
@@ -566,9 +606,9 @@ def rasterize_edge(
     )
 
     # Then we cut the edge with the node boundaries.
-    # edge_segments = cut_edge_segments_with_start_and_end_nodes(
-    #     edge_segments, u_buffer, v_buffer
-    # )
+    edge_segments = cut_edge_segments_with_start_and_end_nodes(
+        edge_segments, u_buffer, v_buffer
+    )
 
     if edge_segment_drawing_mode == EdgeSegmentDrawingMode.box:
         assert (
@@ -597,10 +637,17 @@ def rasterize_edge(
 
     edge_layout = EdgeLayout(input=edge_input, segments=edge_segments)
 
+    boundary_1 = Point.min_point(
+        [edge_segment.min_bound for edge_segment in edge_segments]
+    )
+    boundary_2 = Point.max_point(
+        [edge_segment.max_bound for edge_segment in edge_segments]
+    )
+
     edge_buffer = EdgeBuffer(
         z_index=0,
-        boundary_1=start,
-        boundary_2=end,
+        boundary_1=boundary_1,
+        boundary_2=boundary_2,
         strips=strips,
     )
 

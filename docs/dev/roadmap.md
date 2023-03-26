@@ -40,10 +40,10 @@
 * Better line rendering
     * [x] Use magnets on the node border for edge positions
     * Multiple line segment rendering mechanisms
-        * [ ] Box characters (straight lines only) with corner connection (only for straight lines)
+        * [x] Box characters (straight lines only) with corner connection (only for straight lines)
         * [x] Single character mode
         * [ ] ASCII lines
-        * [ ] Braille (not for straight lines)
+        * [x] Braille (not for straight lines)
 * Attributes for edges
     * [ ] Arrow tips
     * [ ] Dash patterns
