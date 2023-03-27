@@ -35,8 +35,8 @@ def test_trivial_edge(console: Console) -> None:
         data=dict(),
     )
 
-    assert edge.width == 9
-    assert edge.height == 9
+    assert edge.width == 6
+    assert edge.height == 6
 
 
 def test_route_edge_direct(console: Console) -> None:
