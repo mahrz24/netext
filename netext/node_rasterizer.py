@@ -48,9 +48,9 @@ class RectangularShapeMixin:
         return Polygon(
             [
                 (node_buffer.left_x - margin, node_buffer.top_y - margin),
-                (node_buffer.right_x + 1 + margin, node_buffer.top_y - margin),
-                (node_buffer.right_x + 1 + margin, node_buffer.bottom_y + 1 + margin),
-                (node_buffer.left_x - margin, node_buffer.bottom_y + 1 + margin),
+                (node_buffer.right_x + margin, node_buffer.top_y - margin),
+                (node_buffer.right_x + margin, node_buffer.bottom_y + margin),
+                (node_buffer.left_x - margin, node_buffer.bottom_y + margin),
             ]
         )
 

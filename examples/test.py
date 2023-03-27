@@ -8,7 +8,7 @@ from rich.style import Style
 from rich.table import Table
 
 from netext import TerminalGraph
-from netext.edge_rasterizer import EdgeRoutingMode, EdgeSegmentDrawingMode
+from netext.edge_rasterizer import ArrowTip, EdgeRoutingMode, EdgeSegmentDrawingMode
 from netext.node_rasterizer import JustContent
 
 g = cast(nx.Graph, nx.binomial_tree(5))
@@ -35,13 +35,16 @@ def _render2(n, d, s):
     return f"#N{n}"
 
 
-# g.add_edge(0, 22)
+g.add_edge(16, 0)
 # g.add_edge(16, 30)
 
 nx.set_node_attributes(g, Style(color="blue"), "$content-style")
 nx.set_node_attributes(g, box.SQUARE, "$box-type")
 nx.set_edge_attributes(g, EdgeRoutingMode.orthogonal, "$edge-routing-mode")
 nx.set_edge_attributes(g, EdgeSegmentDrawingMode.box, "$edge-segment-drawing-mode")
+nx.set_edge_attributes(g, ArrowTip.arrow, "$end-arrow-tip")
+nx.set_edge_attributes(g, ArrowTip.arrow, "$start-arrow-tip")
+
 # nx.set_edge_attributes(g, "foo", "$label")
 nx.set_node_attributes(g, _render2, "$content-renderer")
 

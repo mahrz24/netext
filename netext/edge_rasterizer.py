@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 
 from bitarray import bitarray
 from rich.console import Console
@@ -16,6 +16,10 @@ from netext.segment_buffer import Strip, StripBuffer, Spacer
 class EdgeRoutingMode(Enum):
     straight = "straight"
     orthogonal = "orthogonal"
+
+
+class ArrowTip(Enum):
+    arrow = "arrow"
 
 
 class EdgeSegmentDrawingMode(Enum):
@@ -45,7 +49,7 @@ class EdgeSegment:
     start: Point
     end: Point
 
-    def length(self) -> float:
+    def length(self) -> int:
         return self.start.distance_to(self.end)
 
     def intersects_with_node(self, node_buffer: NodeBuffer) -> bool:
@@ -53,6 +57,13 @@ class EdgeSegment:
         node_polygon = node_buffer.shape.bounding_box(node_buffer)
         intersection = direct_line.intersection(node_polygon)
         return not intersection.is_empty
+
+    def cut_multiple(self, node_buffers: Iterator[NodeBuffer]) -> "EdgeSegment":
+        node_buffer: NodeBuffer | None = next(node_buffers, None)
+        if node_buffer is None:
+            return self
+        else:
+            return self.cut(node_buffer).cut_multiple(node_buffers)
 
     def cut(self, node_buffer: NodeBuffer) -> "EdgeSegment":
         start = self.start.shapely_point()
@@ -68,15 +79,19 @@ class EdgeSegment:
             return self
         else:
             if intersection_start.is_empty:
-                return EdgeSegment(
+                tmp_segment = EdgeSegment(
                     start=self.start,
                     end=Point.from_shapely_point(intersection),
                 )
+                length = tmp_segment.length()
+                return EdgeSegment(start=self.start, end=self.interpolate(length - 1))
             else:
-                return EdgeSegment(
+                tmp_segment = EdgeSegment(
                     start=Point.from_shapely_point(intersection),
                     end=self.end,
                 )
+                length = tmp_segment.length()
+                return EdgeSegment(start=self.interpolate(length - 1), end=self.end)
 
     def count_node_intersections(self, node_buffers: Iterable[NodeBuffer]) -> int:
         return sum(
@@ -100,6 +115,15 @@ class EdgeSegment:
                 EdgeSegment(start=self.start, end=Point(x=self.end.x, y=self.start.y)),
                 EdgeSegment(start=Point(x=self.end.x, y=self.start.y), end=self.end),
             ]
+
+    def interpolate(self, distance: int, reversed: bool = False) -> Point:
+        direct_line = LineString([self.start.shapely_point(), self.end.shapely_point()])
+        fraction = distance / float(self.length())
+        if reversed:
+            fraction = 1 - fraction
+        return Point.from_shapely_point(
+            direct_line.interpolate(distance=fraction, normalized=True)
+        )
 
     @property
     def midpoint(self) -> Point:
@@ -136,7 +160,7 @@ class RoutedEdgeSegments:
     intersections: int
 
     @classmethod
-    def from_segments(
+    def from_segments_compute_intersections(
         cls, segments: list[EdgeSegment], node_buffers: Iterable[NodeBuffer]
     ) -> "RoutedEdgeSegments":
         return cls(
@@ -151,6 +175,45 @@ class RoutedEdgeSegments:
             segments=self.segments + other.segments,
             intersections=self.intersections + other.intersections,
         )
+
+    def cut_with_nodes(
+        self, node_buffers: Iterable[NodeBuffer]
+    ) -> "RoutedEdgeSegments":
+        return RoutedEdgeSegments(
+            segments=[
+                segment.cut_multiple(iter(node_buffers)) for segment in self.segments
+            ],
+            intersections=self.intersections,
+        )
+
+    @property
+    def min_bound(self) -> Point:
+        return Point.min_point(
+            [edge_segment.min_bound for edge_segment in self.segments]
+        )
+
+    @property
+    def max_bound(self) -> Point:
+        return Point.max_point(
+            [edge_segment.max_bound for edge_segment in self.segments]
+        )
+
+    def edge_iter_point(self, index: int) -> Point:
+        # Return the point traversing the whole edge over all segments.
+        iter_reversed = index < 0
+        # The index is the index of the point in the whole edge.
+        segments = iter(self.segments)
+        if iter_reversed:
+            segments = reversed(self.segments)
+            index = -index - 1
+
+        for segment in segments:
+            if index <= segment.length():
+                return segment.interpolate(index, reversed=iter_reversed)
+            else:
+                index -= segment.length()
+
+        raise IndexError("Index out of range")
 
 
 @dataclass
@@ -220,16 +283,19 @@ def route_edge(
     routing_mode: EdgeRoutingMode,
     non_start_end_nodes: Iterable[NodeBuffer] = [],
     routed_edges: Iterable[EdgeLayout] = [],
-) -> list[EdgeSegment]:
+) -> RoutedEdgeSegments:
     match routing_mode:
         case EdgeRoutingMode.straight:
-            return [EdgeSegment(start=start, end=end)]
+            # We don't need to check for intersections here, because the edge is straight.
+            return RoutedEdgeSegments(
+                segments=[EdgeSegment(start=start, end=end)], intersections=0
+            )
         case EdgeRoutingMode.orthogonal:
             return route_orthogonal_edge(
                 start=start,
                 end=end,
                 non_start_end_nodes=non_start_end_nodes,
-            ).segments
+            )
         case _:
             raise NotImplementedError(
                 f"The routing mode {routing_mode} has not been implemented yet."
@@ -250,11 +316,11 @@ def route_orthogonal_edge(
     # TODO: Also check intersections with other edges.
     # TODO: Add different midpoints as candidates.
     candidates = [
-        RoutedEdgeSegments.from_segments(
+        RoutedEdgeSegments.from_segments_compute_intersections(
             EdgeSegment(start=start, end=end).ortho_split_x(),
             node_buffers=non_start_end_nodes,
         ),
-        RoutedEdgeSegments.from_segments(
+        RoutedEdgeSegments.from_segments_compute_intersections(
             EdgeSegment(start=start, end=end).ortho_split_y(),
             node_buffers=non_start_end_nodes,
         ),
@@ -548,7 +614,7 @@ def rasterize_edge(
     all_nodes: Iterable[NodeBuffer],
     routed_edges: Iterable[EdgeLayout],
     data: Any,
-) -> tuple[EdgeBuffer, EdgeLayout, list[NodeBuffer]]:
+) -> tuple[EdgeBuffer, EdgeLayout, list[StripBuffer]]:
     start = u_buffer.get_magnet_position(
         v_buffer.center, data.get("$magnet", Magnet.CENTER)
     )
@@ -556,6 +622,9 @@ def rasterize_edge(
     end = v_buffer.get_magnet_position(
         u_buffer.center, data.get("$magnet", Magnet.CENTER)
     )
+
+    end_arrow_tip = data.get("$end-arrow-tip", None)
+    start_arrow_tip = data.get("$start-arrow-tip", None)
 
     routing_mode: EdgeRoutingMode = data.get(
         "$edge-routing-mode", EdgeRoutingMode.straight
@@ -572,7 +641,7 @@ def rasterize_edge(
         routing_hints=[],
     )
 
-    label_buffers = []
+    label_buffers: list[StripBuffer] = []
     label = data.get("$label", None)
 
     # TODO Think about this: Shape and node buffer are bound
@@ -606,15 +675,15 @@ def rasterize_edge(
     )
 
     # Then we cut the edge with the node boundaries.
-    edge_segments = cut_edge_segments_with_start_and_end_nodes(
-        edge_segments, u_buffer, v_buffer
-    )
+    edge_segments = edge_segments.cut_with_nodes([u_buffer, v_buffer])
 
     if edge_segment_drawing_mode == EdgeSegmentDrawingMode.box:
         assert (
             routing_mode == EdgeRoutingMode.orthogonal
         ), "Box characters are only supported on orthogonal lines"
-        strips = orthogonal_segments_to_strips_with_box_characters(edge_segments)
+        strips = orthogonal_segments_to_strips_with_box_characters(
+            edge_segments.segments
+        )
     else:
         # In case of pixel / braille we scale and then map character per character
         match edge_segment_drawing_mode:
@@ -629,20 +698,40 @@ def rasterize_edge(
                 y_scaling = 2
 
         bitmap_buffer = rasterize_edge_segments(
-            edge_segments, x_scaling=x_scaling, y_scaling=y_scaling
+            edge_segments.segments, x_scaling=x_scaling, y_scaling=y_scaling
         )
         strips = bitmap_to_strips(
             bitmap_buffer, edge_segment_drawing_mode=edge_segment_drawing_mode
         )
 
-    edge_layout = EdgeLayout(input=edge_input, segments=edge_segments)
+    edge_layout = EdgeLayout(input=edge_input, segments=edge_segments.segments)
 
-    boundary_1 = Point.min_point(
-        [edge_segment.min_bound for edge_segment in edge_segments]
-    )
-    boundary_2 = Point.max_point(
-        [edge_segment.max_bound for edge_segment in edge_segments]
-    )
+    start_arrow_tip_position = edge_segments.edge_iter_point(0)
+    end_arrow_tip_position = edge_segments.edge_iter_point(-1)
+    print(end_arrow_tip_position)
+
+    if end_arrow_tip is not None:
+        label_buffers.append(
+            EdgeBuffer(
+                z_index=-1,
+                boundary_1=end_arrow_tip_position,
+                boundary_2=end_arrow_tip_position,
+                strips=[Strip([Segment(text="X")])],
+            )
+        )
+
+    if start_arrow_tip is not None:
+        label_buffers.append(
+            EdgeBuffer(
+                z_index=-1,
+                boundary_1=start_arrow_tip_position,
+                boundary_2=start_arrow_tip_position,
+                strips=[Strip([Segment(text="Y")])],
+            )
+        )
+
+    boundary_1 = edge_segments.min_bound
+    boundary_2 = edge_segments.max_bound
 
     edge_buffer = EdgeBuffer(
         z_index=0,

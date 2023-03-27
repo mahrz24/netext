@@ -7,6 +7,8 @@ import networkx as nx
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.measure import Measurement
 
+from netext.segment_buffer import StripBuffer
+
 from .buffer_renderer import render_buffers
 from .edge_rasterizer import EdgeBuffer, EdgeLayout, rasterize_edge
 from .layout_engines.engine import LayoutEngine, G
@@ -74,7 +76,7 @@ class TerminalGraph(Generic[G]):
 
         self.edge_buffers: list[EdgeBuffer] = []
         self.edge_layouts: list[EdgeLayout] = []
-        self.label_buffers: list[NodeBuffer] = []
+        self.label_buffers: list[StripBuffer] = []
 
         # Iterate over all edges (so far in no particular order)
         for u, v, data in self._nx_graph.edges(data=True):

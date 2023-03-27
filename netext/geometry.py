@@ -30,8 +30,8 @@ class Point:
     def __truediv__(self, scalar: float | int) -> "Point":
         return Point(x=round(self.x / scalar), y=round(self.y / scalar))
 
-    def distance_to(self, other: "Point") -> float:
-        return self.shapely_point().distance(other.shapely_point())
+    def distance_to(self, other: "Point") -> int:
+        return max(abs(self.x - other.x), abs(self.y - other.y))
 
     @staticmethod
     def min_point(points: list["Point"]) -> "Point":
