@@ -69,7 +69,7 @@ class EdgeSegment:
         start = self.start.shapely_point()
         end = self.end.shapely_point()
         direct_line = LineString([start, end])
-        node_polygon = node_buffer.shape.bounding_box(node_buffer)
+        node_polygon = node_buffer.shape.bounding_box(node_buffer, margin=1)
         node_polygon_boundary = node_polygon.boundary
         intersection = direct_line.intersection(node_polygon_boundary)
         if isinstance(intersection, LineString):
@@ -79,19 +79,15 @@ class EdgeSegment:
             return self
         else:
             if intersection_start.is_empty:
-                tmp_segment = EdgeSegment(
+                return EdgeSegment(
                     start=self.start,
                     end=Point.from_shapely_point(intersection),
                 )
-                length = tmp_segment.length()
-                return EdgeSegment(start=self.start, end=self.interpolate(length - 1))
             else:
-                tmp_segment = EdgeSegment(
+                return EdgeSegment(
                     start=Point.from_shapely_point(intersection),
                     end=self.end,
                 )
-                length = tmp_segment.length()
-                return EdgeSegment(start=self.interpolate(length - 1), end=self.end)
 
     def count_node_intersections(self, node_buffers: Iterable[NodeBuffer]) -> int:
         return sum(
@@ -117,6 +113,8 @@ class EdgeSegment:
             ]
 
     def interpolate(self, distance: int, reversed: bool = False) -> Point:
+        if self.start == self.end:
+            return self.start
         direct_line = LineString([self.start.shapely_point(), self.end.shapely_point()])
         fraction = distance / float(self.length())
         if reversed:
@@ -206,7 +204,7 @@ class RoutedEdgeSegments:
         if iter_reversed:
             segments = reversed(self.segments)
             index = -index - 1
-
+        print(list(self.segments))
         for segment in segments:
             if index <= segment.length():
                 return segment.interpolate(index, reversed=iter_reversed)
