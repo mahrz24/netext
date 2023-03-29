@@ -22,6 +22,23 @@ class ArrowTip(Enum):
     arrow = "arrow"
 
 
+class ArrowDirections(Enum):
+    left = "left"
+    right = "right"
+    up = "up"
+    down = "down"
+
+
+ARROW_TIPS = {
+    ArrowTip.arrow: {
+        ArrowDirections.left: "🭮",
+        ArrowDirections.right: "🭬",
+        ArrowDirections.up: "🭯",
+        ArrowDirections.down: "🭭",
+    }
+}
+
+
 class EdgeSegmentDrawingMode(Enum):
     box = "box"
     single_character = "single_character"
@@ -204,14 +221,15 @@ class RoutedEdgeSegments:
         if iter_reversed:
             segments = reversed(self.segments)
             index = -index - 1
-        print(list(self.segments))
         for segment in segments:
             if index <= segment.length():
                 return segment.interpolate(index, reversed=iter_reversed)
             else:
                 index -= segment.length()
 
-        raise IndexError("Index out of range")
+        if iter_reversed:
+            return self.segments[0].start
+        return self.segments[-1].end
 
 
 @dataclass
@@ -704,29 +722,9 @@ def rasterize_edge(
 
     edge_layout = EdgeLayout(input=edge_input, segments=edge_segments.segments)
 
-    start_arrow_tip_position = edge_segments.edge_iter_point(0)
-    end_arrow_tip_position = edge_segments.edge_iter_point(-1)
-    print(end_arrow_tip_position)
-
-    if end_arrow_tip is not None:
-        label_buffers.append(
-            EdgeBuffer(
-                z_index=-1,
-                boundary_1=end_arrow_tip_position,
-                boundary_2=end_arrow_tip_position,
-                strips=[Strip([Segment(text="X")])],
-            )
-        )
-
-    if start_arrow_tip is not None:
-        label_buffers.append(
-            EdgeBuffer(
-                z_index=-1,
-                boundary_1=start_arrow_tip_position,
-                boundary_2=start_arrow_tip_position,
-                strips=[Strip([Segment(text="Y")])],
-            )
-        )
+    label_buffers.extend(
+        render_arrow_tip_buffers(end_arrow_tip, start_arrow_tip, edge_segments)
+    )
 
     boundary_1 = edge_segments.min_bound
     boundary_2 = edge_segments.max_bound
@@ -739,6 +737,62 @@ def rasterize_edge(
     )
 
     return edge_buffer, edge_layout, label_buffers
+
+
+def render_arrow_tip_buffers(
+    end_arrow_tip: ArrowTip | None,
+    start_arrow_tip: ArrowTip | None,
+    edge_segments: RoutedEdgeSegments,
+) -> list[StripBuffer]:
+    buffers: list[StripBuffer] = []
+
+    start_arrow_tip_position = edge_segments.edge_iter_point(0)
+    start_arrow_tip_dir = edge_segments.edge_iter_point(1)
+
+    if start_arrow_tip is not None:
+        buffers.append(
+            render_arrow_tip_buffer(
+                start_arrow_tip, start_arrow_tip_position, start_arrow_tip_dir
+            )
+        )
+
+    end_arrow_tip_position = edge_segments.edge_iter_point(-1)
+    end_arrow_tip_dir = edge_segments.edge_iter_point(-2)
+
+    if end_arrow_tip is not None:
+        buffers.append(
+            render_arrow_tip_buffer(
+                end_arrow_tip, end_arrow_tip_position, end_arrow_tip_dir
+            )
+        )
+
+    return buffers
+
+
+def render_arrow_tip_buffer(
+    arrow_tip: ArrowTip, arrow_tip_position: Point, arrow_tip_dir: Point
+) -> StripBuffer:
+    tangent = arrow_tip_dir - arrow_tip_position
+
+    if abs(tangent.x) > abs(tangent.y):
+        if tangent.x > 0:
+            direction = ArrowDirections.left
+        else:
+            direction = ArrowDirections.right
+    else:
+        if tangent.y > 0:
+            direction = ArrowDirections.up
+        else:
+            direction = ArrowDirections.down
+
+    tip_character = ARROW_TIPS[arrow_tip][direction]
+
+    return EdgeBuffer(
+        z_index=-1,
+        boundary_1=arrow_tip_position,
+        boundary_2=arrow_tip_position,
+        strips=[Strip([Segment(text=tip_character)])],
+    )
 
 
 def _bresenham_line_drawing(
