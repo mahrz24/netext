@@ -66,6 +66,7 @@ class EdgeSegment:
     start: Point
     end: Point
 
+    @property
     def length(self) -> int:
         return self.start.distance_to(self.end)
 
@@ -133,7 +134,7 @@ class EdgeSegment:
         if self.start == self.end:
             return self.start
         direct_line = LineString([self.start.shapely_point(), self.end.shapely_point()])
-        fraction = distance / float(self.length())
+        fraction = distance / float(self.length)
         if reversed:
             fraction = 1 - fraction
         return Point.from_shapely_point(
@@ -213,6 +214,10 @@ class RoutedEdgeSegments:
             [edge_segment.max_bound for edge_segment in self.segments]
         )
 
+    @property
+    def length(self) -> int:
+        return sum(segment.length for segment in self.segments)
+
     def edge_iter_point(self, index: int) -> Point:
         # Return the point traversing the whole edge over all segments.
         iter_reversed = index < 0
@@ -222,10 +227,10 @@ class RoutedEdgeSegments:
             segments = reversed(self.segments)
             index = -index - 1
         for segment in segments:
-            if index <= segment.length():
+            if index <= segment.length:
                 return segment.interpolate(index, reversed=iter_reversed)
             else:
-                index -= segment.length()
+                index -= segment.length
 
         if iter_reversed:
             return self.segments[0].start
@@ -657,25 +662,6 @@ def rasterize_edge(
         routing_hints=[],
     )
 
-    label_buffers: list[StripBuffer] = []
-    label = data.get("$label", None)
-
-    # TODO Think about this: Shape and node buffer are bound
-    # so maybe use the shape to create the node buffer
-    # and link it to the creating shape?
-    if label is not None:
-        shape = JustContent()
-        label_strips = shape.render_shape(console, label, style=Style(), data={})
-        label_buffer = NodeBuffer.from_strips(
-            label_strips,
-            z_index=1,
-            shape=shape,
-            center=Point(
-                x=round((start.x + end.x) / 2), y=round((start.y + end.y) / 2)
-            ),
-        )
-        label_buffers.append(label_buffer)
-
     # We perform a two pass routing here.
 
     # First we route the edge with allowing the center magnet as start and end
@@ -721,6 +707,23 @@ def rasterize_edge(
         )
 
     edge_layout = EdgeLayout(input=edge_input, segments=edge_segments.segments)
+
+    label_buffers: list[StripBuffer] = []
+    label = data.get("$label", None)
+
+    # TODO Think about this: Shape and node buffer are bound
+    # so maybe use the shape to create the node buffer
+    # and link it to the creating shape?
+    if label is not None:
+        shape = JustContent()
+        label_strips = shape.render_shape(console, label, style=Style(), data={})
+
+        label_position = edge_segments.edge_iter_point(round(edge_segments.length / 2))
+
+        label_buffer = NodeBuffer.from_strips(
+            label_strips, z_index=1, shape=shape, center=label_position
+        )
+        label_buffers.append(label_buffer)
 
     label_buffers.extend(
         render_arrow_tip_buffers(end_arrow_tip, start_arrow_tip, edge_segments)

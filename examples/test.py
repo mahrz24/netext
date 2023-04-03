@@ -45,7 +45,7 @@ nx.set_edge_attributes(g, EdgeSegmentDrawingMode.box, "$edge-segment-drawing-mod
 nx.set_edge_attributes(g, ArrowTip.arrow, "$end-arrow-tip")
 nx.set_edge_attributes(g, ArrowTip.arrow, "$start-arrow-tip")
 
-# nx.set_edge_attributes(g, "foo", "$label")
+nx.set_edge_attributes(g, "foo", "$label")
 nx.set_node_attributes(g, _render2, "$content-renderer")
 
 
