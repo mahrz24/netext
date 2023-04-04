@@ -5,6 +5,7 @@ from netext.edge_rasterizer import (
     EdgeRoutingMode,
     EdgeSegment,
     Point,
+    RoutedEdgeSegments,
     rasterize_edge,
     route_edge,
 )
@@ -35,22 +36,27 @@ def test_trivial_edge(console: Console) -> None:
         data=dict(),
     )
 
-    assert edge.width == 6
-    assert edge.height == 6
+    assert edge.width == 5
+    assert edge.height == 5
 
 
 def test_route_edge_direct(console: Console) -> None:
     edge_segements = route_edge(
         Point(x=1, y=2), Point(x=5, y=6), routing_mode=EdgeRoutingMode.straight
     )
-    assert edge_segements == [EdgeSegment(start=Point(x=1, y=2), end=Point(x=5, y=6))]
+    assert edge_segements == RoutedEdgeSegments(
+        [EdgeSegment(start=Point(x=1, y=2), end=Point(x=5, y=6))], intersections=0
+    )
 
 
 def test_route_edge_straight(console: Console) -> None:
     edge_segements = route_edge(
         Point(x=1, y=2), Point(x=5, y=6), routing_mode=EdgeRoutingMode.orthogonal
     )
-    assert edge_segements == [
-        EdgeSegment(start=Point(x=1, y=2), end=Point(x=1, y=6)),
-        EdgeSegment(start=Point(x=1, y=6), end=Point(x=5, y=6)),
-    ]
+    assert edge_segements == RoutedEdgeSegments(
+        [
+            EdgeSegment(start=Point(x=1, y=2), end=Point(x=1, y=6)),
+            EdgeSegment(start=Point(x=1, y=6), end=Point(x=5, y=6)),
+        ],
+        intersections=0,
+    )
