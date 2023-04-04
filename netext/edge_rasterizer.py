@@ -29,21 +29,41 @@ class ArrowDirections(Enum):
     down = "down"
 
 
-ARROW_TIPS = {
-    ArrowTip.arrow: {
-        ArrowDirections.left: "🭮",
-        ArrowDirections.right: "🭬",
-        ArrowDirections.up: "🭯",
-        ArrowDirections.down: "🭭",
-    }
-}
-
-
 class EdgeSegmentDrawingMode(Enum):
     box = "box"
     single_character = "single_character"
     braille = "braille"
     block = "block"
+
+
+ARROW_TIPS = {
+    ArrowTip.arrow: {
+        EdgeSegmentDrawingMode.box: {
+            ArrowDirections.left: "←",
+            ArrowDirections.right: "→",
+            ArrowDirections.up: "↑",
+            ArrowDirections.down: "↓",
+        },
+        EdgeSegmentDrawingMode.single_character: {
+            ArrowDirections.left: "<",
+            ArrowDirections.right: ">",
+            ArrowDirections.up: "^",
+            ArrowDirections.down: "v",
+        },
+        EdgeSegmentDrawingMode.block: {
+            ArrowDirections.left: "🭮",
+            ArrowDirections.right: "🭬",
+            ArrowDirections.up: "🭯",
+            ArrowDirections.down: "🭭",
+        },
+        EdgeSegmentDrawingMode.braille: {
+            ArrowDirections.left: "🭮",
+            ArrowDirections.right: "🭬",
+            ArrowDirections.up: "🭯",
+            ArrowDirections.down: "🭭",
+        },
+    }
+}
 
 
 @dataclass
@@ -726,7 +746,9 @@ def rasterize_edge(
         label_buffers.append(label_buffer)
 
     label_buffers.extend(
-        render_arrow_tip_buffers(end_arrow_tip, start_arrow_tip, edge_segments)
+        render_arrow_tip_buffers(
+            end_arrow_tip, start_arrow_tip, edge_segments, edge_segment_drawing_mode
+        )
     )
 
     boundary_1 = edge_segments.min_bound
@@ -746,6 +768,7 @@ def render_arrow_tip_buffers(
     end_arrow_tip: ArrowTip | None,
     start_arrow_tip: ArrowTip | None,
     edge_segments: RoutedEdgeSegments,
+    edge_segment_drawing_mode: EdgeSegmentDrawingMode,
 ) -> list[StripBuffer]:
     buffers: list[StripBuffer] = []
 
@@ -755,7 +778,10 @@ def render_arrow_tip_buffers(
     if start_arrow_tip is not None:
         buffers.append(
             render_arrow_tip_buffer(
-                start_arrow_tip, start_arrow_tip_position, start_arrow_tip_dir
+                start_arrow_tip,
+                start_arrow_tip_position,
+                start_arrow_tip_dir,
+                edge_segment_drawing_mode,
             )
         )
 
@@ -765,7 +791,10 @@ def render_arrow_tip_buffers(
     if end_arrow_tip is not None:
         buffers.append(
             render_arrow_tip_buffer(
-                end_arrow_tip, end_arrow_tip_position, end_arrow_tip_dir
+                end_arrow_tip,
+                end_arrow_tip_position,
+                end_arrow_tip_dir,
+                edge_segment_drawing_mode,
             )
         )
 
@@ -773,7 +802,10 @@ def render_arrow_tip_buffers(
 
 
 def render_arrow_tip_buffer(
-    arrow_tip: ArrowTip, arrow_tip_position: Point, arrow_tip_dir: Point
+    arrow_tip: ArrowTip,
+    arrow_tip_position: Point,
+    arrow_tip_dir: Point,
+    edge_segment_drawing_mode: EdgeSegmentDrawingMode,
 ) -> StripBuffer:
     tangent = arrow_tip_dir - arrow_tip_position
 
@@ -788,7 +820,7 @@ def render_arrow_tip_buffer(
         else:
             direction = ArrowDirections.down
 
-    tip_character = ARROW_TIPS[arrow_tip][direction]
+    tip_character = ARROW_TIPS[arrow_tip][edge_segment_drawing_mode][direction]
 
     return EdgeBuffer(
         z_index=-1,
