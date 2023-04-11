@@ -43,10 +43,12 @@ class TerminalGraph(Generic[G]):
         # First we create the node buffers, this allows us to pass the sizing information to the
         # layout engine. For each node in the graph we generate a node buffer that contains the
         # segments to render the node and metadata where to place the buffer.
-        node_buffers: dict[Hashable, NodeBuffer] = {
-            node: rasterize_node(console, node, cast(dict[Hashable, Any], data))
-            for node, data in self._nx_graph.nodes(data=True)
-        }
+        node_buffers: dict[Hashable, NodeBuffer] = {}
+
+        for node, data in self._nx_graph.nodes(data=True):
+            result = rasterize_node(console, node, cast(dict[Hashable, Any], data))
+            if result is not None:
+                node_buffers[node] = result
 
         # Store the node buffers in the graph itself
         nx.set_node_attributes(self._nx_graph, node_buffers, "_netext_node_buffer")
