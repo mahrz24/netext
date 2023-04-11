@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Iterable, Iterator
+from typing import Any, Iterable, Iterator, Sequence
 
 from bitarray import bitarray
 from rich.console import Console
@@ -150,6 +150,18 @@ class EdgeSegment:
                 EdgeSegment(start=Point(x=self.end.x, y=self.start.y), end=self.end),
             ]
 
+    def horizontal_range(self) -> Sequence[int]:
+        if self.start.x <= self.end.x:
+            return range(self.start.x, self.end.x + 1)
+        else:
+            return range(self.start.x, self.end.x - 1, -1)
+
+    def vertical_range(self) -> Sequence[int]:
+        if self.start.y <= self.end.y:
+            return range(self.start.y, self.end.y + 1)
+        else:
+            return range(self.start.y, self.end.y - 1, -1)
+
     def interpolate(self, distance: int, reversed: bool = False) -> Point:
         if self.start == self.end:
             return self.start
@@ -188,6 +200,14 @@ class EdgeSegment:
     @property
     def max_bound(self) -> Point:
         return Point(x=max(self.start.x, self.end.x), y=max(self.start.y, self.end.y))
+
+    @property
+    def vertical(self) -> bool:
+        return self.start.x == self.end.x
+
+    @property
+    def horizontal(self) -> bool:
+        return self.start.y == self.end.y
 
 
 @dataclass
@@ -590,42 +610,47 @@ def orthogonal_segments_to_strips_with_box_characters(
     last_segment: EdgeSegment | None = None
     for edge_segment in offset_edge_segments:
         start, end = edge_segment.start, edge_segment.end
-        if start.x == end.x:
-            for y in range(
-                min(start.y, end.y),
-                max(start.y, end.y) + 1,
-            ):
-                if char_buffer[y][start.x] == "─" and last_segment is not None:
-                    if last_segment.end.y < end.y:
-                        if last_segment.start.x < start.x:
+        first_character = True
+        if edge_segment.vertical:
+            for y in edge_segment.vertical_range():
+                if (
+                    first_character
+                    and last_segment is not None
+                    and last_segment.horizontal
+                ):
+                    if last_segment.start.x < start.x:
+                        if end.y > last_segment.end.y:
                             char_buffer[y][start.x] = "╮"
                         else:
-                            char_buffer[y][start.x] = "╭"
-                    else:
-                        if last_segment.start.x < start.x:
                             char_buffer[y][start.x] = "╯"
+                    else:
+                        if end.y > last_segment.end.y:
+                            char_buffer[y][start.x] = "╭"
                         else:
                             char_buffer[y][start.x] = "╰"
                 else:
                     char_buffer[y][start.x] = "│"
-        elif start.y == end.y:
-            for x in range(
-                min(start.x, end.x),
-                max(start.x, end.x) + 1,
-            ):
-                if char_buffer[start.y][x] == "│" and last_segment is not None:
-                    if last_segment.end.y < end.y:
-                        if last_segment.start.x < start.x:
+                first_character = False
+        elif edge_segment.horizontal:
+            for x in edge_segment.horizontal_range():
+                if (
+                    first_character
+                    and last_segment is not None
+                    and last_segment.vertical
+                ):
+                    if last_segment.start.y > start.y:
+                        if end.x < last_segment.end.x:
                             char_buffer[start.y][x] = "╮"
                         else:
                             char_buffer[start.y][x] = "╭"
                     else:
-                        if last_segment.start.x < start.x:
+                        if end.x < last_segment.end.x:
                             char_buffer[start.y][x] = "╯"
                         else:
                             char_buffer[start.y][x] = "╰"
                 else:
                     char_buffer[start.y][x] = "─"
+                first_character = False
 
         last_segment = edge_segment
 
@@ -655,7 +680,12 @@ def rasterize_edge(
     all_nodes: Iterable[NodeBuffer],
     routed_edges: Iterable[EdgeLayout],
     data: Any,
-) -> tuple[EdgeBuffer, EdgeLayout, list[StripBuffer]]:
+) -> tuple[EdgeBuffer, EdgeLayout, list[StripBuffer]] | None:
+    show = data.get("$show", True)
+
+    if not show:
+        return None
+
     start = u_buffer.get_magnet_position(
         v_buffer.center, data.get("$magnet", Magnet.CENTER)
     )

@@ -80,7 +80,7 @@ class TerminalGraph(Generic[G]):
 
         # Iterate over all edges (so far in no particular order)
         for u, v, data in self._nx_graph.edges(data=True):
-            edge_buffer, edge_layout, label_nodes = rasterize_edge(
+            result = rasterize_edge(
                 console,
                 node_buffers[u],
                 node_buffers[v],
@@ -88,10 +88,12 @@ class TerminalGraph(Generic[G]):
                 self.edge_layouts,
                 data,
             )
+            if result is not None:
+                edge_buffer, edge_layout, label_nodes = result
 
-            self.edge_buffers.append(edge_buffer)
-            self.edge_layouts.append(edge_layout)
-            self.label_buffers.extend(label_nodes)
+                self.edge_buffers.append(edge_buffer)
+                self.edge_layouts.append(edge_layout)
+                self.label_buffers.extend(label_nodes)
 
     def _transform_node_positions_to_console(
         self, node_positions: dict[Hashable, tuple[float, float]]
