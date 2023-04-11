@@ -16,9 +16,9 @@ m = 20  # 20 edges
 seed = 20160  # seed random number generators for reproducibility
 
 # Use seed for reproducibility
-g = nx.gnm_random_graph(n, m, seed=seed)
+# g = nx.gnm_random_graph(n, m, seed=seed)
 
-# g = cast(nx.Graph, nx.binomial_tree(5))
+g = cast(nx.Graph, nx.binomial_tree(5))
 g1 = cast(nx.DiGraph, nx.paley_graph(5))
 
 
@@ -48,12 +48,9 @@ nx.set_edge_attributes(g, EdgeRoutingMode.orthogonal, "$edge-routing-mode")
 nx.set_edge_attributes(g, EdgeSegmentDrawingMode.box, "$edge-segment-drawing-mode")
 nx.set_edge_attributes(g, ArrowTip.arrow, "$end-arrow-tip")
 nx.set_edge_attributes(g, ArrowTip.arrow, "$start-arrow-tip")
-# nx.set_edge_attributes(g, False, "$show")
 
 # nx.set_edge_attributes(g, "foo", "$label")
 nx.set_node_attributes(g, _render2, "$content-renderer")
-
-g.edges[7, 2]["$show"] = True
 
 
 print(Panel(TerminalGraph(g), title="Binomial Tree", expand=False))

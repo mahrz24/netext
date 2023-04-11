@@ -96,6 +96,14 @@ class EdgeSegment:
         intersection = direct_line.intersection(node_polygon)
         return not intersection.is_empty
 
+    def intersects_with_edge_segment(self, other: "EdgeSegment") -> bool:
+        direct_line = LineString([self.start.shapely_point(), self.end.shapely_point()])
+        other_direct_line = LineString(
+            [other.start.shapely_point(), other.end.shapely_point()]
+        )
+        intersection = direct_line.intersection(other_direct_line)
+        return not intersection.is_empty
+
     def cut_multiple(self, node_buffers: Iterator[NodeBuffer]) -> "EdgeSegment":
         node_buffer: NodeBuffer | None = next(node_buffers, None)
         if node_buffer is None:
@@ -130,6 +138,14 @@ class EdgeSegment:
     def count_node_intersections(self, node_buffers: Iterable[NodeBuffer]) -> int:
         return sum(
             1 for node_buffer in node_buffers if self.intersects_with_node(node_buffer)
+        )
+
+    def count_edge_intersections(self, edges: Iterable["EdgeLayout"]) -> int:
+        return sum(
+            1
+            for edge in edges
+            for segment in edge.segments
+            if self.intersects_with_edge_segment(segment)
         )
 
     def ortho_split_x(self) -> list["EdgeSegment"]:
@@ -211,19 +227,33 @@ class EdgeSegment:
 
 
 @dataclass
+class EdgeLayout:
+    input: EdgeInput
+    segments: list[EdgeSegment]
+
+    # label_position: Point | None
+    # start_tip_position: Point | None
+    # end_tip_position: Point | None
+
+
+@dataclass
 class RoutedEdgeSegments:
     segments: list[EdgeSegment]
     intersections: int
 
     @classmethod
     def from_segments_compute_intersections(
-        cls, segments: list[EdgeSegment], node_buffers: Iterable[NodeBuffer]
+        cls,
+        segments: list[EdgeSegment],
+        node_buffers: Iterable[NodeBuffer],
+        edges: Iterable[EdgeLayout] = [],
     ) -> "RoutedEdgeSegments":
         return cls(
             segments=segments,
             intersections=sum(
                 segment.count_node_intersections(node_buffers) for segment in segments
-            ),
+            )
+            + sum(segment.count_edge_intersections(edges) for segment in segments),
         )
 
     def concat(self, other: "RoutedEdgeSegments") -> "RoutedEdgeSegments":
@@ -275,16 +305,6 @@ class RoutedEdgeSegments:
         if iter_reversed:
             return self.segments[0].start
         return self.segments[-1].end
-
-
-@dataclass
-class EdgeLayout:
-    input: EdgeInput
-    segments: list[EdgeSegment]
-
-    # label_position: Point | None
-    # start_tip_position: Point | None
-    # end_tip_position: Point | None
 
 
 @dataclass
@@ -356,6 +376,7 @@ def route_edge(
                 start=start,
                 end=end,
                 non_start_end_nodes=non_start_end_nodes,
+                routed_edges=routed_edges,
             )
         case _:
             raise NotImplementedError(
@@ -367,6 +388,7 @@ def route_orthogonal_edge(
     start: Point,
     end: Point,
     non_start_end_nodes: Iterable[NodeBuffer],
+    routed_edges: Iterable[EdgeLayout] = [],
 ) -> RoutedEdgeSegments:
     """
     Route an edge from start to end using orthogonal segments.
@@ -380,10 +402,12 @@ def route_orthogonal_edge(
         RoutedEdgeSegments.from_segments_compute_intersections(
             EdgeSegment(start=start, end=end).ortho_split_x(),
             node_buffers=non_start_end_nodes,
+            edges=routed_edges,
         ),
         RoutedEdgeSegments.from_segments_compute_intersections(
             EdgeSegment(start=start, end=end).ortho_split_y(),
             node_buffers=non_start_end_nodes,
+            edges=routed_edges,
         ),
     ]
 
@@ -396,11 +420,13 @@ def route_orthogonal_edge(
                 start=start,
                 end=EdgeSegment(start=start, end=end).midpoint,
                 non_start_end_nodes=non_start_end_nodes,
+                routed_edges=routed_edges,
             ).concat(
                 route_orthogonal_edge(
                     start=EdgeSegment(start=start, end=end).midpoint,
                     end=end,
                     non_start_end_nodes=non_start_end_nodes,
+                    routed_edges=routed_edges,
                 )
             )
         )

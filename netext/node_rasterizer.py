@@ -197,12 +197,7 @@ def _default_content_renderer(
 
 def rasterize_node(
     console: Console, node: Hashable, data: dict[Hashable, Any]
-) -> NodeBuffer | None:
-    show = data.get("$show", True)
-
-    if not show:
-        return None
-
+) -> NodeBuffer:
     shape: Shape = data.get("$shape", Box())
     style: Style = data.get("$style", Style())
     content_style = data.get("$content-style", Style())

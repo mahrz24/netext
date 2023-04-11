@@ -43,12 +43,10 @@ class TerminalGraph(Generic[G]):
         # First we create the node buffers, this allows us to pass the sizing information to the
         # layout engine. For each node in the graph we generate a node buffer that contains the
         # segments to render the node and metadata where to place the buffer.
-        node_buffers: dict[Hashable, NodeBuffer] = {}
-
-        for node, data in self._nx_graph.nodes(data=True):
-            result = rasterize_node(console, node, cast(dict[Hashable, Any], data))
-            if result is not None:
-                node_buffers[node] = result
+        node_buffers: dict[Hashable, NodeBuffer] = {
+            node: rasterize_node(console, node, cast(dict[Hashable, Any], data))
+            for node, data in self._nx_graph.nodes(data=True)
+        }
 
         # Store the node buffers in the graph itself
         nx.set_node_attributes(self._nx_graph, node_buffers, "_netext_node_buffer")
@@ -72,10 +70,7 @@ class TerminalGraph(Generic[G]):
             buffer.center.x = round(pos[0])
             buffer.center.y = round(pos[1])
 
-        # Assign magnets to edges
-
         # Now we rasterize the edges
-
         self.edge_buffers: list[EdgeBuffer] = []
         self.edge_layouts: list[EdgeLayout] = []
         self.label_buffers: list[StripBuffer] = []
@@ -157,7 +152,12 @@ class TerminalGraph(Generic[G]):
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        node_buffers = nx.get_node_attributes(self._nx_graph, "_netext_node_buffer")  # type: ignore
+        # Get graph subview
+        visible_nodes = nx.subgraph_view(
+            self._nx_graph,
+            filter_node=lambda n: self._nx_graph.nodes[n].get("$show", True),
+        )
+        node_buffers = nx.get_node_attributes(visible_nodes, "_netext_node_buffer")  # type: ignore
         all_buffers = chain(
             node_buffers.values(), self.edge_buffers, self.label_buffers
         )
