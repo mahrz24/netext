@@ -51,7 +51,10 @@ nx.set_edge_attributes(g, ArrowTip.arrow, "$start-arrow-tip")
 
 # nx.set_edge_attributes(g, "foo", "$label")
 nx.set_node_attributes(g, _render2, "$content-renderer")
+nx.set_node_attributes(g, True, "$show")
 
+# nx.set_edge_attributes(g, False, "$show")
+g.edges[8, 10]["$show"] = True
 
 print(Panel(TerminalGraph(g), title="Binomial Tree", expand=False))
 print(Panel(TerminalGraph(g1), title="Payley Graph", expand=False))

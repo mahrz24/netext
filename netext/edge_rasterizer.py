@@ -96,13 +96,16 @@ class EdgeSegment:
         intersection = direct_line.intersection(node_polygon)
         return not intersection.is_empty
 
-    def intersects_with_edge_segment(self, other: "EdgeSegment") -> bool:
+    def intersects_with_edge_segment(self, other: "EdgeSegment") -> int:
         direct_line = LineString([self.start.shapely_point(), self.end.shapely_point()])
         other_direct_line = LineString(
             [other.start.shapely_point(), other.end.shapely_point()]
         )
         intersection = direct_line.intersection(other_direct_line)
-        return not intersection.is_empty
+        if intersection.is_empty:
+            return 0
+        else:
+            return int(intersection.length)
 
     def cut_multiple(self, node_buffers: Iterator[NodeBuffer]) -> "EdgeSegment":
         node_buffer: NodeBuffer | None = next(node_buffers, None)
@@ -142,10 +145,9 @@ class EdgeSegment:
 
     def count_edge_intersections(self, edges: Iterable["EdgeLayout"]) -> int:
         return sum(
-            1
+            self.intersects_with_edge_segment(segment)
             for edge in edges
             for segment in edge.segments
-            if self.intersects_with_edge_segment(segment)
         )
 
     def ortho_split_x(self) -> list["EdgeSegment"]:
@@ -389,6 +391,7 @@ def route_orthogonal_edge(
     end: Point,
     non_start_end_nodes: Iterable[NodeBuffer],
     routed_edges: Iterable[EdgeLayout] = [],
+    recursion_depth: int = 0,
 ) -> RoutedEdgeSegments:
     """
     Route an edge from start to end using orthogonal segments.
@@ -396,7 +399,6 @@ def route_orthogonal_edge(
     The edge will be routed in a way that minimizes the number of intersections with other nodes.
 
     """
-    # TODO: Also check intersections with other edges.
     # TODO: Add different midpoints as candidates.
     candidates = [
         RoutedEdgeSegments.from_segments_compute_intersections(
@@ -413,7 +415,8 @@ def route_orthogonal_edge(
 
     if (
         all([candidate.intersections > 0 for candidate in candidates])
-        and start.distance_to(end) >= 2
+        and start.distance_to(end) >= 4
+        and recursion_depth < 2
     ):
         candidates.append(
             route_orthogonal_edge(
@@ -421,12 +424,14 @@ def route_orthogonal_edge(
                 end=EdgeSegment(start=start, end=end).midpoint,
                 non_start_end_nodes=non_start_end_nodes,
                 routed_edges=routed_edges,
+                recursion_depth=recursion_depth + 1,
             ).concat(
                 route_orthogonal_edge(
                     start=EdgeSegment(start=start, end=end).midpoint,
                     end=end,
                     non_start_end_nodes=non_start_end_nodes,
                     routed_edges=routed_edges,
+                    recursion_depth=recursion_depth + 1,
                 )
             )
         )
