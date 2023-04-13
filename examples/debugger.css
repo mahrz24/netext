@@ -1,9 +1,23 @@
 Screen {
     align: center middle;
+
+}
+
+Horizontal {
+    overflow-x: auto;
+    overflow-y: auto;
 }
 
 Graph {
     padding: 1 2;
-    width: 75%;
+    height: auto;
+    width: auto;
     content-align: center middle;
+}
+
+Tree#profiler {
+    dock: right;
+    width: 70;
+    height: 100%;
+    overflow-x: auto;
 }

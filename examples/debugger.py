@@ -1,11 +1,12 @@
 import time
 from typing import cast
 from textual.app import App, ComposeResult, RenderResult
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Horizontal
 from textual.widgets import Header, Footer, Tree
 from textual.widget import Widget
 from textual.reactive import reactive, Reactive
 from textual.message import Message
+from textual.geometry import Size
 
 from netext.terminal_graph import GraphProfiler, TerminalGraph
 
@@ -72,6 +73,14 @@ class Graph(Widget):
         else:
             return "Empty graph."
 
+    def get_content_width(self, container: Size, viewport: Size) -> int:
+        """Force content width size."""
+        return self.terminal_graph.width
+
+    def get_content_height(self, container: Size, viewport: Size, width: int) -> int:
+        """Force content width size."""
+        return self.terminal_graph.height
+
 
 def create_graph() -> nx.DiGraph:
     def _render2(n, d, s):
@@ -96,6 +105,56 @@ def create_graph() -> nx.DiGraph:
     return g
 
 
+def add_frame(node, frame, total_time) -> None:
+    if not frame.group or (
+        frame.group.root == frame
+        or frame.total_self_time > 0.2 * total_time
+        or frame in frame.group.exit_frames
+    ):
+        percent = frame.time / total_time * 100
+        time_percent_str = f"{percent:.0f}%"
+        time_str = f"{frame.time:.3f}"
+
+        class_name = frame.class_name
+        if class_name:
+            name = f"{class_name}.{frame.function}"
+        else:
+            name = frame.function
+
+        frame_node = node.add(f"{name} ({time_percent_str} {time_str})")
+
+        if frame.group and frame.group.root == frame:
+            frame_node = frame_node.add(f"[{len(frame.group.frames)} frames hidden]")
+
+    if frame.children:
+        for child in frame.children:
+            add_frame(frame_node, child, total_time)
+
+
+def add_profiler_node(node, profiler: Profiler) -> None:
+    """Add a profiler node to a tree."""
+    stats = node.add("Stats")
+    session = profiler.last_session
+
+    if session is not None:
+        stats.add_leaf(f"Program: {session.program}")
+        stats.add_leaf(
+            "Recorded: {:<9}".format(
+                time.strftime("%X", time.localtime(session.start_time))
+            )
+        )
+        stats.add_leaf(f"Samples:  {session.sample_count}")
+        stats.add_leaf(f"Duration: {session.duration:<9.3f}")
+        stats.add_leaf(f"CPU time: {session.cpu_time:.3f}")
+
+        root_frame = session.root_frame()
+
+        if root_frame:
+            frames = node.add("Frames")
+            total_time = root_frame.time
+            add_frame(frames, root_frame, total_time)
+
+
 class GraphDebuggerApp(App):
     """A Textual app to debug graph rendering with netext."""
 
@@ -112,41 +171,23 @@ class GraphDebuggerApp(App):
         graph.graph = create_graph()
 
         yield Header()
+        yield Tree("Profiler", id="profiler")
         with Horizontal():
             yield graph
-            yield VerticalScroll(Tree("Profiler", id="profiler"))
         yield Footer()
 
     def on_graph_profiled(self, message: Graph.Profiled) -> None:
-        layout_profiler = self.query_one("Tree#profiler")
-        stats = layout_profiler.root.add("Stats")
+        tree = cast(Tree, self.query_one("Tree#profiler"))
+        tree.clear()
 
-        session = message.layout_profiler.last_session
+        layout = tree.root.add("Layout")
+        add_profiler_node(layout, message.layout_profiler)
 
-        if session is not None:
-            node = stats.add(f"Program: {session.program}")
-            node.allow_expand = False
+        node_render = tree.root.add("Node Render")
+        add_profiler_node(node_render, message.node_render_profiler)
 
-            node = stats.add(
-                "Recorded: {:<9}".format(
-                    time.strftime("%X", time.localtime(session.start_time))
-                )
-            )
-            node.allow_expand = False
-
-            node = stats.add(f"Samples:  {session.sample_count}")
-            node.allow_expand = False
-
-            node = stats.add(f"Duration: {session.duration:<9.3f}")
-            node.allow_expand = False
-
-            node = stats.add(f"CPU time: {session.cpu_time:.3f}")
-            node.allow_expand = False
-        # inspector.update(
-        #     message.layout_profiler.output_text(unicode=True, color=True)
-        #     + message.node_render_profiler.output_text(unicode=True, color=True)
-        #     + message.edge_render_profiler.output_text(unicode=True, color=True)
-        # )
+        edge_render = tree.root.add("Edge Render")
+        add_profiler_node(edge_render, message.edge_render_profiler)
 
     def action_toggle_dark(self) -> None:
         """An action to toggle dark mode."""
