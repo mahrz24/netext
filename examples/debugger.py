@@ -1,7 +1,7 @@
 import time
 from typing import cast
 from textual.app import App, ComposeResult, RenderResult
-from textual.containers import Horizontal, VerticalScroll, Vertical
+from textual.containers import Horizontal, VerticalScroll
 from textual.widgets import Header, Footer, Tree
 from textual.widget import Widget
 from textual.reactive import reactive, Reactive
@@ -114,17 +114,11 @@ class GraphDebuggerApp(App):
         yield Header()
         with Horizontal():
             yield graph
-            yield VerticalScroll(
-                Vertical(
-                    Tree("Layout Profiler", id="layout_profiler"),
-                    Tree("Node Render Profiler", id="node_render_profiler"),
-                    Tree("Edge Render Profiler", id="edge_render_profiler"),
-                )
-            )
+            yield VerticalScroll(Tree("Profiler", id="profiler"))
         yield Footer()
 
     def on_graph_profiled(self, message: Graph.Profiled) -> None:
-        layout_profiler = self.query_one("Tree#layout_profiler")
+        layout_profiler = self.query_one("Tree#profiler")
         stats = layout_profiler.root.add("Stats")
 
         session = message.layout_profiler.last_session
