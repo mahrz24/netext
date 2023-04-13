@@ -1,0 +1,9 @@
+Screen {
+    align: center middle;
+}
+
+Graph {
+    padding: 1 2;
+    width: 75%;
+    content-align: center middle;
+}

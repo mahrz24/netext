@@ -1,7 +1,7 @@
 from collections.abc import Hashable
 from itertools import chain
 from math import ceil
-from typing import Any, Generic, cast
+from typing import Any, Generic, Protocol, cast
 
 import networkx as nx
 from rich.console import Console, ConsoleOptions, RenderResult
@@ -16,6 +16,14 @@ from .layout_engines.grandalf import GrandalfSugiyamaLayout
 from .node_rasterizer import NodeBuffer, rasterize_node
 
 
+class GraphProfiler(Protocol):
+    def start(self) -> None:
+        return NotImplemented
+
+    def stop(self) -> None:
+        return NotImplemented
+
+
 class TerminalGraph(Generic[G]):
     def __init__(
         self,
@@ -23,6 +31,9 @@ class TerminalGraph(Generic[G]):
         # see https://github.com/python/mypy/issues/3737
         layout_engine: LayoutEngine[G] = GrandalfSugiyamaLayout[G](),  # type: ignore
         console: Console = Console(),
+        layout_profiler: GraphProfiler | None = None,
+        node_render_profiler: GraphProfiler | None = None,
+        edge_render_profiler: GraphProfiler | None = None,
     ):
         """
         A terminal representation of a networkx graph.
@@ -43,18 +54,29 @@ class TerminalGraph(Generic[G]):
         # First we create the node buffers, this allows us to pass the sizing information to the
         # layout engine. For each node in the graph we generate a node buffer that contains the
         # segments to render the node and metadata where to place the buffer.
+
+        if node_render_profiler:
+            node_render_profiler.start()
+
         node_buffers: dict[Hashable, NodeBuffer] = {
             node: rasterize_node(console, node, cast(dict[Hashable, Any], data))
             for node, data in self._nx_graph.nodes(data=True)
         }
 
+        if node_render_profiler:
+            node_render_profiler.stop()
+
         # Store the node buffers in the graph itself
         nx.set_node_attributes(self._nx_graph, node_buffers, "_netext_node_buffer")
 
+        if layout_profiler:
+            layout_profiler.start()
         # Position the nodes and add the position information to the graph
         node_positions: dict[Hashable, tuple[float, float]] = layout_engine(
             self._nx_graph
         )
+        if layout_profiler:
+            layout_profiler.stop()
 
         # From the node buffer sizing and the layout, determine the total size needed for the graph.
         # TODO: We could add explicit sizing, also it is possible to recompute the edge buffer adaptively.
@@ -75,6 +97,9 @@ class TerminalGraph(Generic[G]):
         self.edge_layouts: list[EdgeLayout] = []
         self.label_buffers: list[StripBuffer] = []
 
+        if edge_render_profiler:
+            edge_render_profiler.start()
+
         # Iterate over all edges (so far in no particular order)
         for u, v, data in self._nx_graph.edges(data=True):
             result = rasterize_edge(
@@ -91,6 +116,9 @@ class TerminalGraph(Generic[G]):
                 self.edge_buffers.append(edge_buffer)
                 self.edge_layouts.append(edge_layout)
                 self.label_buffers.extend(label_nodes)
+
+        if edge_render_profiler:
+            edge_render_profiler.stop()
 
     def _transform_node_positions_to_console(
         self, node_positions: dict[Hashable, tuple[float, float]]
