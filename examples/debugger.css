@@ -1,11 +1,17 @@
-Screen {
+NodeSelectScreen {
     align: center middle;
+}
+
+#node-list {
+    width: 100;
+    height: 80%;
 
 }
 
-Horizontal {
+#main-container {
     overflow-x: auto;
     overflow-y: auto;
+    align: center middle;
 }
 
 Graph {
@@ -15,9 +21,14 @@ Graph {
     content-align: center middle;
 }
 
-Tree#profiler {
+Tree {
+    height: auto;
+}
+
+#sidebar {
     dock: right;
     width: 70;
     height: 100%;
     overflow-x: auto;
+    overflow-y: auto;
 }

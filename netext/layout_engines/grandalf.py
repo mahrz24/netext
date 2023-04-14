@@ -33,6 +33,7 @@ class GrandalfSugiyamaLayout(LayoutEngine[G]):
         edges = [Edge(vertices[u], vertices[v]) for u, v in g.edges]
         graph = graph_core(vertices.values(), edges)
 
+        # TODO Open up settings to netext
         sug = SugiyamaLayout(graph)
         sug.init_all()
         sug.draw(3)

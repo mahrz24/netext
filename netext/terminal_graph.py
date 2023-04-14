@@ -75,6 +75,7 @@ class TerminalGraph(Generic[G]):
         node_positions: dict[Hashable, tuple[float, float]] = layout_engine(
             self._nx_graph
         )
+        self.node_layout = node_positions
         if layout_profiler:
             layout_profiler.stop()
 
