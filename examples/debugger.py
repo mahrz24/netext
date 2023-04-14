@@ -8,6 +8,8 @@ from textual.reactive import reactive, Reactive
 from textual.message import Message
 from textual.geometry import Size
 from textual.screen import ModalScreen
+from netext.edge_rendering.arrow_tips import ArrowTip
+from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
 from netext.layout_engines.static import StaticLayout
 
@@ -19,7 +21,7 @@ from rich.text import Text
 from rich.style import Style
 from rich.pretty import Pretty
 
-from netext.edge_rasterizer import ArrowTip, EdgeRoutingMode, EdgeSegmentDrawingMode
+from netext.edge_routing.modes import EdgeRoutingMode
 
 from pyinstrument import Profiler
 
@@ -106,8 +108,10 @@ def create_graph() -> nx.DiGraph:
 
     nx.set_node_attributes(g, Style(color="blue"), "$content-style")
     nx.set_node_attributes(g, box.SQUARE, "$box-type")
-    nx.set_edge_attributes(g, EdgeRoutingMode.orthogonal, "$edge-routing-mode")
-    nx.set_edge_attributes(g, EdgeSegmentDrawingMode.box, "$edge-segment-drawing-mode")
+    nx.set_edge_attributes(g, EdgeRoutingMode.straight, "$edge-routing-mode")
+    nx.set_edge_attributes(
+        g, EdgeSegmentDrawingMode.single_character, "$edge-segment-drawing-mode"
+    )
     nx.set_edge_attributes(g, ArrowTip.arrow, "$end-arrow-tip")
     nx.set_edge_attributes(g, ArrowTip.arrow, "$start-arrow-tip")
 

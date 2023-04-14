@@ -4,7 +4,7 @@ from heapq import merge
 
 from rich.segment import Segment
 
-from netext.segment_buffer import StripBuffer, Spacer
+from netext.rendering.segment_buffer import StripBuffer, Spacer
 
 
 def render_buffers(

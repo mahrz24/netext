@@ -8,7 +8,7 @@ from rich.segment import Segment, Segments
 from netext.buffer_renderer import render_buffers
 from netext.geometry import Point
 from netext.node_rasterizer import NodeBuffer
-from netext.segment_buffer import Strip, StripBuffer, Spacer
+from netext.rendering.segment_buffer import Strip, StripBuffer, Spacer
 
 
 @dataclass

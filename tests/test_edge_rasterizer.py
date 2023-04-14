@@ -1,14 +1,11 @@
 import pytest
 from rich.console import Console
 
-from netext.edge_rasterizer import (
-    EdgeRoutingMode,
-    EdgeSegment,
-    Point,
-    RoutedEdgeSegments,
-    rasterize_edge,
-    route_edge,
-)
+from netext.edge_rasterizer import rasterize_edge
+from netext.geometry.point import Point
+from netext.edge_routing.edge import EdgeSegment, RoutedEdgeSegments
+from netext.edge_routing.modes import EdgeRoutingMode
+from netext.edge_routing.route import route_edge
 from netext.node_rasterizer import rasterize_node
 
 

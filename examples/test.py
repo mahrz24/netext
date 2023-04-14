@@ -8,7 +8,9 @@ from rich.style import Style
 from rich.table import Table
 
 from netext import TerminalGraph
-from netext.edge_rasterizer import ArrowTip, EdgeRoutingMode, EdgeSegmentDrawingMode
+from netext.edge_routing.modes import EdgeRoutingMode
+from netext.edge_rendering.arrow_tips import ArrowTip
+from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.node_rasterizer import JustContent
 
 n = 10  # 10 nodes

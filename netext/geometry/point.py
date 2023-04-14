@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from enum import Enum
 import shapely as sp
 
 
@@ -46,12 +45,3 @@ class Point:
             x=max(point.x for point in points),
             y=max(point.y for point in points),
         )
-
-
-class Magnet(Enum):
-    CENTER = 0
-    TOP = 1
-    LEFT = 2
-    BOTTOM = 3
-    RIGHT = 4
-    CLOSEST = 5

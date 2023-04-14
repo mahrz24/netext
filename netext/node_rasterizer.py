@@ -12,7 +12,7 @@ from rich.text import Text
 from netext.geometry import Magnet, Point
 from shapely import LineString, Polygon
 
-from netext.segment_buffer import Strip, StripBuffer, Spacer
+from netext.rendering.segment_buffer import Strip, StripBuffer, Spacer
 
 
 class Shape(Protocol):

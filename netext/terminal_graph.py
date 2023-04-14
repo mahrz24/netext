@@ -7,10 +7,13 @@ import networkx as nx
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.measure import Measurement
 
-from netext.segment_buffer import StripBuffer
+from .edge_rendering.buffer import EdgeBuffer
+from .edge_routing.edge import EdgeLayout
+
+from netext.rendering.segment_buffer import StripBuffer
 
 from .buffer_renderer import render_buffers
-from .edge_rasterizer import EdgeBuffer, EdgeLayout, rasterize_edge
+from .edge_rasterizer import rasterize_edge
 from .layout_engines.engine import LayoutEngine, G
 from .layout_engines.grandalf import GrandalfSugiyamaLayout
 from .node_rasterizer import NodeBuffer, rasterize_node
