@@ -2,9 +2,12 @@
 # See "Writing benchmarks" in the asv docs for more information.
 
 from networkx import binomial_tree
+import networkx as nx
 from rich.console import Console
 
 from netext import TerminalGraph
+from netext.edge_rendering.modes import EdgeSegmentDrawingMode
+from netext.edge_routing.modes import EdgeRoutingMode
 
 
 class TimeSuite:
@@ -13,11 +16,30 @@ class TimeSuite:
     of iterating over dictionaries in Python.
     """
 
-    def setup(self):
-        self.graph = binomial_tree(4)
+    params = [2, 4, 5, 6, 7]
+
+    def setup(self, n):
+        self.graph = binomial_tree(n)
+        self.graph_ortho_box = binomial_tree(n)
+
+        nx.set_edge_attributes(
+            self.graph_ortho_box, EdgeRoutingMode.orthogonal, "$edge-routing-mode"
+        )
+        nx.set_edge_attributes(
+            self.graph_ortho_box,
+            EdgeSegmentDrawingMode.box,
+            "$edge-segment-drawing-mode",
+        )
+
         self.terminal_graph = TerminalGraph(self.graph)
         self.console = Console()
 
-    def time_render_binomial_tree_4(self):
+    def time_render_binomial_tree(self, n):
         with self.console.capture():
             self.console.print(self.terminal_graph)
+
+    def time_layout_and_rasterize_binomial_tree(self, n):
+        TerminalGraph(self.graph)
+
+    def time_layout_and_rasterize_binomial_tree_orthogonal_box(self, n):
+        TerminalGraph(self.graph_ortho_box)

@@ -18,11 +18,8 @@ def test_trivial_edge(console: Console) -> None:
     node_buffer_u = rasterize_node(console, node="A", data=dict())
     node_buffer_v = rasterize_node(console, node="B", data=dict())
 
-    node_buffer_u.center.x = 1
-    node_buffer_u.center.y = 1
-
-    node_buffer_v.center.x = 9
-    node_buffer_v.center.y = 9
+    node_buffer_u.center = Point(1, 1)
+    node_buffer_v.center = Point(9, 9)
 
     edge, _, _ = rasterize_edge(
         console,

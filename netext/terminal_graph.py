@@ -7,6 +7,8 @@ import networkx as nx
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.measure import Measurement
 
+from netext.geometry.point import Point
+
 from .edge_rendering.buffer import EdgeBuffer
 from .edge_routing.edge import EdgeLayout
 
@@ -93,8 +95,7 @@ class TerminalGraph(Generic[G]):
         # Store the node positions in the node buffers
         for node, pos in node_positions.items():
             buffer: NodeBuffer = self._nx_graph.nodes[node]["_netext_node_buffer"]
-            buffer.center.x = round(pos[0])
-            buffer.center.y = round(pos[1])
+            buffer.center = Point(x=round(pos[0]), y=round(pos[1]))
 
         # Now we rasterize the edges
         self.edge_buffers: list[EdgeBuffer] = []

@@ -108,10 +108,8 @@ def create_graph() -> nx.DiGraph:
 
     nx.set_node_attributes(g, Style(color="blue"), "$content-style")
     nx.set_node_attributes(g, box.SQUARE, "$box-type")
-    nx.set_edge_attributes(g, EdgeRoutingMode.straight, "$edge-routing-mode")
-    nx.set_edge_attributes(
-        g, EdgeSegmentDrawingMode.single_character, "$edge-segment-drawing-mode"
-    )
+    nx.set_edge_attributes(g, EdgeRoutingMode.orthogonal, "$edge-routing-mode")
+    nx.set_edge_attributes(g, EdgeSegmentDrawingMode.box, "$edge-segment-drawing-mode")
     nx.set_edge_attributes(g, ArrowTip.arrow, "$end-arrow-tip")
     nx.set_edge_attributes(g, ArrowTip.arrow, "$start-arrow-tip")
 

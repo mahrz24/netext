@@ -4,7 +4,7 @@ from netext.geometry.point import Point
 from shapely.geometry import LineString
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class LineSegment:
     start: Point
     end: Point

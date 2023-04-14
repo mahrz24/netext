@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import shapely as sp
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Point:
     x: int
     y: int
