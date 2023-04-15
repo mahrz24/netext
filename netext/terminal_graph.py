@@ -7,6 +7,8 @@ import networkx as nx
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.measure import Measurement
 
+from rtree import index
+
 from netext.geometry.point import Point
 
 from .edge_rendering.buffer import EdgeBuffer
@@ -106,6 +108,12 @@ class TerminalGraph(Generic[G]):
             edge_render_profiler.start()
 
         # Iterate over all edges (so far in no particular order)
+        node_idx = index.Index()
+        edge_idx = index.Index()
+
+        for i, node in enumerate(node_buffers.values()):
+            node_idx.insert(i, node.bounding_box)
+
         for u, v, data in self._nx_graph.edges(data=True):
             result = rasterize_edge(
                 console,
@@ -114,9 +122,12 @@ class TerminalGraph(Generic[G]):
                 node_buffers.values(),
                 self.edge_layouts,
                 data,
+                node_idx,
+                edge_idx,
             )
             if result is not None:
                 edge_buffer, edge_layout, label_nodes = result
+                edge_idx.insert(len(self.edge_buffers), edge_buffer.bounding_box)
 
                 self.edge_buffers.append(edge_buffer)
                 self.edge_layouts.append(edge_layout)

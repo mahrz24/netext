@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import shapely as sp
 
 
@@ -6,12 +6,19 @@ import shapely as sp
 class Point:
     x: int
     y: int
+    _shapely: sp.Point = field(init=False, repr=False)
 
-    def shapely_point(self) -> sp.Point:
-        return sp.Point([self.x, self.y])
+    def __post_init__(self):
+        object.__setattr__(self, "_shapely", None)
+
+    @property
+    def shapely(self) -> sp.Point:
+        if self._shapely is None:
+            object.__setattr__(self, "_shapely", sp.Point([self.x, self.y]))
+        return self._shapely
 
     @classmethod
-    def from_shapely_point(cls, point: sp.Point) -> "Point":
+    def from_shapely(cls, point: sp.Point) -> "Point":
         return cls(x=round(point.x), y=round(point.y))
 
     def __add__(self, other: "Point") -> "Point":

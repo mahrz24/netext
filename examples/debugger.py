@@ -12,6 +12,7 @@ from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
 from netext.layout_engines.static import StaticLayout
+from pyinstrument.processors import aggregate_repeated_calls
 
 from netext.terminal_graph import GraphProfiler, TerminalGraph
 
@@ -167,7 +168,7 @@ def add_profiler_node(node, profiler: Profiler) -> None:
         stats.add_leaf(f"Duration: {session.duration:<9.3f}")
         stats.add_leaf(f"CPU time: {session.cpu_time:.3f}")
 
-        root_frame = session.root_frame()
+        root_frame = aggregate_repeated_calls(session.root_frame(), {})
 
         if root_frame:
             frames = node.add("Frames")

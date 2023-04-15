@@ -70,7 +70,7 @@ class RectangularShapeMixin:
                 return node_buffer.center
             case Magnet.CLOSEST:
                 direct_line = LineString(
-                    [node_buffer.center.shapely_point(), target_point.shapely_point()]
+                    [node_buffer.center.shapely, target_point.shapely]
                 )
                 node_polygon = self.bounding_box(node_buffer)
                 intersection = direct_line.intersection(node_polygon)
@@ -86,9 +86,7 @@ class RectangularShapeMixin:
                     target_point=target_point,
                     magnet=closest_magnet,
                 )
-                closest_distance = intersection_point.distance(
-                    closest_point.shapely_point()
-                )
+                closest_distance = intersection_point.distance(closest_point.shapely)
 
                 for magnet in [Magnet.LEFT, Magnet.RIGHT, Magnet.BOTTOM]:
                     point = self.get_magnet_position(
@@ -96,7 +94,7 @@ class RectangularShapeMixin:
                         target_point=target_point,
                         magnet=magnet,
                     )
-                    distance = intersection_point.distance(point.shapely_point())
+                    distance = intersection_point.distance(point.shapely)
                     if distance < closest_distance:
                         closest_point = point
                         closest_distance = distance

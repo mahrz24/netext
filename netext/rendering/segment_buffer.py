@@ -55,3 +55,7 @@ class StripBuffer:
         if isinstance(value, StripBuffer):
             return self.left_x < value.left_x
         return False
+
+    @property
+    def bounding_box(self) -> tuple[int, int, int, int]:
+        return self.left_x, self.top_y, self.right_x, self.bottom_y

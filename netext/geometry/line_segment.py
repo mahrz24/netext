@@ -1,13 +1,25 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Sequence
 from netext.geometry.point import Point
-from shapely.geometry import LineString
+import shapely as sp
 
 
 @dataclass(frozen=True, slots=True)
 class LineSegment:
     start: Point
     end: Point
+    _shapely: sp.LineString = field(init=False, repr=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "_shapely", None)
+
+    @property
+    def shapely(self) -> sp.LineString:
+        if self._shapely is None:
+            object.__setattr__(
+                self, "_shapely", sp.LineString([self.start.shapely, self.end.shapely])
+            )
+        return self._shapely
 
     @property
     def length(self) -> int:
@@ -28,11 +40,11 @@ class LineSegment:
     def interpolate(self, distance: int, reversed: bool = False) -> Point:
         if self.start == self.end:
             return self.start
-        direct_line = LineString([self.start.shapely_point(), self.end.shapely_point()])
+        direct_line = self.shapely
         fraction = distance / float(self.length)
         if reversed:
             fraction = 1 - fraction
-        return Point.from_shapely_point(
+        return Point.from_shapely(
             direct_line.interpolate(distance=fraction, normalized=True)
         )
 
@@ -71,3 +83,7 @@ class LineSegment:
     @property
     def horizontal(self) -> bool:
         return self.start.y == self.end.y
+
+    @property
+    def bounding_box(self) -> tuple[int, int, int, int]:
+        return (self.min_bound.x, self.min_bound.y, self.max_bound.x, self.max_bound.y)

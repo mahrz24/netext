@@ -14,16 +14,14 @@ from typing import Iterable, Iterator
 
 class EdgeSegment(LineSegment):
     def intersects_with_node(self, node_buffer: NodeBuffer) -> bool:
-        direct_line = LineString([self.start.shapely_point(), self.end.shapely_point()])
+        direct_line = LineString([self.start.shapely, self.end.shapely])
         node_polygon = node_buffer.shape.bounding_box(node_buffer)
         intersection = direct_line.intersection(node_polygon)
         return not intersection.is_empty
 
     def intersects_with_edge_segment(self, other: "EdgeSegment") -> int:
-        direct_line = LineString([self.start.shapely_point(), self.end.shapely_point()])
-        other_direct_line = LineString(
-            [other.start.shapely_point(), other.end.shapely_point()]
-        )
+        direct_line = LineString([self.start.shapely, self.end.shapely])
+        other_direct_line = LineString([other.start.shapely, other.end.shapely])
         intersection = direct_line.intersection(other_direct_line)
         if intersection.is_empty:
             return 0
@@ -38,8 +36,8 @@ class EdgeSegment(LineSegment):
             return self.cut(node_buffer).cut_multiple(node_buffers)
 
     def cut(self, node_buffer: NodeBuffer) -> "EdgeSegment":
-        start = self.start.shapely_point()
-        end = self.end.shapely_point()
+        start = self.start.shapely
+        end = self.end.shapely
         direct_line = LineString([start, end])
         node_polygon = node_buffer.shape.bounding_box(node_buffer, margin=1)
         node_polygon_boundary = node_polygon.boundary
@@ -53,11 +51,11 @@ class EdgeSegment(LineSegment):
             if intersection_start.is_empty:
                 return EdgeSegment(
                     start=self.start,
-                    end=Point.from_shapely_point(intersection),
+                    end=Point.from_shapely(intersection),
                 )
             else:
                 return EdgeSegment(
-                    start=Point.from_shapely_point(intersection),
+                    start=Point.from_shapely(intersection),
                     end=self.end,
                 )
 
