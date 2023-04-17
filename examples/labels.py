@@ -1,0 +1,19 @@
+from netext import TerminalGraph
+from netext.edge_rendering.arrow_tips import ArrowTip
+from netext.edge_routing.modes import EdgeRoutingMode
+from netext.edge_rendering.modes import EdgeSegmentDrawingMode
+
+from rich import print
+
+import networkx as nx
+
+g = nx.Graph()
+g.add_node("Chunky")
+g.add_node("Bacon")
+g.add_edge("Chunky", "Bacon", **{"$label": "Yum yuuuum!"})
+
+nx.set_edge_attributes(g, ArrowTip.arrow, "$end-arrow-tip")
+nx.set_edge_attributes(g, EdgeRoutingMode.orthogonal, "$edge-routing-mode")
+nx.set_edge_attributes(g, EdgeSegmentDrawingMode.box, "$edge-segment-drawing-mode")
+
+print(TerminalGraph(g))
