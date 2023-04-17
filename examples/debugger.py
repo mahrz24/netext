@@ -1,5 +1,5 @@
 import time
-from typing import Any, cast
+from typing import Any, Callable, cast
 from textual.app import App, ComposeResult, RenderResult
 from textual.containers import Vertical
 from textual.widgets import Header, Footer, Tree, OptionList
@@ -176,7 +176,49 @@ def add_profiler_node(node, profiler: Profiler) -> None:
             add_frame(frames, root_frame, total_time)
 
 
-class NodeSelectScreen(ModalScreen):
+class ModalDialog(ModalScreen):
+    BINDINGS = [
+        ("escape", "close", "Close node select screen"),
+    ]
+
+    class ValueSelected(Message):
+        """Color selected message."""
+
+        value: Any
+
+        def __init__(
+            self,
+            value: Any,
+        ) -> None:
+            self.value = value
+            super().__init__()
+
+
+class SelectDialog(ModalDialog):
+    """Screen with a dialog to quit."""
+
+    def __init__(
+        self,
+        options: list[str],
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+    ) -> None:
+        super().__init__(name, id, classes)
+        self.options = options
+
+    def compose(self) -> ComposeResult:
+        yield OptionList(*[str(s) for s in self.options], id="option-list").focus()
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        self.app.post_message(self.ValueSelected(self.options[event.option_index]))
+        self.app.pop_screen()
+
+    def action_close(self) -> None:
+        self.app.pop_screen()
+
+
+class NodeSelectDialog(SelectDialog):
     """Screen with a dialog to quit."""
 
     def __init__(
@@ -186,32 +228,10 @@ class NodeSelectScreen(ModalScreen):
         id: str | None = None,
         classes: str | None = None,
     ) -> None:
+        super().__init__(
+            options=list(graph.nodes(data=False)), name=name, id=id, classes=classes
+        )
         self.graph = graph
-        self.options = list(self.graph.nodes(data=False))
-        super().__init__(name, id, classes)
-
-    BINDINGS = [
-        ("escape", "close", "Close node select screen"),
-    ]
-
-    class NodeSelected(Message):
-        """Color selected message."""
-
-        node: Any
-
-        def __init__(
-            self,
-            node: Any,
-        ) -> None:
-            self.node = node
-            super().__init__()
-
-    def compose(self) -> ComposeResult:
-        yield OptionList(*[str(s) for s in self.options], id="node-list").focus()
-
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        self.app.post_message(self.NodeSelected(self.options[event.option_index]))
-        self.app.pop_screen()
 
     def action_close(self) -> None:
         self.app.pop_screen()
@@ -229,20 +249,31 @@ class GraphDebuggerApp(App):
 
     BINDINGS = [
         ("d", "toggle_dark", "Toggle dark mode"),
+        ("l", "load_graph", "Load graph"),
         ("n", "toggle_nodes", "Toggle nodes"),
         ("e", "toggle_edges", "Toggle edges"),
         ("s", "select_node", "Select node"),
+        ("ctrl+a", "add_node", "Add node"),
+        ("ctrl+e", "add_edge", "Add edge"),
+        ("ctrl+l", "layout", "Layout"),
     ]
     CSS_PATH = "debugger.css"
 
     selected_node: Reactive[Any | None] = reactive(None)
     graph: nx.DiGraph | nx.Graph | None = None
 
-    def on_node_select_screen_node_selected(
-        self, message: NodeSelectScreen.NodeSelected
-    ):
-        self.log("HI")
-        self.selected_node = message.node
+    _modal_callback: Callable[[Any], None] | None = None
+
+    def on_modal_dialog_value_selected(self, message: ModalDialog.ValueSelected):
+        if _modal_callback := self._modal_callback:
+            self._modal_callback(message.value)
+            self._modal_callback = None
+
+    def show_modal_dialog(
+        self, dialog: ModalDialog, callback: Callable[[Any], None]
+    ) -> None:
+        self.push_screen(dialog)
+        self._modal_callback = callback
 
     def watch_selected_node(self, old_node: Any, new_node: Any):
         graph_widget = self.query_one(Graph)
@@ -281,6 +312,12 @@ class GraphDebuggerApp(App):
         """An action to toggle dark mode."""
         self.dark = not self.dark
 
+    def action_add_node(self) -> None:
+        """An action to add a node."""
+        graph_widget = self.query_one(Graph)
+        graph_widget.graph.add_node("New Node")
+        graph_widget.graph_mutated()
+
     def action_toggle_nodes(self) -> None:
         """An action to toggle nodes."""
         graph_widget = self.query_one(Graph)
@@ -303,12 +340,33 @@ class GraphDebuggerApp(App):
 
     def action_select_node(self) -> None:
         graph_widget = self.query_one(Graph)
-        self.push_screen(NodeSelectScreen(graph_widget.graph))
+        self.show_modal_dialog(
+            NodeSelectDialog(graph_widget.graph),
+            lambda node: setattr(self, "selected_node", node),
+        )
 
     def action_scroll_up(self) -> None:
         if self.selected_node:
             graph_widget = self.query_one(Graph)
             graph_widget.graph.nodes[self.selected_node]["$y"] -= 1
+            graph_widget.graph_mutated()
+
+    def action_scroll_down(self) -> None:
+        if self.selected_node:
+            graph_widget = self.query_one(Graph)
+            graph_widget.graph.nodes[self.selected_node]["$y"] += 1
+            graph_widget.graph_mutated()
+
+    def action_scroll_left(self) -> None:
+        if self.selected_node:
+            graph_widget = self.query_one(Graph)
+            graph_widget.graph.nodes[self.selected_node]["$x"] -= 1
+            graph_widget.graph_mutated()
+
+    def action_scroll_right(self) -> None:
+        if self.selected_node:
+            graph_widget = self.query_one(Graph)
+            graph_widget.graph.nodes[self.selected_node]["$x"] += 1
             graph_widget.graph_mutated()
 
 
