@@ -1,7 +1,7 @@
 from collections.abc import Hashable
 from typing import Any
 
-from grandalf.graphs import Edge, Vertex, graph_core  # type: ignore
+from grandalf.graphs import Edge, Vertex, Graph  # type: ignore
 from grandalf.layouts import SugiyamaLayout  # type: ignore
 
 from .engine import G, LayoutEngine
@@ -31,12 +31,17 @@ class GrandalfSugiyamaLayout(LayoutEngine[G]):
             node: _create_vertex(node, data) for node, data in g.nodes(data=True)
         }
         edges = [Edge(vertices[u], vertices[v]) for u, v in g.edges]
-        graph = graph_core(vertices.values(), edges)
+        graph = Graph(vertices.values(), edges)
 
         # TODO Open up settings to netext
-        sug = SugiyamaLayout(graph)
-        sug.init_all()
-        sug.draw(3)
+        # TODO Draw components next to each other.
+        for c in graph.components():
+            sug = SugiyamaLayout(c)
+            sug.init_all()
+            sug.draw(3)
         # Rescale back, but leave a bit more space to avoid overlaps in the
         # terminal coordinate space.
-        return {v.data: (v.view.xy[0] / 4, v.view.xy[1] / 6) for v in graph.sV}
+        vs = []
+        for c in graph.components():
+            vs.extend(c.sV)
+        return {v.data: (v.view.xy[0] / 4, v.view.xy[1] / 6) for v in vs}

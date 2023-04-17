@@ -1,17 +1,24 @@
-NodeSelectScreen {
+ModalDialog {
     align: center middle;
 }
 
-#node-list {
+ModalDialog>Widget {
     width: 100;
     height: 80%;
-
 }
 
 #main-container {
     overflow-x: auto;
     overflow-y: auto;
     align: center middle;
+}
+
+#node-view {
+    overflow-y: auto;
+}
+
+#node-view>NodeView {
+    height: auto;
 }
 
 Graph {
@@ -22,7 +29,7 @@ Graph {
 }
 
 Tree {
-    height: auto;
+    height: 70%;
 }
 
 #sidebar {
@@ -30,5 +37,4 @@ Tree {
     width: 70;
     height: 100%;
     overflow-x: auto;
-    overflow-y: auto;
 }

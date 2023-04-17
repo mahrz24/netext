@@ -1,13 +1,14 @@
 import time
 from typing import Any, Callable, cast
 from textual.app import App, ComposeResult, RenderResult
-from textual.containers import Vertical
-from textual.widgets import Header, Footer, Tree, OptionList
+from textual.containers import Vertical, Horizontal
+from textual.widgets import Header, Footer, Tree, OptionList, Input
 from textual.widget import Widget
 from textual.reactive import reactive, Reactive
 from textual.message import Message
 from textual.geometry import Size
-from textual.screen import ModalScreen
+from textual.screen import ModalScreen, Screen
+from textual.events import Key
 from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
@@ -181,60 +182,62 @@ class ModalDialog(ModalScreen):
         ("escape", "close", "Close node select screen"),
     ]
 
-    class ValueSelected(Message):
-        """Color selected message."""
-
-        value: Any
-
-        def __init__(
-            self,
-            value: Any,
-        ) -> None:
-            self.value = value
-            super().__init__()
-
-
-class SelectDialog(ModalDialog):
-    """Screen with a dialog to quit."""
-
     def __init__(
         self,
-        options: list[str],
+        callback: Callable[[Any], None],
         name: str | None = None,
         id: str | None = None,
         classes: str | None = None,
     ) -> None:
         super().__init__(name, id, classes)
+        self.callback = callback
+
+    def action_close(self) -> None:
+        self.app.pop_screen()
+
+
+class SelectDialog(ModalDialog):
+    """Option select dialog."""
+
+    def __init__(
+        self,
+        options: list[str],
+        callback: Callable[[Any], None],
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+    ) -> None:
+        super().__init__(callback, name, id, classes)
         self.options = options
 
     def compose(self) -> ComposeResult:
         yield OptionList(*[str(s) for s in self.options], id="option-list").focus()
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        self.app.post_message(self.ValueSelected(self.options[event.option_index]))
         self.app.pop_screen()
-
-    def action_close(self) -> None:
-        self.app.pop_screen()
+        self.callback(self.options[event.option_index])
 
 
-class NodeSelectDialog(SelectDialog):
-    """Screen with a dialog to quit."""
+class InputDialog(ModalDialog):
+    """Option select dialog."""
 
     def __init__(
         self,
-        graph: nx.DiGraph | nx.Graph,
+        default: str,
+        callback: Callable[[Any], None],
         name: str | None = None,
         id: str | None = None,
         classes: str | None = None,
     ) -> None:
-        super().__init__(
-            options=list(graph.nodes(data=False)), name=name, id=id, classes=classes
-        )
-        self.graph = graph
+        super().__init__(callback, name, id, classes)
+        self.default = default
 
-    def action_close(self) -> None:
+    def compose(self) -> ComposeResult:
+        yield Input(placeholder=self.default).focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
         self.app.pop_screen()
+        self.callback(event.value)
 
 
 class NodeView(Widget):
@@ -244,12 +247,12 @@ class NodeView(Widget):
         return Pretty(self.node)
 
 
-class GraphDebuggerApp(App):
+class MainScreen(Screen):
     """A Textual app to debug graph rendering with netext."""
 
     BINDINGS = [
         ("d", "toggle_dark", "Toggle dark mode"),
-        ("l", "load_graph", "Load graph"),
+        ("o", "load_graph", "Load graph"),
         ("n", "toggle_nodes", "Toggle nodes"),
         ("e", "toggle_edges", "Toggle edges"),
         ("s", "select_node", "Select node"),
@@ -257,23 +260,9 @@ class GraphDebuggerApp(App):
         ("ctrl+e", "add_edge", "Add edge"),
         ("ctrl+l", "layout", "Layout"),
     ]
-    CSS_PATH = "debugger.css"
 
     selected_node: Reactive[Any | None] = reactive(None)
     graph: nx.DiGraph | nx.Graph | None = None
-
-    _modal_callback: Callable[[Any], None] | None = None
-
-    def on_modal_dialog_value_selected(self, message: ModalDialog.ValueSelected):
-        if _modal_callback := self._modal_callback:
-            self._modal_callback(message.value)
-            self._modal_callback = None
-
-    def show_modal_dialog(
-        self, dialog: ModalDialog, callback: Callable[[Any], None]
-    ) -> None:
-        self.push_screen(dialog)
-        self._modal_callback = callback
 
     def watch_selected_node(self, old_node: Any, new_node: Any):
         graph_widget = self.query_one(Graph)
@@ -289,7 +278,8 @@ class GraphDebuggerApp(App):
         yield Header()
         with Vertical(id="sidebar"):
             yield Tree("Profiler", id="profiler")
-            yield NodeView()
+            with Horizontal(id="node-view"):
+                yield NodeView()
         with Vertical(id="main-container"):
             yield graph
 
@@ -315,8 +305,18 @@ class GraphDebuggerApp(App):
     def action_add_node(self) -> None:
         """An action to add a node."""
         graph_widget = self.query_one(Graph)
-        graph_widget.graph.add_node("New Node")
-        graph_widget.graph_mutated()
+
+        def _add_node(name: str) -> None:
+            if name:
+                graph_widget.graph.add_node(name)
+                graph_widget.graph_mutated()
+
+        self.app.push_screen(
+            InputDialog(
+                "New Node",
+                _add_node,
+            )
+        )
 
     def action_toggle_nodes(self) -> None:
         """An action to toggle nodes."""
@@ -340,34 +340,43 @@ class GraphDebuggerApp(App):
 
     def action_select_node(self) -> None:
         graph_widget = self.query_one(Graph)
-        self.show_modal_dialog(
-            NodeSelectDialog(graph_widget.graph),
-            lambda node: setattr(self, "selected_node", node),
-        )
+        if graph_widget:
+            self.app.push_screen(
+                SelectDialog(
+                    list(graph_widget.graph.nodes(data=False)),
+                    lambda node: setattr(self, "selected_node", node),
+                )
+            )
 
-    def action_scroll_up(self) -> None:
+    def action_layout(self) -> None:
+        """An action to add a node."""
+        graph_widget = self.query_one(Graph)
+        for node in graph_widget.graph.nodes(data=False):
+            del graph_widget.graph.nodes[node]["$x"]
+            del graph_widget.graph.nodes[node]["$y"]
+
+        graph_widget.graph_mutated()
+
+    def on_key(self, event: Key) -> None:
         if self.selected_node:
             graph_widget = self.query_one(Graph)
-            graph_widget.graph.nodes[self.selected_node]["$y"] -= 1
+            match event.character:
+                case "k":
+                    graph_widget.graph.nodes[self.selected_node]["$y"] -= 1
+                case "j":
+                    graph_widget.graph.nodes[self.selected_node]["$y"] += 1
+                case "h":
+                    graph_widget.graph.nodes[self.selected_node]["$x"] -= 1
+                case "l":
+                    graph_widget.graph.nodes[self.selected_node]["$x"] += 1
             graph_widget.graph_mutated()
 
-    def action_scroll_down(self) -> None:
-        if self.selected_node:
-            graph_widget = self.query_one(Graph)
-            graph_widget.graph.nodes[self.selected_node]["$y"] += 1
-            graph_widget.graph_mutated()
 
-    def action_scroll_left(self) -> None:
-        if self.selected_node:
-            graph_widget = self.query_one(Graph)
-            graph_widget.graph.nodes[self.selected_node]["$x"] -= 1
-            graph_widget.graph_mutated()
+class GraphDebuggerApp(App):
+    CSS_PATH = "debugger.css"
 
-    def action_scroll_right(self) -> None:
-        if self.selected_node:
-            graph_widget = self.query_one(Graph)
-            graph_widget.graph.nodes[self.selected_node]["$x"] += 1
-            graph_widget.graph_mutated()
+    def on_mount(self):
+        self.push_screen(MainScreen())
 
 
 if __name__ == "__main__":
