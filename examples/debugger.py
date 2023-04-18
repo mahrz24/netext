@@ -85,7 +85,7 @@ class Graph(Widget):
         self.post_message(
             self.Profiled(layout_profiler, node_render_profiler, edge_render_profiler)
         )
-        self.refresh()
+        self.refresh(layout=True)
 
     def render(self) -> RenderResult:
         if self.terminal_graph:
@@ -317,6 +317,30 @@ class MainScreen(Screen):
                 _add_node,
             )
         )
+
+    def action_add_edge(self) -> None:
+        """An action to add a node."""
+        graph_widget = self.query_one(Graph)
+
+        if graph_widget and self.selected_node:
+
+            def _add_edge(node: Any) -> None:
+                graph_widget.graph.add_edge(self.selected_node, node)
+                graph_widget.graph.edges[self.selected_node, node].update(
+                    {
+                        "$edge-routing-mode": EdgeRoutingMode.orthogonal,
+                        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.box,
+                        "$end-arrow-tip": ArrowTip.arrow,
+                    }
+                )
+                graph_widget.graph_mutated()
+
+            self.app.push_screen(
+                SelectDialog(
+                    list(graph_widget.graph.nodes(data=False)),
+                    _add_edge,
+                )
+            )
 
     def action_toggle_nodes(self) -> None:
         """An action to toggle nodes."""
