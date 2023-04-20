@@ -1,10 +1,10 @@
 from dataclasses import dataclass, field
+import itertools
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.geometry import Point
 from netext.geometry.line_segment import LineSegment
 from netext.node_rasterizer import NodeBuffer
-
 
 from shapely import LineString
 
@@ -28,27 +28,52 @@ class EdgeSegment(LineSegment):
         else:
             return int(intersection.length)
 
-    def cut_multiple(self, node_buffers: Iterator[NodeBuffer]) -> "EdgeSegment":
+    def cut_multiple(self, node_buffers: Iterator[NodeBuffer]) -> list["EdgeSegment"]:
         node_buffer: NodeBuffer | None = next(node_buffers, None)
         if node_buffer is None:
-            return self
+            return [self]
         else:
-            return self.cut(node_buffer).cut_multiple(node_buffers)
-
-    def cut(self, node_buffer: NodeBuffer) -> "EdgeSegment":
-        node_shape = node_buffer.shape.bounding_box(node_buffer=node_buffer, margin=1)
-
-        if self.shapely.intersects(node_shape):
-            remaining: LineString = self.shapely.difference(node_shape)
-            if remaining.is_empty or remaining.geom_type == "MultiLine":
-                # The line segment is fully ocluded by the node or cut into two we keep it as it is
-                # TODO fix to make this return a list, so we cut return none or multiple segments
-                return self
-            return EdgeSegment(
-                start=Point.from_shapely(remaining.interpolate(0, normalized=True)),
-                end=Point.from_shapely(remaining.interpolate(1, normalized=True)),
+            return list(
+                itertools.chain(
+                    *[
+                        edge_segment.cut_multiple(node_buffers)
+                        for edge_segment in self.cut(node_buffer)
+                    ]
+                )
             )
-        return self
+
+    def cut(self, node_buffer: NodeBuffer) -> list["EdgeSegment"]:
+        node_shape = node_buffer.shape.bounding_box(node_buffer=node_buffer, margin=1)
+        result = []
+        if self.shapely.intersects(node_shape):
+            remaining = self.shapely.difference(node_shape)
+            if remaining.is_empty:
+                return []
+            if remaining.geom_type == "MultiLineString":
+                for line in remaining:
+                    result.append(
+                        EdgeSegment(
+                            start=Point.from_shapely(
+                                line.interpolate(0, normalized=True)
+                            ),
+                            end=Point.from_shapely(
+                                line.interpolate(1, normalized=True)
+                            ),
+                        )
+                    )
+            else:
+                result.append(
+                    EdgeSegment(
+                        start=Point.from_shapely(
+                            remaining.interpolate(0, normalized=True)
+                        ),
+                        end=Point.from_shapely(
+                            remaining.interpolate(1, normalized=True)
+                        ),
+                    )
+                )
+            return result
+        return [self]
 
     def count_node_intersections(self, node_buffers: Iterable[NodeBuffer]) -> int:
         return sum(
@@ -132,9 +157,14 @@ class RoutedEdgeSegments:
         self, node_buffers: Iterable[NodeBuffer]
     ) -> "RoutedEdgeSegments":
         return RoutedEdgeSegments(
-            segments=[
-                segment.cut_multiple(iter(node_buffers)) for segment in self.segments
-            ],
+            segments=list(
+                itertools.chain(
+                    *[
+                        segment.cut_multiple(iter(node_buffers))
+                        for segment in self.segments
+                    ]
+                )
+            ),
             intersections=self.intersections,
         )
 

@@ -89,7 +89,11 @@ def rasterize_edge(
     )
 
     # Then we cut the edge with the node boundaries.
+
     edge_segments = edge_segments.cut_with_nodes([u_buffer, v_buffer])
+
+    if not edge_segments.segments:
+        return None
 
     if edge_segment_drawing_mode == EdgeSegmentDrawingMode.box:
         assert (
