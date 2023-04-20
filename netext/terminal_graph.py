@@ -41,6 +41,7 @@ class TerminalGraph(Generic[G]):
         layout_profiler: GraphProfiler | None = None,
         node_render_profiler: GraphProfiler | None = None,
         edge_render_profiler: GraphProfiler | None = None,
+        buffer_render_profiler: GraphProfiler | None = None,
     ):
         """
         A terminal representation of a networkx graph.
@@ -136,6 +137,8 @@ class TerminalGraph(Generic[G]):
         if edge_render_profiler:
             edge_render_profiler.stop()
 
+        self._buffer_render_profiler = buffer_render_profiler
+
     def _transform_node_positions_to_console(
         self, node_positions: dict[Hashable, tuple[float, float]]
     ) -> dict[Hashable, tuple[float, float]]:
@@ -146,6 +149,9 @@ class TerminalGraph(Generic[G]):
         """
 
         # TODO: Division by 2 can lead to some rounding errors, check this is still what we want
+        if not node_positions:
+            return dict()
+
         x_offset = -min(
             [
                 x - self._nx_graph.nodes[node]["_netext_node_buffer"].width / 2
@@ -176,6 +182,11 @@ class TerminalGraph(Generic[G]):
         """
 
         # TODO: Division by 2 can lead to some rounding errors, check this is still what we want
+        if not node_positions:
+            self.width = 0
+            self.height = 0
+            return
+
         self.width = ceil(
             max(
                 [
@@ -206,6 +217,22 @@ class TerminalGraph(Generic[G]):
             node_buffers.values(), self.edge_buffers, self.label_buffers
         )
         yield from render_buffers(all_buffers, self.width, self.height)
+
+    def _profile_render(self):
+        if self._buffer_render_profiler:
+            self._buffer_render_profiler.start()
+        # TODO move to common method
+        visible_nodes = nx.subgraph_view(
+            self._nx_graph,
+            filter_node=lambda n: self._nx_graph.nodes[n].get("$show", True),
+        )
+        node_buffers = nx.get_node_attributes(visible_nodes, "_netext_node_buffer")  # type: ignore
+        all_buffers = chain(
+            node_buffers.values(), self.edge_buffers, self.label_buffers
+        )
+        render_buffers(all_buffers, self.width, self.height)
+        if self._buffer_render_profiler:
+            self._buffer_render_profiler.stop()
 
     def __rich_measure__(
         self, console: Console, options: ConsoleOptions

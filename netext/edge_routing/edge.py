@@ -36,28 +36,19 @@ class EdgeSegment(LineSegment):
             return self.cut(node_buffer).cut_multiple(node_buffers)
 
     def cut(self, node_buffer: NodeBuffer) -> "EdgeSegment":
-        start = self.start.shapely
-        end = self.end.shapely
-        direct_line = LineString([start, end])
-        node_polygon = node_buffer.shape.bounding_box(node_buffer, margin=1)
-        node_polygon_boundary = node_polygon.boundary
-        intersection = direct_line.intersection(node_polygon_boundary)
-        if isinstance(intersection, LineString):
-            intersection = intersection.interpolate(1)
-        intersection_start = start.intersection(node_polygon)
-        if intersection.is_empty:
-            return self
-        else:
-            if intersection_start.is_empty:
-                return EdgeSegment(
-                    start=self.start,
-                    end=Point.from_shapely(intersection),
-                )
-            else:
-                return EdgeSegment(
-                    start=Point.from_shapely(intersection),
-                    end=self.end,
-                )
+        node_shape = node_buffer.shape.bounding_box(node_buffer=node_buffer, margin=1)
+
+        if self.shapely.intersects(node_shape):
+            remaining: LineString = self.shapely.difference(node_shape)
+            if remaining.is_empty or remaining.geom_type == "MultiLine":
+                # The line segment is fully ocluded by the node or cut into two we keep it as it is
+                # TODO fix to make this return a list, so we cut return none or multiple segments
+                return self
+            return EdgeSegment(
+                start=Point.from_shapely(remaining.interpolate(0, normalized=True)),
+                end=Point.from_shapely(remaining.interpolate(1, normalized=True)),
+            )
+        return self
 
     def count_node_intersections(self, node_buffers: Iterable[NodeBuffer]) -> int:
         return sum(

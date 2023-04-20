@@ -47,6 +47,6 @@ class GrandalfSugiyamaLayout(LayoutEngine[G]):
             component = {
                 v.data: (v.view.xy[0] / 4 + x_offset, v.view.xy[1] / 6) for v in c.sV
             }
-            x_offset = max([coord[0] for coord in component.values()]) + 3
+            x_offset = max([v.view.xy[0] / 4 + x_offset + v.view.w + 2 for v in c.sV])
             result.update(component)
         return result

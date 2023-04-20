@@ -2,7 +2,7 @@ import time
 from typing import Any, Callable, cast
 from textual.app import App, ComposeResult, RenderResult
 from textual.containers import Vertical, Horizontal
-from textual.widgets import Header, Footer, Tree, OptionList, Input
+from textual.widgets import Header, Footer, Tree, OptionList, Input, TabbedContent
 from textual.widget import Widget
 from textual.reactive import reactive, Reactive
 from textual.message import Message
@@ -42,10 +42,12 @@ class Graph(Widget):
             layout_profiler: Profiler,
             node_render_profiler: Profiler,
             edge_render_profiler: Profiler,
+            buffer_render_profiler: Profiler,
         ) -> None:
             self.layout_profiler = layout_profiler
             self.node_render_profiler = node_render_profiler
             self.edge_render_profiler = edge_render_profiler
+            self.buffer_render_profiler = buffer_render_profiler
             super().__init__()
 
     def watch_graph(
@@ -57,13 +59,14 @@ class Graph(Widget):
             self._render_with_graph(new_graph)
 
     def graph_mutated(self) -> None:
-        if self.graph:
+        if self.graph is not None:
             self._render_with_graph(self.graph)
 
     def _render_with_graph(self, graph: nx.DiGraph | nx.Graph) -> None:
         layout_profiler = Profiler()
         node_render_profiler = Profiler()
         edge_render_profiler = Profiler()
+        buffer_render_profiler = Profiler(async_mode=False)
 
         # If the graph has coordinates use a static layout, otherwise use the grandalf engine
         engine = GrandalfSugiyamaLayout()
@@ -76,16 +79,24 @@ class Graph(Widget):
             layout_profiler=cast(GraphProfiler, layout_profiler),
             node_render_profiler=cast(GraphProfiler, node_render_profiler),
             edge_render_profiler=cast(GraphProfiler, edge_render_profiler),
+            buffer_render_profiler=cast(GraphProfiler, buffer_render_profiler),
         )
+
+        self.terminal_graph._profile_render()
 
         for node, pos in self.terminal_graph.node_layout.items():
             graph.nodes[node]["$x"] = pos[0]
             graph.nodes[node]["$y"] = pos[1]
 
         self.post_message(
-            self.Profiled(layout_profiler, node_render_profiler, edge_render_profiler)
+            self.Profiled(
+                layout_profiler,
+                node_render_profiler,
+                edge_render_profiler,
+                buffer_render_profiler,
+            )
         )
-        self.refresh(layout=True)
+        self.refresh(layout=False)
 
     def render(self) -> RenderResult:
         if self.terminal_graph:
@@ -277,9 +288,10 @@ class MainScreen(Screen):
 
         yield Header()
         with Vertical(id="sidebar"):
-            yield Tree("Profiler", id="profiler")
-            with Horizontal(id="node-view"):
-                yield NodeView()
+            with TabbedContent("Profiler", "Inspector"):
+                yield Tree("Profiler", id="profiler")
+                with Horizontal(id="node-view"):
+                    yield NodeView()
         with Vertical(id="main-container"):
             yield graph
 
@@ -298,6 +310,9 @@ class MainScreen(Screen):
         edge_render = tree.root.add("Edge Render")
         add_profiler_node(edge_render, message.edge_render_profiler)
 
+        buffer_render = tree.root.add("Buffer Render")
+        add_profiler_node(buffer_render, message.buffer_render_profiler)
+
     def action_toggle_dark(self) -> None:
         """An action to toggle dark mode."""
         self.dark = not self.dark
@@ -309,6 +324,7 @@ class MainScreen(Screen):
         def _add_node(name: str) -> None:
             if name:
                 graph_widget.graph.add_node(name)
+                graph_widget.graph.nodes[name]["$show"] = True
                 graph_widget.graph_mutated()
 
         self.app.push_screen(
@@ -331,6 +347,7 @@ class MainScreen(Screen):
                         "$edge-routing-mode": EdgeRoutingMode.orthogonal,
                         "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.box,
                         "$end-arrow-tip": ArrowTip.arrow,
+                        "$show": True,
                     }
                 )
                 graph_widget.graph_mutated()
@@ -365,11 +382,16 @@ class MainScreen(Screen):
     def action_select_node(self) -> None:
         graph_widget = self.query_one(Graph)
         if graph_widget:
+
+            def _select_node(node: Any) -> None:
+                if self.selected_node:
+                    del graph_widget.graph.nodes[self.selected_node]["$style"]
+                self.selected_node = node
+                graph_widget.graph.nodes[node]["$style"] = Style(color="red")
+                graph_widget.graph_mutated()
+
             self.app.push_screen(
-                SelectDialog(
-                    list(graph_widget.graph.nodes(data=False)),
-                    lambda node: setattr(self, "selected_node", node),
-                )
+                SelectDialog(list(graph_widget.graph.nodes(data=False)), _select_node)
             )
 
     def action_layout(self) -> None:
@@ -380,6 +402,21 @@ class MainScreen(Screen):
             del graph_widget.graph.nodes[node]["$y"]
 
         graph_widget.graph_mutated()
+
+    def action_load_graph(self) -> None:
+        graph_widget = self.query_one(Graph)
+        if graph_widget:
+
+            def _load_graph(graph: str) -> None:
+                if graph == "Binomial Graph n=5":
+                    graph_widget.graph = create_graph()
+                elif graph == "Empty Graph":
+                    graph_widget.graph = nx.DiGraph()
+                graph_widget.graph_mutated()
+
+            self.app.push_screen(
+                SelectDialog(["Binomial Graph n=5", "Empty Graph"], _load_graph)
+            )
 
     def on_key(self, event: Key) -> None:
         if self.selected_node:

@@ -29,7 +29,7 @@ Graph {
 }
 
 Tree {
-    height: 70%;
+    height: auto;
 }
 
 #sidebar {
