@@ -35,6 +35,8 @@ def rasterize_edge(
 ) -> tuple[EdgeBuffer, EdgeLayout, list[StripBuffer]] | None:
     show = data.get("$show", True)
 
+    print(f"Edge {u_buffer} ->> {v_buffer}")
+
     if not show:
         return None
 

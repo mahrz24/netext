@@ -15,6 +15,7 @@ mkdocstrings = {extras = ["python"], version = "^0.20.0"}
 networkx-stubs = "^0.0.1"
 shapely = "^2.0.1"
 rtree = "^1.0.1"
+cachetools = "^5.3.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"

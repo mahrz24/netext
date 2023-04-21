@@ -21,7 +21,7 @@ class Shape(Protocol):
     ) -> Point:
         return NotImplemented
 
-    def bounding_box(self, node_buffer: "NodeBuffer", margin: int = 0) -> Polygon:
+    def polygon(self, node_buffer: "NodeBuffer", margin: float = 0) -> Polygon:
         return NotImplemented
 
     def render_shape(
@@ -44,7 +44,7 @@ class RectangularShapeMixin:
             for segments in segment_lists
         ]
 
-    def bounding_box(self, node_buffer: "NodeBuffer", margin: int = 0) -> Polygon:
+    def polygon(self, node_buffer: "NodeBuffer", margin: float = 0) -> Polygon:
         return Polygon(
             [
                 (node_buffer.left_x - margin, node_buffer.top_y - margin),

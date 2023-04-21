@@ -48,6 +48,10 @@ def route_orthogonal_edge(
         if i in edge_view and (edge_candidates is None or i in edge_candidates)
     ]
 
+    print("Node candidates")
+    print(list(node_candidates))
+    print("Nodes", len(relevant_nodes))
+
     # TODO: Add different midpoints as candidates.
     candidates = [
         RoutedEdgeSegments.from_segments_compute_intersections(
@@ -65,7 +69,7 @@ def route_orthogonal_edge(
     if (
         all([candidate.intersections > 0 for candidate in candidates])
         and start.distance_to(end) >= 4
-        and recursion_depth < 2
+        and recursion_depth <= 2
     ):
         candidates.append(
             route_orthogonal_edge(

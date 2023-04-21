@@ -15,7 +15,7 @@ from typing import Iterable, Iterator
 class EdgeSegment(LineSegment):
     def intersects_with_node(self, node_buffer: NodeBuffer) -> bool:
         direct_line = LineString([self.start.shapely, self.end.shapely])
-        node_polygon = node_buffer.shape.bounding_box(node_buffer)
+        node_polygon = node_buffer.shape.polygon(node_buffer)
         intersection = direct_line.intersection(node_polygon)
         return not intersection.is_empty
 
@@ -43,7 +43,7 @@ class EdgeSegment(LineSegment):
             )
 
     def cut(self, node_buffer: NodeBuffer) -> list["EdgeSegment"]:
-        node_shape = node_buffer.shape.bounding_box(node_buffer=node_buffer, margin=1)
+        node_shape = node_buffer.shape.polygon(node_buffer=node_buffer, margin=0.75)
         result = []
         if self.shapely.intersects(node_shape):
             remaining = self.shapely.difference(node_shape)
