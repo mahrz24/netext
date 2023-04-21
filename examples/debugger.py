@@ -1,7 +1,7 @@
 import time
 from typing import Any, Callable, cast
 from textual.app import App, ComposeResult, RenderResult
-from textual.containers import Vertical, Horizontal
+from textual.containers import Vertical
 from textual.widgets import Header, Footer, Tree, OptionList, Input, TabbedContent
 from textual.widget import Widget
 from textual.reactive import reactive, Reactive
@@ -290,8 +290,7 @@ class MainScreen(Screen):
         with Vertical(id="sidebar"):
             with TabbedContent("Profiler", "Inspector"):
                 yield Tree("Profiler", id="profiler")
-                with Horizontal(id="node-view"):
-                    yield NodeView()
+                yield NodeView(id="node-view")
         with Vertical(id="main-container"):
             yield graph
 

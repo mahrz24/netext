@@ -13,14 +13,6 @@ ModalDialog>Widget {
     align: center middle;
 }
 
-#node-view {
-    overflow-y: auto;
-}
-
-#node-view>NodeView {
-    height: auto;
-}
-
 Graph {
     padding: 1 2;
     height: auto;
@@ -28,13 +20,12 @@ Graph {
     content-align: center middle;
 }
 
-Tree {
-    height: auto;
-}
+
+
 
 #sidebar {
     dock: right;
     width: 70;
     height: 100%;
-    overflow-x: auto;
+
 }
