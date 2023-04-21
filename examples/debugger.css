@@ -20,12 +20,24 @@ Graph {
     content-align: center middle;
 }
 
+TabbedContent {
+    height: 100%;
+    overflow: auto;
+}
 
+Tree {
+    overflow: auto;
+    height: auto;
+    scrollbar-gutter: stable;
+}
 
+NodeView {
+    overflow: auto;
+    height: auto;
+}
 
 #sidebar {
     dock: right;
-    width: 70;
+    width: 60;
     height: 100%;
-
 }
