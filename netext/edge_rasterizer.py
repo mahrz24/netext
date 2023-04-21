@@ -30,8 +30,8 @@ def rasterize_edge(
     all_nodes: list[NodeBuffer],
     routed_edges: list[EdgeLayout],
     data: Any,
-    node_idx: Index,
-    edge_idx: Index,
+    node_idx: Index | None = None,
+    edge_idx: Index | None = None,
 ) -> tuple[EdgeBuffer, EdgeLayout, list[StripBuffer]] | None:
     show = data.get("$show", True)
 
@@ -74,7 +74,7 @@ def rasterize_edge(
         if node_buffer is not u_buffer and node_buffer is not v_buffer
     ]
 
-    routed_edge_indices = range(len(routed_edges))
+    routed_edge_indices = list(range(len(routed_edges)))
 
     edge_segments = route_edge(
         start,

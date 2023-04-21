@@ -21,10 +21,10 @@ class ArrowDirections(Enum):
 ARROW_TIPS = {
     ArrowTip.arrow: {
         EdgeSegmentDrawingMode.box: {
-            ArrowDirections.left: "←",
-            ArrowDirections.right: "→",
-            ArrowDirections.up: "↑",
-            ArrowDirections.down: "↓",
+            ArrowDirections.left: "◀",
+            ArrowDirections.right: "▶",
+            ArrowDirections.up: "▲",
+            ArrowDirections.down: "▼",
         },
         EdgeSegmentDrawingMode.single_character: {
             ArrowDirections.left: "<",
