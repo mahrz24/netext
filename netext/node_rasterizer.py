@@ -72,7 +72,7 @@ class RectangularShapeMixin:
                 direct_line = LineString(
                     [node_buffer.center.shapely, target_point.shapely]
                 )
-                node_polygon = self.bounding_box(node_buffer)
+                node_polygon = self.polygon(node_buffer)
                 intersection = direct_line.intersection(node_polygon)
                 intersection_point = intersection.line_interpolate_point(
                     1.0, normalized=True

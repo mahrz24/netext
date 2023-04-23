@@ -25,10 +25,10 @@ from .node_rasterizer import NodeBuffer, rasterize_node
 
 class GraphProfiler(Protocol):
     def start(self) -> None:
-        return NotImplemented
+        raise NotImplementedError()
 
     def stop(self) -> None:
-        return NotImplemented
+        raise NotImplementedError()
 
 
 class TerminalGraph(Generic[G]):
@@ -115,12 +115,14 @@ class TerminalGraph(Generic[G]):
         for i, node in enumerate(node_buffers.values()):
             node_idx.insert(i, node.bounding_box)
 
+        all_node_buffers = list(node_buffers.values())
+
         for u, v, data in self._nx_graph.edges(data=True):
             result = rasterize_edge(
                 console,
                 node_buffers[u],
                 node_buffers[v],
-                node_buffers.values(),
+                all_node_buffers,
                 self.edge_layouts,
                 data,
                 node_idx,
