@@ -19,6 +19,8 @@ def _slice_to_strip(slice: bitarray) -> Strip:
 
 
 def _infinite_canvas_access(slice: bitarray, x: int, y: int, width: int) -> int:
+    if width <= 0:
+        raise ValueError("Width must be positive")
     index = width * y + x
     if index < 0:
         return 0
