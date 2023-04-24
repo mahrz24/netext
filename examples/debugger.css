@@ -21,7 +21,7 @@ Graph {
 }
 
 TabbedContent {
-    height: 100%;
+
     overflow: auto;
 }
 
