@@ -1,5 +1,6 @@
 from enum import Enum
 from rich.segment import Segment
+from rich.style import Style
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_rendering.buffer import EdgeBuffer
 from netext.edge_routing.edge import RoutedEdgeSegments
@@ -8,41 +9,41 @@ from netext.rendering.segment_buffer import Strip, StripBuffer
 
 
 class ArrowTip(Enum):
-    arrow = "arrow"
+    ARROW = "arrow"
 
 
 class ArrowDirections(Enum):
-    left = "left"
-    right = "right"
-    up = "up"
-    down = "down"
+    LEFT = "left"
+    RIGHT = "right"
+    UP = "up"
+    DOWN = "down"
 
 
 ARROW_TIPS = {
-    ArrowTip.arrow: {
-        EdgeSegmentDrawingMode.box: {
-            ArrowDirections.left: "◀",
-            ArrowDirections.right: "▶",
-            ArrowDirections.up: "▲",
-            ArrowDirections.down: "▼",
+    ArrowTip.ARROW: {
+        EdgeSegmentDrawingMode.BOX: {
+            ArrowDirections.LEFT: "◀",
+            ArrowDirections.RIGHT: "▶",
+            ArrowDirections.UP: "▲",
+            ArrowDirections.DOWN: "▼",
         },
-        EdgeSegmentDrawingMode.single_character: {
-            ArrowDirections.left: "<",
-            ArrowDirections.right: ">",
-            ArrowDirections.up: "^",
-            ArrowDirections.down: "v",
+        EdgeSegmentDrawingMode.SINGLE_CHARACTER: {
+            ArrowDirections.LEFT: "<",
+            ArrowDirections.RIGHT: ">",
+            ArrowDirections.UP: "^",
+            ArrowDirections.DOWN: "v",
         },
-        EdgeSegmentDrawingMode.block: {
-            ArrowDirections.left: "🭮",
-            ArrowDirections.right: "🭬",
-            ArrowDirections.up: "🭯",
-            ArrowDirections.down: "🭭",
+        EdgeSegmentDrawingMode.BLOCK: {
+            ArrowDirections.LEFT: "🭮",
+            ArrowDirections.RIGHT: "🭬",
+            ArrowDirections.UP: "🭯",
+            ArrowDirections.DOWN: "🭭",
         },
-        EdgeSegmentDrawingMode.braille: {
-            ArrowDirections.left: "🭮",
-            ArrowDirections.right: "🭬",
-            ArrowDirections.up: "🭯",
-            ArrowDirections.down: "🭭",
+        EdgeSegmentDrawingMode.BRAILLE: {
+            ArrowDirections.LEFT: "🭮",
+            ArrowDirections.RIGHT: "🭬",
+            ArrowDirections.UP: "🭯",
+            ArrowDirections.DOWN: "🭭",
         },
     }
 }
@@ -53,19 +54,20 @@ def render_arrow_tip_buffer(
     arrow_tip_position: Point,
     arrow_tip_dir: Point,
     edge_segment_drawing_mode: EdgeSegmentDrawingMode,
+    style: Style | None = None,
 ) -> StripBuffer:
     tangent = arrow_tip_dir - arrow_tip_position
 
     if abs(tangent.x) > abs(tangent.y):
         if tangent.x > 0:
-            direction = ArrowDirections.left
+            direction = ArrowDirections.LEFT
         else:
-            direction = ArrowDirections.right
+            direction = ArrowDirections.RIGHT
     else:
         if tangent.y > 0:
-            direction = ArrowDirections.up
+            direction = ArrowDirections.UP
         else:
-            direction = ArrowDirections.down
+            direction = ArrowDirections.DOWN
 
     tip_character = ARROW_TIPS[arrow_tip][edge_segment_drawing_mode][direction]
 
@@ -73,7 +75,7 @@ def render_arrow_tip_buffer(
         z_index=-1,
         boundary_1=arrow_tip_position,
         boundary_2=arrow_tip_position,
-        strips=[Strip([Segment(text=tip_character)])],
+        strips=[Strip([Segment(text=tip_character, style=style)])],
     )
 
 
@@ -82,6 +84,7 @@ def render_arrow_tip_buffers(
     start_arrow_tip: ArrowTip | None,
     edge_segments: RoutedEdgeSegments,
     edge_segment_drawing_mode: EdgeSegmentDrawingMode,
+    style: Style | None = None,
 ) -> list[StripBuffer]:
     buffers: list[StripBuffer] = []
 
@@ -95,6 +98,7 @@ def render_arrow_tip_buffers(
                 start_arrow_tip_position,
                 start_arrow_tip_dir,
                 edge_segment_drawing_mode,
+                style=style,
             )
         )
 
@@ -108,6 +112,7 @@ def render_arrow_tip_buffers(
                 end_arrow_tip_position,
                 end_arrow_tip_dir,
                 edge_segment_drawing_mode,
+                style=style,
             )
         )
 

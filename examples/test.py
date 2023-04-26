@@ -46,10 +46,11 @@ def _render2(n, d, s):
 
 nx.set_node_attributes(g, Style(color="blue"), "$content-style")
 nx.set_node_attributes(g, box.SQUARE, "$box-type")
-nx.set_edge_attributes(g, EdgeRoutingMode.orthogonal, "$edge-routing-mode")
-nx.set_edge_attributes(g, EdgeSegmentDrawingMode.box, "$edge-segment-drawing-mode")
-nx.set_edge_attributes(g, ArrowTip.arrow, "$end-arrow-tip")
-nx.set_edge_attributes(g, ArrowTip.arrow, "$start-arrow-tip")
+nx.set_edge_attributes(g, Style(color="red"), "$style")
+nx.set_edge_attributes(g, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
+nx.set_edge_attributes(g, EdgeSegmentDrawingMode.BOX, "$edge-segment-drawing-mode")
+nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
+nx.set_edge_attributes(g, ArrowTip.ARROW, "$start-arrow-tip")
 
 # nx.set_edge_attributes(g, "foo", "$label")
 nx.set_node_attributes(g, _render2, "$content-renderer")

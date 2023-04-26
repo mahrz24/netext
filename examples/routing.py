@@ -3,6 +3,7 @@ from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.layout_engines.static import StaticLayout
 from rich import print
+from rich.style import Style
 
 import networkx as nx
 
@@ -15,8 +16,9 @@ g.add_edge(
     1,
     3,
     **{
-        "$edge-routing-mode": EdgeRoutingMode.orthogonal,
-        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.box,
+        "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
+        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
+        "$style": Style(color="green"),
     }
 )
 

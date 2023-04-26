@@ -50,15 +50,19 @@ def rasterize_edge(
     start_arrow_tip = data.get("$start-arrow-tip", None)
 
     routing_mode: EdgeRoutingMode = data.get(
-        "$edge-routing-mode", EdgeRoutingMode.straight
+        "$edge-routing-mode", EdgeRoutingMode.STRAIGHT
     )
     edge_segment_drawing_mode: EdgeSegmentDrawingMode = data.get(
-        "$edge-segment-drawing-mode", EdgeSegmentDrawingMode.single_character
+        "$edge-segment-drawing-mode", EdgeSegmentDrawingMode.SINGLE_CHARACTER
     )
+
+    label = data.get("$label", None)
+    style = data.get("$style", None)
 
     edge_input = EdgeInput(
         start=start,
         end=end,
+        label=label,
         routing_mode=routing_mode,
         edge_segment_drawing_mode=edge_segment_drawing_mode,
         routing_hints=[],
@@ -95,23 +99,23 @@ def rasterize_edge(
     if not edge_segments.segments:
         return None
 
-    if edge_segment_drawing_mode == EdgeSegmentDrawingMode.box:
+    if edge_segment_drawing_mode == EdgeSegmentDrawingMode.BOX:
         assert (
-            routing_mode == EdgeRoutingMode.orthogonal
+            routing_mode == EdgeRoutingMode.ORTHOGONAL
         ), "Box characters are only supported on orthogonal lines"
         strips = orthogonal_segments_to_strips_with_box_characters(
-            edge_segments.segments
+            edge_segments.segments, style=style
         )
     else:
         # In case of pixel / braille we scale and then map character per character
         match edge_segment_drawing_mode:
-            case EdgeSegmentDrawingMode.single_character:
+            case EdgeSegmentDrawingMode.SINGLE_CHARACTER:
                 x_scaling = 1
                 y_scaling = 1
-            case EdgeSegmentDrawingMode.braille:
+            case EdgeSegmentDrawingMode.BRAILLE:
                 x_scaling = 2
                 y_scaling = 4
-            case EdgeSegmentDrawingMode.block:
+            case EdgeSegmentDrawingMode.BLOCK:
                 x_scaling = 2
                 y_scaling = 2
 
@@ -119,13 +123,14 @@ def rasterize_edge(
             edge_segments.segments, x_scaling=x_scaling, y_scaling=y_scaling
         )
         strips = bitmap_to_strips(
-            bitmap_buffer, edge_segment_drawing_mode=edge_segment_drawing_mode
+            bitmap_buffer,
+            edge_segment_drawing_mode=edge_segment_drawing_mode,
+            style=style,
         )
 
     edge_layout = EdgeLayout(input=edge_input, segments=edge_segments.segments)
 
     label_buffers: list[StripBuffer] = []
-    label = data.get("$label", None)
 
     # TODO Think about this: Shape and node buffer are bound
     # so maybe use the shape to create the node buffer
@@ -143,7 +148,11 @@ def rasterize_edge(
 
     label_buffers.extend(
         render_arrow_tip_buffers(
-            end_arrow_tip, start_arrow_tip, edge_segments, edge_segment_drawing_mode
+            end_arrow_tip,
+            start_arrow_tip,
+            edge_segments,
+            edge_segment_drawing_mode,
+            style=style,
         )
     )
 

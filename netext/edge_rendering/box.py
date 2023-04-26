@@ -4,10 +4,11 @@ from netext.rendering.segment_buffer import Spacer, Strip
 
 
 from rich.segment import Segment
+from rich.style import Style
 
 
 def orthogonal_segments_to_strips_with_box_characters(
-    edge_segments: list[EdgeSegment],
+    edge_segments: list[EdgeSegment], style: Style | None = None
 ) -> list[Strip]:
     if not edge_segments:
         return []
@@ -86,7 +87,9 @@ def orthogonal_segments_to_strips_with_box_characters(
     return [
         Strip(
             [
-                Segment(text=character) if character is not None else Spacer(width=1)
+                Segment(text=character, style=style)
+                if character is not None
+                else Spacer(width=1)
                 for character in line
             ]
         )

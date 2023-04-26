@@ -12,8 +12,8 @@ g.add_node("Chunky")
 g.add_node("Bacon")
 g.add_edge("Chunky", "Bacon", **{"$label": "Yum yuuuum!"})
 
-nx.set_edge_attributes(g, ArrowTip.arrow, "$end-arrow-tip")
-nx.set_edge_attributes(g, EdgeRoutingMode.orthogonal, "$edge-routing-mode")
-nx.set_edge_attributes(g, EdgeSegmentDrawingMode.box, "$edge-segment-drawing-mode")
+nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
+nx.set_edge_attributes(g, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
+nx.set_edge_attributes(g, EdgeSegmentDrawingMode.BOX, "$edge-segment-drawing-mode")
 
 print(TerminalGraph(g))

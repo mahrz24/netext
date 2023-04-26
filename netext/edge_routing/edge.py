@@ -111,7 +111,7 @@ class EdgeInput:
     start: Point
     end: Point
 
-    # label: str | None
+    label: str | None
 
     routing_mode: EdgeRoutingMode
     edge_segment_drawing_mode: EdgeSegmentDrawingMode

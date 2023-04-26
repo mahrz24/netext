@@ -20,12 +20,12 @@ def route_edge(
     edge_idx: Index | None = None,
 ) -> RoutedEdgeSegments:
     match routing_mode:
-        case EdgeRoutingMode.straight:
+        case EdgeRoutingMode.STRAIGHT:
             # We don't need to check for intersections here, because the edge is straight.
             return RoutedEdgeSegments(
                 segments=[EdgeSegment(start=start, end=end)], intersections=0
             )
-        case EdgeRoutingMode.orthogonal:
+        case EdgeRoutingMode.ORTHOGONAL:
             return route_orthogonal_edge(
                 start=start,
                 end=end,

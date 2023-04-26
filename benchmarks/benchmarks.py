@@ -23,11 +23,11 @@ class TimeSuite:
         self.graph_ortho_box = binomial_tree(n)
 
         nx.set_edge_attributes(
-            self.graph_ortho_box, EdgeRoutingMode.orthogonal, "$edge-routing-mode"
+            self.graph_ortho_box, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode"
         )
         nx.set_edge_attributes(
             self.graph_ortho_box,
-            EdgeSegmentDrawingMode.box,
+            EdgeSegmentDrawingMode.BOX,
             "$edge-segment-drawing-mode",
         )
 

@@ -121,10 +121,10 @@ def create_graph() -> nx.DiGraph:
 
     nx.set_node_attributes(g, Style(color="blue"), "$content-style")
     nx.set_node_attributes(g, box.SQUARE, "$box-type")
-    nx.set_edge_attributes(g, EdgeRoutingMode.orthogonal, "$edge-routing-mode")
-    nx.set_edge_attributes(g, EdgeSegmentDrawingMode.box, "$edge-segment-drawing-mode")
-    nx.set_edge_attributes(g, ArrowTip.arrow, "$end-arrow-tip")
-    nx.set_edge_attributes(g, ArrowTip.arrow, "$start-arrow-tip")
+    nx.set_edge_attributes(g, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
+    nx.set_edge_attributes(g, EdgeSegmentDrawingMode.BOX, "$edge-segment-drawing-mode")
+    nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
+    nx.set_edge_attributes(g, ArrowTip.ARROW, "$start-arrow-tip")
 
     # nx.set_edge_attributes(g, "foo", "$label")
     nx.set_node_attributes(g, _render2, "$content-renderer")
@@ -343,9 +343,9 @@ class MainScreen(Screen):
                 graph_widget.graph.add_edge(self.selected_node, node)
                 graph_widget.graph.edges[self.selected_node, node].update(
                     {
-                        "$edge-routing-mode": EdgeRoutingMode.orthogonal,
-                        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.box,
-                        "$end-arrow-tip": ArrowTip.arrow,
+                        "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
+                        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
+                        "$end-arrow-tip": ArrowTip.ARROW,
                         "$show": True,
                     }
                 )
