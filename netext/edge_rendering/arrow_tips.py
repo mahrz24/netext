@@ -33,6 +33,12 @@ ARROW_TIPS = {
             ArrowDirections.UP: "^",
             ArrowDirections.DOWN: "v",
         },
+        EdgeSegmentDrawingMode.ASCII: {
+            ArrowDirections.LEFT: "<",
+            ArrowDirections.RIGHT: ">",
+            ArrowDirections.UP: "^",
+            ArrowDirections.DOWN: "v",
+        },
         EdgeSegmentDrawingMode.BLOCK: {
             ArrowDirections.LEFT: "🭮",
             ArrowDirections.RIGHT: "🭬",

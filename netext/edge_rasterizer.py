@@ -99,12 +99,15 @@ def rasterize_edge(
     if not edge_segments.segments:
         return None
 
-    if edge_segment_drawing_mode == EdgeSegmentDrawingMode.BOX:
+    if edge_segment_drawing_mode in [
+        EdgeSegmentDrawingMode.BOX,
+        EdgeSegmentDrawingMode.ASCII,
+    ]:
         assert (
             routing_mode == EdgeRoutingMode.ORTHOGONAL
         ), "Box characters are only supported on orthogonal lines"
         strips = orthogonal_segments_to_strips_with_box_characters(
-            edge_segments.segments, style=style
+            edge_segments.segments, edge_segment_drawing_mode, style=style
         )
     else:
         # In case of pixel / braille we scale and then map character per character
