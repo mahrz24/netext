@@ -22,10 +22,26 @@ edge_characters = {
     EdgeSegmentDrawingMode.BOX: {
         EdgeCharacters.HORIZONTAL: "─",
         EdgeCharacters.VERTICAL: "│",
+        EdgeCharacters.CORNER_UPPER_LEFT: "┌",
+        EdgeCharacters.CORNER_UPPER_RIGHT: "┐",
+        EdgeCharacters.CORNER_LOWER_LEFT: "└",
+        EdgeCharacters.CORNER_LOWER_RIGHT: "┘",
+    },
+    EdgeSegmentDrawingMode.BOX_ROUNDED: {
+        EdgeCharacters.HORIZONTAL: "─",
+        EdgeCharacters.VERTICAL: "│",
         EdgeCharacters.CORNER_UPPER_LEFT: "╭",
         EdgeCharacters.CORNER_UPPER_RIGHT: "╮",
         EdgeCharacters.CORNER_LOWER_LEFT: "╰",
         EdgeCharacters.CORNER_LOWER_RIGHT: "╯",
+    },
+    EdgeSegmentDrawingMode.BOX_HEAVY: {
+        EdgeCharacters.HORIZONTAL: "━",
+        EdgeCharacters.VERTICAL: "┃",
+        EdgeCharacters.CORNER_UPPER_LEFT: "┏",
+        EdgeCharacters.CORNER_UPPER_RIGHT: "┓",
+        EdgeCharacters.CORNER_LOWER_LEFT: "┗",
+        EdgeCharacters.CORNER_LOWER_RIGHT: "┛",
     },
     EdgeSegmentDrawingMode.ASCII: {
         EdgeCharacters.HORIZONTAL: "-",
