@@ -51,6 +51,8 @@ nx.set_node_attributes(g, Style(color="blue"), "$content-style")
 nx.set_node_attributes(g, Style(color="red"), "$style")
 nx.set_node_attributes(g, box.SQUARE, "$box-type")
 
+nx.set_edge_attributes(g, Style(color="green"), "$style")
+
 print(TerminalGraph(g))
 ```
 
@@ -69,6 +71,8 @@ g = nx.binomial_tree(3)
 nx.set_node_attributes(g, Style(color="blue"), "$content-style")
 nx.set_node_attributes(g, Style(color="red"), "$style")
 nx.set_node_attributes(g, box.SQUARE, "$box-type")
+
+nx.set_edge_attributes(g, Style(color="green"), "$style")
 
 output = TerminalGraph(g)
 ```

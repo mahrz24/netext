@@ -12,8 +12,6 @@ nav:
     - api/terminal-graph.md
     - api/styling.md
     - api/layout-engines.md
-  - 'Development':
-    - dev/roadmap.md
 
 theme:
   name: material
@@ -32,6 +30,7 @@ plugins:
       handlers:
         python:
           options:
+            heading_level: 3
             show_root_heading: true
             show_root_full_path: false
             separate_signature: true

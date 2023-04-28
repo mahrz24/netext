@@ -24,8 +24,12 @@ def _create_vertex(node: Hashable, data: dict[Hashable, Any]) -> Vertex:
     return v
 
 
-# TODO: Add proper typing here
 class GrandalfSugiyamaLayout(LayoutEngine[G]):
+    """Layout engine that uses the grandalf library to layout the graph using the Sugiyama algorithm.
+
+    Multiple components will be placed next to each other.
+    """
+
     def __call__(self, g: G) -> dict[Hashable, tuple[float, float]]:
         vertices = {
             node: _create_vertex(node, data) for node, data in g.nodes(data=True)

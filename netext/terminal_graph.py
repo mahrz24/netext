@@ -57,6 +57,10 @@ class TerminalGraph(Generic[G]):
             g (G): A networkx graph object (see [networkx.Graph][] or [networkx.DiGraph][]).
             layout_engine (LayoutEngine[G], optional): The layout engine used.
             console (Console, optional): The rich console driver used to render.
+            layout_profiler (GraphProfiler, optional): Profiler that is executed during layout.
+            node_render_profiler (GraphProfiler, optional): Profiler that is exeuted during node rendering.
+            edge_render_profiler (GraphProfiler, optional): Profiler that is exeuted during edge rendering.
+            buffer_render_profiler (GraphProfiler, optional): Profiler that is execuuted during buffer rendering.
         """
         self._nx_graph: G = cast(G, g.copy())
         # First we create the node buffers, this allows us to pass the sizing information to the
