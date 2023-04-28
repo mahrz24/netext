@@ -2,6 +2,7 @@ from typing import cast
 
 import networkx as nx
 from rich import box, print
+from rich.console import Console
 from rich.panel import Panel
 from rich.pretty import Pretty
 from rich.style import Style
@@ -61,3 +62,23 @@ g.edges[8, 10]["$show"] = True
 
 print(Panel(TerminalGraph(g), title="Binomial Tree", expand=False))
 print(Panel(TerminalGraph(g1), title="Payley Graph", expand=False))
+
+console = Console(record=True, width=80, height=60)
+
+g = cast(nx.Graph, nx.binomial_tree(3))
+
+nx.set_node_attributes(g, Style(color="blue"), "$style")
+nx.set_node_attributes(g, box.SQUARE, "$box-type")
+
+nx.set_edge_attributes(g, Style(color="red"), "$style")
+nx.set_edge_attributes(g, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
+nx.set_edge_attributes(g, EdgeSegmentDrawingMode.BOX, "$edge-segment-drawing-mode")
+nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
+nx.set_edge_attributes(g, ArrowTip.ARROW, "$start-arrow-tip")
+
+# nx.set_edge_attributes(g, "foo", "$label")
+nx.set_node_attributes(g, _render2, "$content-renderer")
+nx.set_node_attributes(g, True, "$show")
+
+console.print(TerminalGraph(g, console=console))
+console.save_svg("test.svg", title="Binomial Tree")
