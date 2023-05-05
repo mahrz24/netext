@@ -10,4 +10,4 @@ Netext is a graph (network) rendering library for the terminal. It uses the awes
 
 ![](example.svg)
 
-The library is in its early stages and has currently no emphasis on performance, so please do not try to render large graphs with it. While it has been release expect some breaking API changes in the future. Node layout is currently provided by the [grandalf](https://github.com/bdcht/grandalf) library.
+The library is in its early stages and has currently no emphasis on performance, so please do not try to render large graphs with it. While it has been released expect some breaking API changes in the future. Node layout is currently provided by the [grandalf](https://github.com/bdcht/grandalf) library.
