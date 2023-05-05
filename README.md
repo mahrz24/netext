@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![GitHub issues](https://img.shields.io/github/issues-raw/mahrz24/netext.svg)](https://github.com/mahrz24/netext/issues)
 [![Python Version](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-3100/)
-
+[![Documentation](https://img.shields.io/badge/documentation-latest-green)](https://mahrz24.github.io/netext/)
 
 ![](logo.jpg)
 
