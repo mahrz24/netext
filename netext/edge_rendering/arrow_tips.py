@@ -27,6 +27,24 @@ ARROW_TIPS = {
             ArrowDirections.UP: "▲",
             ArrowDirections.DOWN: "▼",
         },
+        EdgeSegmentDrawingMode.BOX_ROUNDED: {
+            ArrowDirections.LEFT: "◀",
+            ArrowDirections.RIGHT: "▶",
+            ArrowDirections.UP: "▲",
+            ArrowDirections.DOWN: "▼",
+        },
+        EdgeSegmentDrawingMode.BOX_HEAVY: {
+            ArrowDirections.LEFT: "◀",
+            ArrowDirections.RIGHT: "▶",
+            ArrowDirections.UP: "▲",
+            ArrowDirections.DOWN: "▼",
+        },
+        EdgeSegmentDrawingMode.BOX_DOUBLE: {
+            ArrowDirections.LEFT: "◀",
+            ArrowDirections.RIGHT: "▶",
+            ArrowDirections.UP: "▲",
+            ArrowDirections.DOWN: "▼",
+        },
         EdgeSegmentDrawingMode.SINGLE_CHARACTER: {
             ArrowDirections.LEFT: "<",
             ArrowDirections.RIGHT: ">",

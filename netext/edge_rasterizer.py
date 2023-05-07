@@ -101,6 +101,9 @@ def rasterize_edge(
 
     if edge_segment_drawing_mode in [
         EdgeSegmentDrawingMode.BOX,
+        EdgeSegmentDrawingMode.BOX_ROUNDED,
+        EdgeSegmentDrawingMode.BOX_HEAVY,
+        EdgeSegmentDrawingMode.BOX_DOUBLE,
         EdgeSegmentDrawingMode.ASCII,
     ]:
         assert (
