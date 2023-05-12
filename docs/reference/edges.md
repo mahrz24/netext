@@ -38,24 +38,24 @@ g.add_edge("A", "B", **{"$end-arrow-tip": ArrowTip.ARROW})
 
 g.add_node("C", **{"$x": 15, "$y": 0})
 g.add_node("D", **{"$x": 15, "$y": 9})
-g.add_edge("C", "D", **{"$end-arrow-tip": ArrowTip.ARROW, 
-                        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX, 
+g.add_edge("C", "D", **{"$end-arrow-tip": ArrowTip.ARROW,
+                        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
                         "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL}
 )
-                        
+
 
 g.add_node("E", **{"$x": 25, "$y": 0})
 g.add_node("F", **{"$x": 25, "$y": 9})
-g.add_edge("E", "F", **{"$end-arrow-tip": ArrowTip.ARROW, 
-                        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BLOCK, 
+g.add_edge("E", "F", **{"$end-arrow-tip": ArrowTip.ARROW,
+                        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BLOCK,
                         "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL}
 )
 
 
 g.add_node("G", **{"$x": 35, "$y": 0})
 g.add_node("H", **{"$x": 35, "$y": 9})
-g.add_edge("G", "H", **{"$end-arrow-tip": ArrowTip.ARROW, 
-                        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BRAILLE, 
+g.add_edge("G", "H", **{"$end-arrow-tip": ArrowTip.ARROW,
+                        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BRAILLE,
                         "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL}
 )
 
@@ -112,7 +112,7 @@ g.add_edge("A", "B", **{"$style": Style(color="red")})
 g.add_node("C", **{"$x": 15, "$y": 0})
 g.add_node("D", **{"$x": 15, "$y": 9})
 g.add_edge("C", "D", **{"$style": Style(color="blue", bold=True)})
-                        
+
 
 g.add_node("E", **{"$x": 25, "$y": 0})
 g.add_node("F", **{"$x": 25, "$y": 9})
@@ -121,8 +121,8 @@ g.add_edge("E", "F", **{"$style": Style(bgcolor="blue", bold=True)})
 
 g.add_node("G", **{"$x": 35, "$y": 0})
 g.add_node("H", **{"$x": 35, "$y": 9})
-g.add_edge("G", "H" 
-                     
+g.add_edge("G", "H"
+
 )
 
 output = TerminalGraph(g, layout_engine=StaticLayout())
@@ -144,6 +144,30 @@ Possible values are:
 | Straight | [EdgeRoutingMode.STRAIGHT][netext.edge_routing.modes.EdgeRoutingMode.STRAIGHT] | Uses a single edge segment connecting start and endpoint. (*Default*) |
 | Orthogonal | [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.EdgeRoutingMode.ORTHOGONAL] | Uses multiple vertical or horizontal edge segments. |
 
+### Example
+
+```{.rich title='Edge Routing Mode' }
+from netext import TerminalGraph
+from netext.edge_rendering.arrow_tips import ArrowTip
+from netext.edge_rendering.modes import EdgeSegmentDrawingMode
+from netext.edge_routing.modes import EdgeRoutingMode
+from netext.layout_engines.static import StaticLayout
+from rich import print
+
+
+import networkx as nx
+g = nx.Graph()
+g.add_node("A", **{"$x": 5, "$y": 0})
+g.add_node("B", **{"$x": 13, "$y": 9})
+g.add_edge("A", "B", **{"$edge-routing-mode": EdgeRoutingMode.STRAIGHT})
+
+g.add_node("C", **{"$x": 21, "$y": 0})
+g.add_node("D", **{"$x": 29, "$y": 9})
+g.add_edge("C", "D", **{"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL}
+)
+
+output = TerminalGraph(g, layout_engine=StaticLayout())
+```
 
 ## Edge Segment Drawing Mode
 
