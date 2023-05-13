@@ -185,3 +185,57 @@ Possible values are:
 | ASCII compatible | [EdgeSegmentDrawingMode.ASCII][netext.edge_rendering.modes.EdgeSegmentDrawingMode.ASCII] | Uses ASCII characters to draw orthogonal lines. Corners between edge segments are merged with plus signs. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.EdgeRoutingMode.ORTHOGONAL]. |
 | Braille | [EdgeSegmentDrawingMode.BRAILLE][netext.edge_rendering.modes.EdgeSegmentDrawingMode.BRAILLE] | Uses braille characters to draw the whole edge. |
 | Block | [EdgeSegmentDrawingMode.BLOCK][netext.edge_rendering.modes.EdgeSegmentDrawingMode.BLOCK] | Uses 2x3 block characters to draw the whole edge. |
+
+### Examples
+
+```{.rich title='Style' }
+from netext import TerminalGraph
+from netext.edge_routing.modes import EdgeRoutingMode
+from netext.edge_rendering.modes import EdgeSegmentDrawingMode
+from netext.layout_engines.static import StaticLayout
+from rich import print
+from rich.style import Style
+
+
+import networkx as nx
+g = nx.Graph()
+g.add_node("A", **{"$x": 5, "$y": 0})
+g.add_node("B", **{"$x": 15, "$y": 9})
+g.add_edge("A", "B", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.SINGLE_CHARACTER})
+
+g.add_node("C", **{"$x": 25, "$y": 0})
+g.add_node("D", **{"$x": 35, "$y": 9})
+g.add_edge("C", "D", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX, "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
+
+
+
+g.add_node("E", **{"$x": 45, "$y": 0})
+g.add_node("F", **{"$x": 55, "$y": 9})
+g.add_edge("E", "F", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX_ROUNDED,"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
+
+
+g.add_node("G", **{"$x": 65, "$y": 0})
+g.add_node("H", **{"$x": 75, "$y": 9})
+g.add_edge("G", "H", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX_HEAVY,"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
+
+
+g.add_node("I", **{"$x": 5, "$y": 13})
+g.add_node("J", **{"$x": 15, "$y": 22})
+g.add_edge("I", "J", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX_DOUBLE,"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
+
+g.add_node("K", **{"$x": 25, "$y": 13})
+g.add_node("L", **{"$x": 35, "$y": 22})
+g.add_edge("K", "L", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.ASCII,"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
+
+
+g.add_node("M", **{"$x": 45, "$y": 13})
+g.add_node("N", **{"$x": 55, "$y": 22})
+g.add_edge("M", "N", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BRAILLE,"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
+
+g.add_node("O", **{"$x": 65, "$y": 13})
+g.add_node("P", **{"$x": 75, "$y": 22})
+g.add_edge("O", "P", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BLOCK,"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
+
+
+output = TerminalGraph(g, layout_engine=StaticLayout())
+```
