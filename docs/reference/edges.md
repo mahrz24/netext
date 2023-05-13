@@ -10,14 +10,14 @@ Type: bool.
 
 The `start-arrow-tip` and `end-arrow-tip` attribute determines if edges are rendered with arrow tips.
 
-Type: [ArrowTip][netext.edge_rendering.arrow_tips.ArrowTip] | None.
+Type: [ArrowTip][netext.edge_rendering.arrow_tips.arrowtip] | None.
 
 Possible values are:
 
-| Arrow |  Value | Description |
-|------|--------|-------------|
-| No tips | None | Uses a single edge segment connecting start and endpoint. |
-| Arrow | [ArrowTip.ARROW][netext.edge_rendering.arrow_tips.ArrowTip] | Show an arrow tip using characters matching the `edge-segment-drawing-mode`. |
+| Arrow   | Value                                                       | Description                                                                  |
+| ------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| No tips | None                                                        | Uses a single edge segment connecting start and endpoint.                    |
+| Arrow   | [ArrowTip.ARROW][netext.edge_rendering.arrow_tips.arrowtip] | Show an arrow tip using characters matching the `edge-segment-drawing-mode`. |
 
 ### Examples
 
@@ -62,7 +62,6 @@ g.add_edge("G", "H", **{"$end-arrow-tip": ArrowTip.ARROW,
 output = TerminalGraph(g, layout_engine=StaticLayout())
 ```
 
-
 ## Label
 
 The `label` attribute can be set to render a label on the edge.
@@ -89,10 +88,9 @@ output = TerminalGraph(g, layout_engine=StaticLayout())
 
 ## Style
 
-The `style` attribute determines the rich [style][rich.style.Style] used to render the edge characters.
+The `style` attribute determines the rich [style][rich.style.style] used to render the edge characters.
 
-Type: [Style][rich.style.Style] | None.
-
+Type: [Style][rich.style.style] | None.
 
 ### Examples
 
@@ -128,21 +126,20 @@ g.add_edge("G", "H"
 output = TerminalGraph(g, layout_engine=StaticLayout())
 ```
 
-
 ## Edge Routing Mode
 
 The `edge-routing-mode` attribute determines how edges are routed from start to end point.
 
 Each edge is represented as a concatenation of one or more edge segments (straight lines).
 
-Type: [EdgeRoutingMode][netext.edge_routing.modes.EdgeRoutingMode] | None
+Type: [EdgeRoutingMode][netext.edge_routing.modes.edgeroutingmode] | None
 
 Possible values are:
 
-| Edge Routing Mode |  Value | Description |
-|------|--------|-------------|
-| Straight | [EdgeRoutingMode.STRAIGHT][netext.edge_routing.modes.EdgeRoutingMode.STRAIGHT] | Uses a single edge segment connecting start and endpoint. (*Default*) |
-| Orthogonal | [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.EdgeRoutingMode.ORTHOGONAL] | Uses multiple vertical or horizontal edge segments. |
+| Edge Routing Mode | Value                                                                              | Description                                                           |
+| ----------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Straight          | [EdgeRoutingMode.STRAIGHT][netext.edge_routing.modes.edgeroutingmode.straight]     | Uses a single edge segment connecting start and endpoint. (_Default_) |
+| Orthogonal        | [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.edgeroutingmode.orthogonal] | Uses multiple vertical or horizontal edge segments.                   |
 
 ### Example
 
@@ -175,16 +172,16 @@ The `edge-segment-drawing-mode` attribute determines how individual edge segment
 
 Possible values are:
 
-| Edge Segment Drawing Mode |  Value | Description |
-|------|--------|-------------|
-| Single character | [EdgeSegmentDrawingMode.SINGLE_CHARACTER][netext.edge_rendering.modes.EdgeSegmentDrawingMode.SINGLE_CHARACTER] | Uses a single character to draw the whole edge. (*Default*) |
-| Box | [EdgeSegmentDrawingMode.BOX][netext.edge_rendering.modes.EdgeSegmentDrawingMode.BOX] | Uses box drawing characters to draw lines. Corners between edge segments are merged. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.EdgeRoutingMode.ORTHOGONAL].  |
-| Rounded Box | [EdgeSegmentDrawingMode.BOX_ROUNDED][netext.edge_rendering.modes.EdgeSegmentDrawingMode.BOX_ROUNDED] | Uses box drawing characters to draw lines. Corners between edge segments are merged using rounded box characters. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.EdgeRoutingMode.ORTHOGONAL]. |
-| Heavy Box | [EdgeSegmentDrawingMode.BOX_HEAVY][netext.edge_rendering.modes.EdgeSegmentDrawingMode.BOX_HEAVY] | Uses thicker box drawing characters to draw lines. Corners between edge segments are merged. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.EdgeRoutingMode.ORTHOGONAL]. |
-| Double Box | [EdgeSegmentDrawingMode.BOX_DOUBLE][netext.edge_rendering.modes.EdgeSegmentDrawingMode.BOX_DOUBLE] | Uses double line box drawing characters to draw lines. Corners between edge segments are merged. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.EdgeRoutingMode.ORTHOGONAL]. |
-| ASCII compatible | [EdgeSegmentDrawingMode.ASCII][netext.edge_rendering.modes.EdgeSegmentDrawingMode.ASCII] | Uses ASCII characters to draw orthogonal lines. Corners between edge segments are merged with plus signs. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.EdgeRoutingMode.ORTHOGONAL]. |
-| Braille | [EdgeSegmentDrawingMode.BRAILLE][netext.edge_rendering.modes.EdgeSegmentDrawingMode.BRAILLE] | Uses braille characters to draw the whole edge. |
-| Block | [EdgeSegmentDrawingMode.BLOCK][netext.edge_rendering.modes.EdgeSegmentDrawingMode.BLOCK] | Uses 2x3 block characters to draw the whole edge. |
+| Edge Segment Drawing Mode | Value                                                                                                          | Description                                                                                                                                                                                                           |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Single character          | [EdgeSegmentDrawingMode.SINGLE_CHARACTER][netext.edge_rendering.modes.edgesegmentdrawingmode.single_character] | Uses a single character to draw the whole edge. (_Default_)                                                                                                                                                           |
+| Box                       | [EdgeSegmentDrawingMode.BOX][netext.edge_rendering.modes.edgesegmentdrawingmode.box]                           | Uses box drawing characters to draw lines. Corners between edge segments are merged. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.edgeroutingmode.orthogonal].                              |
+| Rounded Box               | [EdgeSegmentDrawingMode.BOX_ROUNDED][netext.edge_rendering.modes.edgesegmentdrawingmode.box_rounded]           | Uses box drawing characters to draw lines. Corners between edge segments are merged using rounded box characters. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.edgeroutingmode.orthogonal]. |
+| Heavy Box                 | [EdgeSegmentDrawingMode.BOX_HEAVY][netext.edge_rendering.modes.edgesegmentdrawingmode.box_heavy]               | Uses thicker box drawing characters to draw lines. Corners between edge segments are merged. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.edgeroutingmode.orthogonal].                      |
+| Double Box                | [EdgeSegmentDrawingMode.BOX_DOUBLE][netext.edge_rendering.modes.edgesegmentdrawingmode.box_double]             | Uses double line box drawing characters to draw lines. Corners between edge segments are merged. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.edgeroutingmode.orthogonal].                  |
+| ASCII compatible          | [EdgeSegmentDrawingMode.ASCII][netext.edge_rendering.modes.edgesegmentdrawingmode.ascii]                       | Uses ASCII characters to draw orthogonal lines. Corners between edge segments are merged with plus signs. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.edgeroutingmode.orthogonal].         |
+| Braille                   | [EdgeSegmentDrawingMode.BRAILLE][netext.edge_rendering.modes.edgesegmentdrawingmode.braille]                   | Uses braille characters to draw the whole edge.                                                                                                                                                                       |
+| Block                     | [EdgeSegmentDrawingMode.BLOCK][netext.edge_rendering.modes.edgesegmentdrawingmode.block]                       | Uses 2x3 block characters to draw the whole edge.                                                                                                                                                                     |
 
 ### Examples
 
