@@ -133,7 +133,7 @@ class NodeBuffer(StripBuffer):
     center: Point
     node_width: int
     node_height: int
-    margin: int
+    margin: int = 0
 
     shape: Shape = JustContent()
 
