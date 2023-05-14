@@ -17,3 +17,11 @@ def test_rich_nodes_example(snap_compare):
 
 def test_routing_example(snap_compare):
     assert snap_compare(EXAMPLES_DIR / "routing.py")
+
+
+def test_hypercube_example(snap_compare):
+    assert snap_compare(EXAMPLES_DIR / "hypercube.py")
+
+
+def test_mst_example(snap_compare):
+    assert snap_compare(EXAMPLES_DIR / "mst.py")
