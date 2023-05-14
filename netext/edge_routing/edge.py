@@ -125,6 +125,7 @@ class EdgeInput:
 class EdgeLayout:
     input: EdgeInput
     segments: list[EdgeSegment]
+    z_index: int
 
 
 @dataclass

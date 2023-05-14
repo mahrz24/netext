@@ -134,7 +134,12 @@ def rasterize_edge(
             style=style,
         )
 
-    edge_layout = EdgeLayout(input=edge_input, segments=edge_segments.segments)
+    z_index = len(all_nodes) ** 2
+    if routed_edges:
+        z_index = min([layout.z_index for layout in routed_edges]) - 1
+    edge_layout = EdgeLayout(
+        input=edge_input, segments=edge_segments.segments, z_index=z_index
+    )
 
     label_buffers: list[StripBuffer] = []
 
@@ -166,7 +171,7 @@ def rasterize_edge(
     boundary_2 = edge_segments.max_bound
 
     edge_buffer = EdgeBuffer(
-        z_index=0,
+        z_index=edge_layout.z_index,
         boundary_1=boundary_1,
         boundary_2=boundary_2,
         strips=strips,

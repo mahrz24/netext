@@ -4,11 +4,18 @@ import networkx as nx
 from netext import TerminalGraph
 from rich.style import Style
 from rich import print
+from netext.edge_rendering.modes import EdgeSegmentDrawingMode
+
+from netext.edge_routing.modes import EdgeRoutingMode
 
 G = nx.star_graph(10)
 
 nx.set_node_attributes(G, Style(color="blue", bold=True), "$content-style")
+nx.set_edge_attributes(G, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
+nx.set_edge_attributes(G, EdgeSegmentDrawingMode.BOX, "$edge-segment-drawing-mode")
+
 nx.set_node_attributes(G, Style(color="green"), "$style")
+nx.set_node_attributes(G, 2, "$margin")
 
 # Rainbow colors
 colors = [
