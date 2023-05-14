@@ -14,7 +14,6 @@ rich = "^13"
 networkx = {extras = ["default"], version="^3.0"}
 grandalf = "^0.7"
 bitarray = "^2.6.2"
-mkdocstrings = {extras = ["python"], version = "^0.20.0"}
 networkx-stubs = "^0.0.1"
 shapely = "^2.0.1"
 rtree = "^1.0.1"
@@ -23,6 +22,7 @@ cachetools = "^5.3.0"
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
 black = {version = "^22.6.0", allow-prereleases = true}
+mkdocstrings = {extras = ["python"], version = "^0.20.0"}
 pre-commit = "^2.20.0"
 pytest-cov = "^3.0.0"
 coverage = {extras = ["toml"], version = "^6.4.2"}
@@ -55,5 +55,5 @@ format = "md"
 
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core>=1.2.0"]
 build-backend = "poetry.core.masonry.api"
