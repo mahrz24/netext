@@ -19,8 +19,8 @@ def _create_vertex(node: Hashable, data: dict[Hashable, Any]) -> Vertex:
     # The API is a bit weird that it assumes to just add some members externally.
     v.view = GrandalfView()
     # TODO: A width of 1 does not work well and makes to much space, so we scale up by some arbitrary constant
-    v.view.w = data["_netext_node_buffer"].width * 5
-    v.view.h = data["_netext_node_buffer"].height * 5
+    v.view.w = data["_netext_node_buffer"].layout_width * 5
+    v.view.h = data["_netext_node_buffer"].layout_height * 5
     return v
 
 

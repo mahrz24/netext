@@ -133,6 +133,7 @@ class NodeBuffer(StripBuffer):
     center: Point
     node_width: int
     node_height: int
+    margin: int = 0
 
     shape: Shape = JustContent()
 
@@ -143,6 +144,7 @@ class NodeBuffer(StripBuffer):
         center: Point,
         shape: Shape,
         z_index: int = 0,
+        margin: int = 0,
     ) -> "NodeBuffer":
         width = max(
             sum(segment.cell_length for segment in strip.segments) for strip in strips
@@ -151,10 +153,11 @@ class NodeBuffer(StripBuffer):
         return cls(
             shape=shape,
             center=center,
-            z_index=-1,
+            z_index=z_index,
             node_width=width,
             node_height=len(strips),
             strips=strips,
+            margin=margin,
         )
 
     def get_magnet_position(self, target_point: Point, magnet: Magnet) -> Point:
@@ -186,6 +189,14 @@ class NodeBuffer(StripBuffer):
     def height(self) -> int:
         return self.node_height
 
+    @property
+    def layout_width(self) -> int:
+        return self.node_width + self.margin * 2
+
+    @property
+    def layout_height(self) -> int:
+        return self.node_height + self.margin * 2
+
 
 def _default_content_renderer(
     node_str: str, data: dict[Hashable, Any], content_style: Style
@@ -199,6 +210,7 @@ def rasterize_node(
     shape: Shape = data.get("$shape", Box())
     style: Style = data.get("$style", Style())
     content_style = data.get("$content-style", Style())
+    margin: int = data.get("$margin", 0)
     content_renderer = data.get("$content-renderer", _default_content_renderer)
     content_renderable = content_renderer(str(node), data, content_style)
 
@@ -206,5 +218,5 @@ def rasterize_node(
     strips = shape.render_shape(console, content_renderable, style=style, data=data)
 
     return NodeBuffer.from_strips(
-        strips, center=Point(x=0, y=0), z_index=-1, shape=shape
+        strips, center=Point(x=0, y=0), z_index=-1, shape=shape, margin=margin
     )

@@ -26,14 +26,14 @@ def route_orthogonal_edge(
 
     node_candidates = None
     if node_idx is not None:
-        node_candidates = node_idx.intersection(
-            straight_connection.bounding_box, objects=False
+        node_candidates = list(
+            node_idx.intersection(straight_connection.bounding_box, objects=False)
         )
 
     edge_candidates = None
     if edge_idx is not None:
-        edge_candidates = edge_idx.intersection(
-            straight_connection.bounding_box, objects=False
+        edge_candidates = list(
+            edge_idx.intersection(straight_connection.bounding_box, objects=False)
         )
 
     relevant_nodes = [
@@ -81,6 +81,58 @@ def route_orthogonal_edge(
             ).concat(
                 route_orthogonal_edge(
                     start=EdgeSegment(start=start, end=end).midpoint,
+                    end=end,
+                    all_nodes=all_nodes,
+                    routed_edges=routed_edges,
+                    node_view=node_view,
+                    edge_view=edge_view,
+                    node_idx=node_idx,
+                    edge_idx=edge_idx,
+                    recursion_depth=recursion_depth + 1,
+                )
+            )
+        )
+
+        candidates.append(
+            route_orthogonal_edge(
+                start=start,
+                end=Point(start.x, round((end.y + start.y) / 2)),
+                all_nodes=all_nodes,
+                routed_edges=routed_edges,
+                node_view=node_view,
+                edge_view=edge_view,
+                node_idx=node_idx,
+                edge_idx=edge_idx,
+                recursion_depth=recursion_depth + 1,
+            ).concat(
+                route_orthogonal_edge(
+                    start=Point(start.x, round((end.y + start.y) / 2)),
+                    end=end,
+                    all_nodes=all_nodes,
+                    routed_edges=routed_edges,
+                    node_view=node_view,
+                    edge_view=edge_view,
+                    node_idx=node_idx,
+                    edge_idx=edge_idx,
+                    recursion_depth=recursion_depth + 1,
+                )
+            )
+        )
+
+        candidates.append(
+            route_orthogonal_edge(
+                start=start,
+                end=Point(round((end.x + start.x) / 2), start.y),
+                all_nodes=all_nodes,
+                routed_edges=routed_edges,
+                node_view=node_view,
+                edge_view=edge_view,
+                node_idx=node_idx,
+                edge_idx=edge_idx,
+                recursion_depth=recursion_depth + 1,
+            ).concat(
+                route_orthogonal_edge(
+                    start=Point(round((end.x + start.x) / 2), start.y),
                     end=end,
                     all_nodes=all_nodes,
                     routed_edges=routed_edges,
