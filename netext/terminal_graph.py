@@ -1,26 +1,24 @@
 from collections.abc import Hashable
 from itertools import chain
-from math import ceil
 from typing import Any, Generic, Protocol, cast
 
 import networkx as nx
 from rich.console import Console, ConsoleOptions, RenderResult
-from rich.measure import Measurement
 
 from rtree import index
 
-from netext.geometry.point import Point
+from netext.geometry import Point, Region
 
-from .edge_rendering.buffer import EdgeBuffer
-from .edge_routing.edge import EdgeLayout
+from netext.edge_rendering.buffer import EdgeBuffer
+from netext.edge_routing.edge import EdgeLayout
 
 from netext.rendering.segment_buffer import StripBuffer
 
-from .buffer_renderer import render_buffers
-from .edge_rasterizer import rasterize_edge
-from .layout_engines.engine import LayoutEngine, G
-from .layout_engines.grandalf import GrandalfSugiyamaLayout
-from .node_rasterizer import NodeBuffer, rasterize_node
+from netext.buffer_renderer import render_buffers
+from netext.edge_rasterizer import rasterize_edge
+from netext.layout_engines.engine import LayoutEngine, G
+from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
+from netext.node_rasterizer import NodeBuffer, rasterize_node
 
 
 class GraphProfiler(Protocol):
@@ -38,6 +36,8 @@ class TerminalGraph(Generic[G]):
         # see https://github.com/python/mypy/issues/3737
         layout_engine: LayoutEngine[G] = GrandalfSugiyamaLayout[G](),  # type: ignore
         console: Console = Console(),
+        viewport: Region | None = None,
+        zoom: float = 1.0,
         layout_profiler: GraphProfiler | None = None,
         node_render_profiler: GraphProfiler | None = None,
         edge_render_profiler: GraphProfiler | None = None,
@@ -62,6 +62,8 @@ class TerminalGraph(Generic[G]):
             edge_render_profiler (GraphProfiler, optional): Profiler that is exeuted during edge rendering.
             buffer_render_profiler (GraphProfiler, optional): Profiler that is execuuted during buffer rendering.
         """
+        self._viewport = viewport
+        self._zoom = zoom
         self._nx_graph: G = cast(G, g.copy())
         # First we create the node buffers, this allows us to pass the sizing information to the
         # layout engine. For each node in the graph we generate a node buffer that contains the
@@ -90,14 +92,6 @@ class TerminalGraph(Generic[G]):
         self.node_layout = node_positions
         if layout_profiler:
             layout_profiler.stop()
-
-        # From the node buffer sizing and the layout, determine the total size needed for the graph.
-        # TODO: We could add explicit sizing, also it is possible to recompute the edge buffer adaptively.
-        # TODO: Check if this should be part of the engine if we have a native integer coordinate layout engine)
-
-        # The offset needs should be the most upper left point including the size of the node buffer
-        node_positions = self._transform_node_positions_to_console(node_positions)
-        self._set_size_from_node_positions(node_positions)
 
         # Store the node positions in the node buffers
         for node, pos in node_positions.items():
@@ -179,70 +173,37 @@ class TerminalGraph(Generic[G]):
             for node, (x, y) in node_positions.items()
         }
 
-    def _set_size_from_node_positions(
-        self, node_positions: dict[Hashable, tuple[float, float]]
-    ) -> None:
-        """
-        Sets the graph size given the node positions & node buffers. Assumes positions
-        in console coordinate space.
-        """
-
-        # TODO: Division by 2 can lead to some rounding errors, check this is still what we want
-        if not node_positions:
-            self.width = 0
-            self.height = 0
-            return
-
-        self.width = ceil(
-            max(
-                [
-                    x + self._nx_graph.nodes[node]["_netext_node_buffer"].width / 2
-                    for node, (x, _) in node_positions.items()
-                ]
-            )
-        )
-        self.height = ceil(
-            max(
-                [
-                    y + self._nx_graph.nodes[node]["_netext_node_buffer"].height / 2
-                    for node, (_, y) in node_positions.items()
-                ]
-            )
-        )
-
-    def __rich_console__(
-        self, console: Console, options: ConsoleOptions
-    ) -> RenderResult:
+    @property
+    def all_buffers(self):
         # Get graph subview
         visible_nodes = nx.subgraph_view(
             self._nx_graph,
             filter_node=lambda n: self._nx_graph.nodes[n].get("$show", True),
         )
         node_buffers = nx.get_node_attributes(visible_nodes, "_netext_node_buffer")  # type: ignore
-        all_buffers = chain(
-            node_buffers.values(), self.edge_buffers, self.label_buffers
-        )
-        yield from render_buffers(all_buffers, self.width, self.height)
+        return chain(node_buffers.values(), self.edge_buffers, self.label_buffers)
+
+    @property
+    def viewport(self):
+        if self._viewport is not None:
+            return self._viewport
+        return Region.union([buffer.region for buffer in self.all_buffers])
+
+    def __rich_console__(
+        self, console: Console, options: ConsoleOptions
+    ) -> RenderResult:
+        yield from render_buffers(self.all_buffers, self.viewport)
 
     def _profile_render(self):
         if self._buffer_render_profiler:
             self._buffer_render_profiler.start()
-        # TODO move to common method
-        visible_nodes = nx.subgraph_view(
-            self._nx_graph,
-            filter_node=lambda n: self._nx_graph.nodes[n].get("$show", True),
-        )
-        node_buffers = nx.get_node_attributes(visible_nodes, "_netext_node_buffer")  # type: ignore
-        all_buffers = chain(
-            node_buffers.values(), self.edge_buffers, self.label_buffers
-        )
-        render_buffers(all_buffers, self.width, self.height)
+        list(render_buffers(self.all_buffers, self.viewport))
         if self._buffer_render_profiler:
             self._buffer_render_profiler.stop()
 
-    def __rich_measure__(
-        self, console: Console, options: ConsoleOptions
-    ) -> Measurement:
-        # We only support fixed width for now. It would be possible
-        # to adaptively re-render if a different width is requested.
-        return Measurement(self.width, self.width)
+    # def __rich_measure__(
+    #     self, console: Console, options: ConsoleOptions
+    # ) -> Measurement:
+    #     # We only support fixed width for now. It would be possible
+    #     # to adaptively re-render if a different width is requested.
+    #     return Measurement(self.width, self.width)

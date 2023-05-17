@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from typing import Any, Tuple
 
 from rich.segment import Segment
+from netext.geometry import Region
+from netext.geometry.point import Point
 
 
 @dataclass
@@ -59,3 +61,10 @@ class StripBuffer:
     @property
     def bounding_box(self) -> tuple[int, int, int, int]:
         return self.left_x, self.top_y, self.right_x, self.bottom_y
+
+    @property
+    def region(self) -> Region:
+        return Region.from_points(
+            Point(self.left_x, self.top_y),
+            Point(self.right_x, self.bottom_y),
+        )
