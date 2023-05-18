@@ -1,9 +1,12 @@
 from collections.abc import Hashable
+from dataclasses import dataclass
+from enum import Enum
 from itertools import chain
 from typing import Any, Generic, Protocol, cast
 
 import networkx as nx
 from rich.console import Console, ConsoleOptions, RenderResult
+from rich.measure import Measurement
 
 from rtree import index
 
@@ -29,6 +32,17 @@ class GraphProfiler(Protocol):
         raise NotImplementedError()
 
 
+class AutoZoom(Enum):
+    FIT = "fit"
+    FIT_PROPORTIONAL = "fit_proportional"
+
+
+@dataclass
+class ZoomSpec:
+    x: float
+    y: float
+
+
 class TerminalGraph(Generic[G]):
     def __init__(
         self,
@@ -37,7 +51,7 @@ class TerminalGraph(Generic[G]):
         layout_engine: LayoutEngine[G] = GrandalfSugiyamaLayout[G](),  # type: ignore
         console: Console = Console(),
         viewport: Region | None = None,
-        zoom: float = 1.0,
+        zoom: float | tuple[float, float] | ZoomSpec | AutoZoom = 1.0,
         layout_profiler: GraphProfiler | None = None,
         node_render_profiler: GraphProfiler | None = None,
         edge_render_profiler: GraphProfiler | None = None,
@@ -58,11 +72,17 @@ class TerminalGraph(Generic[G]):
             layout_engine (LayoutEngine[G], optional): The layout engine used.
             console (Console, optional): The rich console driver used to render.
             layout_profiler (GraphProfiler, optional): Profiler that is executed during layout.
-            node_render_profiler (GraphProfiler, optional): Profiler that is exeuted during node rendering.
-            edge_render_profiler (GraphProfiler, optional): Profiler that is exeuted during edge rendering.
+            node_render_profiler (GraphProfiler, optional): Profiler that is executed during node rendering.
+            edge_render_profiler (GraphProfiler, optional): Profiler that is executed during edge rendering.
             buffer_render_profiler (GraphProfiler, optional): Profiler that is execuuted during buffer rendering.
         """
         self._viewport = viewport
+
+        if isinstance(zoom, float):
+            zoom = ZoomSpec(zoom, zoom)
+        elif isinstance(zoom, tuple):
+            zoom = ZoomSpec(zoom[0], zoom[1])
+
         self._zoom = zoom
         self._nx_graph: G = cast(G, g.copy())
         # First we create the node buffers, this allows us to pass the sizing information to the
@@ -72,7 +92,7 @@ class TerminalGraph(Generic[G]):
         if node_render_profiler:
             node_render_profiler.start()
 
-        node_buffers: dict[Hashable, NodeBuffer] = {
+        self.node_buffers: dict[Hashable, NodeBuffer] = {
             node: rasterize_node(console, node, cast(dict[Hashable, Any], data))
             for node, data in self._nx_graph.nodes(data=True)
         }
@@ -81,45 +101,86 @@ class TerminalGraph(Generic[G]):
             node_render_profiler.stop()
 
         # Store the node buffers in the graph itself
-        nx.set_node_attributes(self._nx_graph, node_buffers, "_netext_node_buffer")
+        nx.set_node_attributes(self._nx_graph, self.node_buffers, "_netext_node_buffer")
 
         if layout_profiler:
             layout_profiler.start()
+
         # Position the nodes and add the position information to the graph
-        node_positions: dict[Hashable, tuple[float, float]] = layout_engine(
+        self.node_positions: dict[Hashable, tuple[float, float]] = layout_engine(
             self._nx_graph
         )
-        self.node_layout = node_positions
+
+        # Center node positions around the midpoint of all nodes
+        min_x = min([x for _, (x, _) in self.node_positions.items()])
+        max_x = max([x for _, (x, _) in self.node_positions.items()])
+        min_y = min([y for _, (_, y) in self.node_positions.items()])
+        max_y = max([y for _, (_, y) in self.node_positions.items()])
+
+        self.node_positions = {
+            node: (x - min_x - (max_x - min_x) / 2, y - min_y - (max_y - min_y) / 2)
+            for node, (x, y) in self.node_positions.items()
+        }
+
         if layout_profiler:
             layout_profiler.stop()
 
-        # Store the node positions in the node buffers
-        for node, pos in node_positions.items():
-            buffer: NodeBuffer = self._nx_graph.nodes[node]["_netext_node_buffer"]
-            buffer.center = Point(x=round(pos[0]), y=round(pos[1]))
-
-        # Now we rasterize the edges
         self.edge_buffers: list[EdgeBuffer] = []
         self.edge_layouts: list[EdgeLayout] = []
         self.label_buffers: list[StripBuffer] = []
 
-        if edge_render_profiler:
-            edge_render_profiler.start()
+        self._buffer_render_profiler = buffer_render_profiler
+        self._edge_render_profiler = edge_render_profiler
+
+    def _project_positions(self, max_width: int, max_height: int) -> None:
+        # Need to set this first, otherwise viewport is determined the wrong way
+        max_buffer_width = max([buffer.width for buffer in self.node_buffers.values()])
+        max_buffer_height = max(
+            [buffer.height for buffer in self.node_buffers.values()]
+        )
+        for node, pos in self.node_positions.items():
+            buffer: NodeBuffer = self._nx_graph.nodes[node]["_netext_node_buffer"]
+            buffer.center = Point(x=round(pos[0]), y=round(pos[1]))
+
+        vp = self._unconstrained_viewport()
+
+        match self._zoom:
+            case AutoZoom.FIT:
+                zoom_x = (max_width - max_buffer_width / 2 - 1) / vp.width
+                zoom_y = (max_height - max_buffer_height / 2 - 1) / vp.height
+            case AutoZoom.FIT_PROPORTIONAL:
+                zoom_x = max_width / vp.width
+                zoom_y = max_height / vp.height
+                zoom_y = zoom_x = min(zoom_x, zoom_y)
+            case ZoomSpec(x, y):
+                zoom_x = x
+                zoom_y = y
+            case _:
+                raise ValueError("Invalid zoom value")
+        # Store the node positions in the node buffers
+        for node, pos in self.node_positions.items():
+            buffer: NodeBuffer = self._nx_graph.nodes[node]["_netext_node_buffer"]
+            buffer.center = Point(x=round(zoom_x * pos[0]), y=round(zoom_y * pos[1]))
+
+    def _render_edges(self, console: Console) -> None:
+        # Now we rasterize the edges
+        if self._edge_render_profiler:
+            self._edge_render_profiler.start()
 
         # Iterate over all edges (so far in no particular order)
         node_idx = index.Index()
         edge_idx = index.Index()
 
-        for i, node in enumerate(node_buffers.values()):
+        for i, node in enumerate(self.node_buffers.values()):
             node_idx.insert(i, node.bounding_box)
 
-        all_node_buffers = list(node_buffers.values())
+        all_node_buffers = list(self.node_buffers.values())
 
         for u, v, data in self._nx_graph.edges(data=True):
             result = rasterize_edge(
                 console,
-                node_buffers[u],
-                node_buffers[v],
+                self.node_buffers[u],
+                self.node_buffers[v],
                 all_node_buffers,
                 self.edge_layouts,
                 data,
@@ -134,44 +195,8 @@ class TerminalGraph(Generic[G]):
                 self.edge_layouts.append(edge_layout)
                 self.label_buffers.extend(label_nodes)
 
-        if edge_render_profiler:
-            edge_render_profiler.stop()
-
-        self._buffer_render_profiler = buffer_render_profiler
-
-    def _transform_node_positions_to_console(
-        self, node_positions: dict[Hashable, tuple[float, float]]
-    ) -> dict[Hashable, tuple[float, float]]:
-        """Transforms the node positions into console coordinate space.
-
-        Right now this assumes sizing from the layout engine is correct and only
-        performs rounding and transpositions.
-        """
-
-        # TODO: Division by 2 can lead to some rounding errors, check this is still what we want
-        if not node_positions:
-            return dict()
-
-        x_offset = -min(
-            [
-                x - self._nx_graph.nodes[node]["_netext_node_buffer"].width / 2
-                for node, (x, _) in node_positions.items()
-            ]
-        )
-        y_offset = -min(
-            [
-                y - self._nx_graph.nodes[node]["_netext_node_buffer"].height / 2
-                for node, (_, y) in node_positions.items()
-            ]
-        )
-
-        return {
-            node: (
-                round(x_offset + x),
-                round(y_offset + y),
-            )
-            for node, (x, y) in node_positions.items()
-        }
+        if self._edge_render_profiler:
+            self._edge_render_profiler.stop()
 
     @property
     def all_buffers(self):
@@ -183,16 +208,20 @@ class TerminalGraph(Generic[G]):
         node_buffers = nx.get_node_attributes(visible_nodes, "_netext_node_buffer")  # type: ignore
         return chain(node_buffers.values(), self.edge_buffers, self.label_buffers)
 
-    @property
-    def viewport(self):
+    def _unconstrained_viewport(self):
+        return Region.union([buffer.region for buffer in self.all_buffers])
+
+    def _viewport_with_constraints(self):
         if self._viewport is not None:
             return self._viewport
-        return Region.union([buffer.region for buffer in self.all_buffers])
+        return self._unconstrained_viewport()
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        yield from render_buffers(self.all_buffers, self.viewport)
+        self._project_positions(options.max_width, options.max_height)
+        self._render_edges(console)
+        yield from render_buffers(self.all_buffers, self._viewport_with_constraints())
 
     def _profile_render(self):
         if self._buffer_render_profiler:
@@ -201,9 +230,8 @@ class TerminalGraph(Generic[G]):
         if self._buffer_render_profiler:
             self._buffer_render_profiler.stop()
 
-    # def __rich_measure__(
-    #     self, console: Console, options: ConsoleOptions
-    # ) -> Measurement:
-    #     # We only support fixed width for now. It would be possible
-    #     # to adaptively re-render if a different width is requested.
-    #     return Measurement(self.width, self.width)
+    def __rich_measure__(
+        self, console: Console, options: ConsoleOptions
+    ) -> Measurement:
+        print("measuring")
+        return Measurement(self.width, self.width)
