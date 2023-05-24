@@ -68,10 +68,6 @@ class TerminalGraph(Generic[G]):
             g (G): A networkx graph object (see [networkx.Graph][] or [networkx.DiGraph][]).
             layout_engine (LayoutEngine[G], optional): The layout engine used.
             console (Console, optional): The rich console driver used to render.
-            layout_profiler (GraphProfiler, optional): Profiler that is executed during layout.
-            node_render_profiler (GraphProfiler, optional): Profiler that is executed during node rendering.
-            edge_render_profiler (GraphProfiler, optional): Profiler that is executed during edge rendering.
-            buffer_render_profiler (GraphProfiler, optional): Profiler that is execuuted during buffer rendering.
         """
         self._viewport = viewport
 
@@ -96,7 +92,7 @@ class TerminalGraph(Generic[G]):
         # Store the node buffers in the graph itself
         nx.set_node_attributes(self._nx_graph, self.node_buffers, "_netext_node_buffer")
 
-        # Position the nodes and add the position information to the graph
+        # Position the nodes and store these original positions
         self.node_positions: dict[Hashable, tuple[float, float]] = layout_engine(
             self._nx_graph
         )
@@ -121,18 +117,22 @@ class TerminalGraph(Generic[G]):
     def _project_positions(
         self, max_width: int, max_height: int
     ) -> tuple[float, float]:
-        # Need to set this first, otherwise viewport is determined the wrong way
+        # Reset all node positions to the original, non zoomed position
+        # from the layout engine
         for node, pos in self.node_positions.items():
             buffer: NodeBuffer = self._nx_graph.nodes[node]["_netext_node_buffer"]
             buffer.center = Point(x=round(pos[0]), y=round(pos[1]))
 
+        # Get the unconstrined full viewport given the current positions
         vp = self._unconstrained_viewport()
 
+        # Compute the zoom value for both axes
         max_buffer_width = max([buffer.width for buffer in self.node_buffers.values()])
         max_buffer_height = max(
             [buffer.height for buffer in self.node_buffers.values()]
         )
 
+        # TODO Up until here everything could be precomputed
         match self._zoom:
             case AutoZoom.FIT:
                 zoom_x = (max_width - max_buffer_width / 2 - 1) / vp.width
@@ -161,11 +161,10 @@ class TerminalGraph(Generic[G]):
         node_idx = index.Index()
         edge_idx = index.Index()
 
+        current_lod_node_buffers = self.render_lod_buffers(console, zoom)
+
         all_node_buffers = []
-        for i, (node, data) in enumerate(self._nx_graph.nodes(data=True)):
-            lod = lod_for_node(data, zoom)
-            print(node, lod)
-            node_buffer = self.node_buffers_per_lod[lod][node]
+        for i, (node, node_buffer) in enumerate(current_lod_node_buffers.items()):
             node_idx.insert(i, node_buffer.bounding_box)
             all_node_buffers.append(node_buffer)
 
@@ -200,32 +199,41 @@ class TerminalGraph(Generic[G]):
             filter_node=lambda n: self._nx_graph.nodes[n].get("$show", True),
         )
 
-        node_buffer_dict = nx.get_node_attributes(
-            visible_nodes, "_netext_node_buffer"
-        )  # type: ignore
-
         if zoom != 1.0:
-            if console is None:
-                raise RuntimeError(
-                    "Cannot generate ad-hoc zoomed node buffers without a console."
-                )
-
-            for node, data in self._nx_graph.nodes(data=True):
-                lod = lod_for_node(data, zoom)
-                position = node_buffer_dict[node].center
-                node_buffer = self.node_buffers_per_lod.get(lod, dict()).get(node)
-                if node_buffer is None:
-                    node_buffer = rasterize_node(
-                        console, node, cast(dict[Hashable, Any], data), lod=lod
-                    )
-                    node_buffer.center = position
-                    self.node_buffers_per_lod[lod][node] = node_buffer
-                    if node in visible_nodes.nodes:
-                        node_buffer_dict[node] = node_buffer
-
-        node_buffers = node_buffer_dict.values()
+            node_buffers = [
+                node_buffer
+                for node, node_buffer in self.render_lod_buffers(console, zoom).items()
+                if node in visible_nodes
+            ]
+        else:
+            node_buffers = nx.get_node_attributes(
+                visible_nodes, "_netext_node_buffer"
+            ).values()  # type: ignore
 
         return chain(node_buffers, self.edge_buffers, self.label_buffers)
+
+    def render_lod_buffers(self, console: Console, zoom) -> dict[Hashable, NodeBuffer]:
+        if console is None:
+            raise RuntimeError(
+                "Cannot generate ad-hoc zoomed node buffers without a console."
+            )
+
+        nodebuffers_at_current_lod = dict()
+
+        for node, data in self._nx_graph.nodes(data=True):
+            lod = lod_for_node(data, zoom)
+            # Get the zoomed position of the node
+            position = self.node_buffers[node].center
+            node_buffer = self.node_buffers_per_lod.get(lod, dict()).get(node)
+            if node_buffer is None:
+                node_buffer = rasterize_node(
+                    console, node, cast(dict[Hashable, Any], data), lod=lod
+                )
+                node_buffer.center = position
+                self.node_buffers_per_lod[lod][node] = node_buffer
+            nodebuffers_at_current_lod[node] = node_buffer
+
+        return nodebuffers_at_current_lod
 
     def _unconstrained_viewport(self) -> Region:
         return Region.union([buffer.region for buffer in self._all_buffers()])
@@ -242,6 +250,7 @@ class TerminalGraph(Generic[G]):
         zoom = min([zoom_x, zoom_y])
 
         # TODO this needs to be called before render edges and this coupling is quite implicit
+        # Also project positions is not idempotent, which it should be
         all_buffers = self._all_buffers(console=console, zoom=zoom)
 
         self._render_edges(console, zoom=zoom)
@@ -253,8 +262,9 @@ class TerminalGraph(Generic[G]):
     def __rich_measure__(
         self, console: Console, options: ConsoleOptions
     ) -> Measurement:
+        # Once done, we
         self._project_positions(options.max_width, options.max_height)
 
-        viewport = self._unconstrained_viewport()
+        viewport = self._viewport_with_constraints()
 
         return Measurement(viewport.width, options.max_width)

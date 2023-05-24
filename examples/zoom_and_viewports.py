@@ -13,7 +13,7 @@ from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.node_rasterizer import JustContent
 from netext.terminal_graph import AutoZoom
 
-g = cast(nx.Graph, nx.binomial_tree(5))
+g = cast(nx.Graph, nx.binomial_tree(6))
 nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
 nx.set_edge_attributes(g, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
 nx.set_edge_attributes(
