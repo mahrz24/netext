@@ -85,5 +85,9 @@ class LineSegment:
         return self.start.y == self.end.y
 
     @property
+    def is_point(self) -> bool:
+        return self.start == self.end
+
+    @property
     def bounding_box(self) -> tuple[int, int, int, int]:
         return (self.min_bound.x, self.min_bound.y, self.max_bound.x, self.max_bound.y)

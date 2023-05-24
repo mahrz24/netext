@@ -159,11 +159,14 @@ class RoutedEdgeSegments:
     ) -> "RoutedEdgeSegments":
         return RoutedEdgeSegments(
             segments=list(
-                itertools.chain(
-                    *[
-                        segment.cut_multiple(iter(node_buffers))
-                        for segment in self.segments
-                    ]
+                filter(
+                    lambda segment: not segment.is_point,
+                    itertools.chain(
+                        *[
+                            segment.cut_multiple(iter(node_buffers))
+                            for segment in self.segments
+                        ]
+                    ),
                 )
             ),
             intersections=self.intersections,
