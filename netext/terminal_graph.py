@@ -1,8 +1,9 @@
+from collections import defaultdict
 from collections.abc import Hashable
 from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
-from typing import Any, Generic, Protocol, cast
+from typing import Any, Generic, Iterable, Protocol, cast
 
 import networkx as nx
 from rich.console import Console, ConsoleOptions, RenderResult
@@ -21,7 +22,7 @@ from netext.buffer_renderer import render_buffers
 from netext.edge_rasterizer import rasterize_edge
 from netext.layout_engines.engine import LayoutEngine, G
 from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
-from netext.node_rasterizer import NodeBuffer, rasterize_node
+from netext.node_rasterizer import NodeBuffer, lod_for_node, rasterize_node
 
 
 class GraphProfiler(Protocol):
@@ -52,10 +53,6 @@ class TerminalGraph(Generic[G]):
         console: Console = Console(),
         viewport: Region | None = None,
         zoom: float | tuple[float, float] | ZoomSpec | AutoZoom = 1.0,
-        layout_profiler: GraphProfiler | None = None,
-        node_render_profiler: GraphProfiler | None = None,
-        edge_render_profiler: GraphProfiler | None = None,
-        buffer_render_profiler: GraphProfiler | None = None,
     ):
         """
         A terminal representation of a networkx graph.
@@ -89,60 +86,52 @@ class TerminalGraph(Generic[G]):
         # layout engine. For each node in the graph we generate a node buffer that contains the
         # segments to render the node and metadata where to place the buffer.
 
-        if node_render_profiler:
-            node_render_profiler.start()
-
         self.node_buffers: dict[Hashable, NodeBuffer] = {
             node: rasterize_node(console, node, cast(dict[Hashable, Any], data))
             for node, data in self._nx_graph.nodes(data=True)
         }
 
-        if node_render_profiler:
-            node_render_profiler.stop()
+        self.node_buffers_per_lod = defaultdict(dict, {1: self.node_buffers})
 
         # Store the node buffers in the graph itself
         nx.set_node_attributes(self._nx_graph, self.node_buffers, "_netext_node_buffer")
-
-        if layout_profiler:
-            layout_profiler.start()
 
         # Position the nodes and add the position information to the graph
         self.node_positions: dict[Hashable, tuple[float, float]] = layout_engine(
             self._nx_graph
         )
 
+        x_positions = [x for _, (x, _) in self.node_positions.items()]
+        y_positions = [y for _, (_, y) in self.node_positions.items()]
         # Center node positions around the midpoint of all nodes
-        min_x = min([x for _, (x, _) in self.node_positions.items()])
-        max_x = max([x for _, (x, _) in self.node_positions.items()])
-        min_y = min([y for _, (_, y) in self.node_positions.items()])
-        max_y = max([y for _, (_, y) in self.node_positions.items()])
+        min_x = min(x_positions)
+        max_x = max(x_positions)
+        min_y = min(y_positions)
+        max_y = max(y_positions)
 
         self.node_positions = {
             node: (x - min_x - (max_x - min_x) / 2, y - min_y - (max_y - min_y) / 2)
             for node, (x, y) in self.node_positions.items()
         }
 
-        if layout_profiler:
-            layout_profiler.stop()
-
         self.edge_buffers: list[EdgeBuffer] = []
         self.edge_layouts: list[EdgeLayout] = []
         self.label_buffers: list[StripBuffer] = []
 
-        self._buffer_render_profiler = buffer_render_profiler
-        self._edge_render_profiler = edge_render_profiler
-
-    def _project_positions(self, max_width: int, max_height: int) -> None:
+    def _project_positions(
+        self, max_width: int, max_height: int
+    ) -> tuple[float, float]:
         # Need to set this first, otherwise viewport is determined the wrong way
-        max_buffer_width = max([buffer.width for buffer in self.node_buffers.values()])
-        max_buffer_height = max(
-            [buffer.height for buffer in self.node_buffers.values()]
-        )
         for node, pos in self.node_positions.items():
             buffer: NodeBuffer = self._nx_graph.nodes[node]["_netext_node_buffer"]
             buffer.center = Point(x=round(pos[0]), y=round(pos[1]))
 
         vp = self._unconstrained_viewport()
+
+        max_buffer_width = max([buffer.width for buffer in self.node_buffers.values()])
+        max_buffer_height = max(
+            [buffer.height for buffer in self.node_buffers.values()]
+        )
 
         match self._zoom:
             case AutoZoom.FIT:
@@ -157,30 +146,37 @@ class TerminalGraph(Generic[G]):
                 zoom_y = y
             case _:
                 raise ValueError("Invalid zoom value")
+
         # Store the node positions in the node buffers
         for node, pos in self.node_positions.items():
             buffer: NodeBuffer = self._nx_graph.nodes[node]["_netext_node_buffer"]
             buffer.center = Point(x=round(zoom_x * pos[0]), y=round(zoom_y * pos[1]))
 
-    def _render_edges(self, console: Console) -> None:
+        return zoom_x, zoom_y
+
+    def _render_edges(self, console: Console, zoom: float = 1.0) -> None:
         # Now we rasterize the edges
-        if self._edge_render_profiler:
-            self._edge_render_profiler.start()
 
         # Iterate over all edges (so far in no particular order)
         node_idx = index.Index()
         edge_idx = index.Index()
 
-        for i, node in enumerate(self.node_buffers.values()):
-            node_idx.insert(i, node.bounding_box)
-
-        all_node_buffers = list(self.node_buffers.values())
+        all_node_buffers = []
+        for i, (node, data) in enumerate(self._nx_graph.nodes(data=True)):
+            lod = lod_for_node(data, zoom)
+            print(node, lod)
+            node_buffer = self.node_buffers_per_lod[lod][node]
+            node_idx.insert(i, node_buffer.bounding_box)
+            all_node_buffers.append(node_buffer)
 
         for u, v, data in self._nx_graph.edges(data=True):
+            u_lod = lod_for_node(self._nx_graph.nodes[u], zoom)
+            v_lod = lod_for_node(self._nx_graph.nodes[v], zoom)
+
             result = rasterize_edge(
                 console,
-                self.node_buffers[u],
-                self.node_buffers[v],
+                self.node_buffers_per_lod[u_lod][u],
+                self.node_buffers_per_lod[v_lod][v],
                 all_node_buffers,
                 self.edge_layouts,
                 data,
@@ -195,23 +191,46 @@ class TerminalGraph(Generic[G]):
                 self.edge_layouts.append(edge_layout)
                 self.label_buffers.extend(label_nodes)
 
-        if self._edge_render_profiler:
-            self._edge_render_profiler.stop()
-
-    @property
-    def all_buffers(self):
+    def _all_buffers(
+        self, console: Console | None = None, zoom: float = 1.0
+    ) -> Iterable[NodeBuffer]:
         # Get graph subview
         visible_nodes = nx.subgraph_view(
             self._nx_graph,
             filter_node=lambda n: self._nx_graph.nodes[n].get("$show", True),
         )
-        node_buffers = nx.get_node_attributes(visible_nodes, "_netext_node_buffer")  # type: ignore
-        return chain(node_buffers.values(), self.edge_buffers, self.label_buffers)
 
-    def _unconstrained_viewport(self):
-        return Region.union([buffer.region for buffer in self.all_buffers])
+        node_buffer_dict = nx.get_node_attributes(
+            visible_nodes, "_netext_node_buffer"
+        )  # type: ignore
 
-    def _viewport_with_constraints(self):
+        if zoom != 1.0:
+            if console is None:
+                raise RuntimeError(
+                    "Cannot generate ad-hoc zoomed node buffers without a console."
+                )
+
+            for node, data in self._nx_graph.nodes(data=True):
+                lod = lod_for_node(data, zoom)
+                position = node_buffer_dict[node].center
+                node_buffer = self.node_buffers_per_lod.get(lod, dict()).get(node)
+                if node_buffer is None:
+                    node_buffer = rasterize_node(
+                        console, node, cast(dict[Hashable, Any], data), lod=lod
+                    )
+                    node_buffer.center = position
+                    self.node_buffers_per_lod[lod][node] = node_buffer
+                    if node in visible_nodes.nodes:
+                        node_buffer_dict[node] = node_buffer
+
+        node_buffers = node_buffer_dict.values()
+
+        return chain(node_buffers, self.edge_buffers, self.label_buffers)
+
+    def _unconstrained_viewport(self) -> Region:
+        return Region.union([buffer.region for buffer in self._all_buffers()])
+
+    def _viewport_with_constraints(self) -> Region:
         if self._viewport is not None:
             return self._viewport
         return self._unconstrained_viewport()
@@ -219,19 +238,23 @@ class TerminalGraph(Generic[G]):
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
-        self._project_positions(options.max_width, options.max_height)
-        self._render_edges(console)
-        yield from render_buffers(self.all_buffers, self._viewport_with_constraints())
+        zoom_x, zoom_y = self._project_positions(options.max_width, options.max_height)
+        zoom = min([zoom_x, zoom_y])
 
-    def _profile_render(self):
-        if self._buffer_render_profiler:
-            self._buffer_render_profiler.start()
-        list(render_buffers(self.all_buffers, self.viewport))
-        if self._buffer_render_profiler:
-            self._buffer_render_profiler.stop()
+        # TODO this needs to be called before render edges and this coupling is quite implicit
+        all_buffers = self._all_buffers(console=console, zoom=zoom)
+
+        self._render_edges(console, zoom=zoom)
+        yield from render_buffers(
+            all_buffers,
+            self._viewport_with_constraints(),
+        )
 
     def __rich_measure__(
         self, console: Console, options: ConsoleOptions
     ) -> Measurement:
-        print("measuring")
-        return Measurement(self.width, self.width)
+        self._project_positions(options.max_width, options.max_height)
+
+        viewport = self._unconstrained_viewport()
+
+        return Measurement(viewport.width, options.max_width)

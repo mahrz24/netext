@@ -134,6 +134,7 @@ class NodeBuffer(StripBuffer):
     node_width: int
     node_height: int
     margin: int = 0
+    lod: int = 1
 
     shape: Shape = JustContent()
 
@@ -145,6 +146,7 @@ class NodeBuffer(StripBuffer):
         shape: Shape,
         z_index: int = 0,
         margin: int = 0,
+        lod: int = 1,
     ) -> "NodeBuffer":
         width = max(
             sum(segment.cell_length for segment in strip.segments) for strip in strips
@@ -158,6 +160,7 @@ class NodeBuffer(StripBuffer):
             node_height=len(strips),
             strips=strips,
             margin=margin,
+            lod=lod,
         )
 
     def get_magnet_position(self, target_point: Point, magnet: Magnet) -> Point:
@@ -205,7 +208,7 @@ def _default_content_renderer(
 
 
 def rasterize_node(
-    console: Console, node: Hashable, data: dict[Hashable, Any]
+    console: Console, node: Hashable, data: dict[Hashable, Any], lod: int = 1
 ) -> NodeBuffer:
     shape: Shape = data.get("$shape", Box())
     style: Style = data.get("$style", Style())
@@ -214,9 +217,22 @@ def rasterize_node(
     content_renderer = data.get("$content-renderer", _default_content_renderer)
     content_renderable = content_renderer(str(node), data, content_style)
 
-    # TODO render shape needs to return a strip as it could have spacers
+    if lod != 1:
+        shape: Shape = data.get(f"$shape-{lod}", shape)
+        style: Style = data.get(f"$style-{lod}", style)
+        content_style = data.get(f"$content-style-{lod}", content_style)
+        margin: int = data.get(f"$margin-{lod}", margin)
+        content_renderer = data.get(f"$content-renderer-{lod}", content_renderer)
+        content_renderable = content_renderer(str(node), data, content_style)
+
     strips = shape.render_shape(console, content_renderable, style=style, data=data)
 
     return NodeBuffer.from_strips(
-        strips, center=Point(x=0, y=0), z_index=-1, shape=shape, margin=margin
+        strips, center=Point(x=0, y=0), z_index=-1, shape=shape, margin=margin, lod=lod
     )
+
+
+def lod_for_node(data: dict[Hashable, Any], zoom: float = 1.0) -> int:
+    lod_map = data.get("$lod-map", lambda _: 1)
+    lod = lod_map(zoom)
+    return lod

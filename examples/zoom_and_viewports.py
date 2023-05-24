@@ -4,13 +4,13 @@ import networkx as nx
 from rich import print
 from rich.panel import Panel
 from rich.style import Style
-from rich import print
 from rich.layout import Layout
 
 from netext import TerminalGraph
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_rendering.arrow_tips import ArrowTip
+from netext.node_rasterizer import JustContent
 from netext.terminal_graph import AutoZoom
 
 g = cast(nx.Graph, nx.binomial_tree(5))
@@ -21,7 +21,12 @@ nx.set_edge_attributes(
 )
 
 nx.set_edge_attributes(g, Style(color="purple", bold=True), "$style")
+
 nx.set_node_attributes(g, Style(color="green"), "$style")
+nx.set_node_attributes(g, lambda zoom: 0 if zoom < 0.5 else 1, "$lod-map")
+nx.set_node_attributes(g, JustContent(), "$shape-0")
+nx.set_node_attributes(g, lambda _, __, ___: ".", "$content-renderer-0")
+
 
 layout = Layout()
 
