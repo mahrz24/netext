@@ -230,9 +230,3 @@ def rasterize_node(
     return NodeBuffer.from_strips(
         strips, center=Point(x=0, y=0), z_index=-1, shape=shape, margin=margin, lod=lod
     )
-
-
-def lod_for_node(data: dict[Hashable, Any], zoom: float = 1.0) -> int:
-    lod_map = data.get("$lod-map", lambda _: 1)
-    lod = lod_map(zoom)
-    return lod

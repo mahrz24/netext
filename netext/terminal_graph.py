@@ -22,7 +22,7 @@ from netext.buffer_renderer import render_buffers
 from netext.edge_rasterizer import rasterize_edge
 from netext.layout_engines.engine import LayoutEngine, G
 from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
-from netext.node_rasterizer import NodeBuffer, lod_for_node, rasterize_node
+from netext.node_rasterizer import NodeBuffer, rasterize_node
 
 
 class GraphProfiler(Protocol):
@@ -169,8 +169,10 @@ class TerminalGraph(Generic[G]):
             all_node_buffers.append(node_buffer)
 
         for u, v, data in self._nx_graph.edges(data=True):
-            u_lod = lod_for_node(self._nx_graph.nodes[u], zoom)
-            v_lod = lod_for_node(self._nx_graph.nodes[v], zoom)
+            u_lod = determine_lod(self._nx_graph.nodes[u], zoom)
+            v_lod = determine_lod(self._nx_graph.nodes[v], zoom)
+
+            edge_lod = determine_lod(data, zoom)
 
             # TODO: Also get a lod for the edge and pass it to the rasterizer
             result = rasterize_edge(
@@ -182,6 +184,7 @@ class TerminalGraph(Generic[G]):
                 data,
                 node_idx,
                 edge_idx,
+                edge_lod,
             )
             if result is not None:
                 edge_buffer, edge_layout, label_nodes = result
@@ -201,6 +204,10 @@ class TerminalGraph(Generic[G]):
         )
 
         if zoom != 1.0:
+            if console is None:
+                raise RuntimeError(
+                    "Cannot generate ad-hoc zoomed node buffers without a console."
+                )
             node_buffers = [
                 node_buffer
                 for node, node_buffer in self.render_lod_buffers(console, zoom).items()
@@ -214,15 +221,10 @@ class TerminalGraph(Generic[G]):
         return chain(node_buffers, self.edge_buffers, self.label_buffers)
 
     def render_lod_buffers(self, console: Console, zoom) -> dict[Hashable, NodeBuffer]:
-        if console is None:
-            raise RuntimeError(
-                "Cannot generate ad-hoc zoomed node buffers without a console."
-            )
-
         nodebuffers_at_current_lod = dict()
 
         for node, data in self._nx_graph.nodes(data=True):
-            lod = lod_for_node(data, zoom)
+            lod = determine_lod(data, zoom)
             # Get the zoomed position of the node
             position = self.node_buffers[node].center
             node_buffer = self.node_buffers_per_lod.get(lod, dict()).get(node)
@@ -269,3 +271,9 @@ class TerminalGraph(Generic[G]):
         viewport = self._viewport_with_constraints()
 
         return Measurement(viewport.width, options.max_width)
+
+
+def determine_lod(data: dict[Hashable, Any], zoom: float = 1.0) -> int:
+    lod_map = data.get("$lod-map", lambda _: 1)
+    lod = lod_map(zoom)
+    return lod

@@ -2,6 +2,7 @@ from typing import cast
 
 import networkx as nx
 from rich import print
+from rich.color import Color
 from rich.panel import Panel
 from rich.style import Style
 from rich.layout import Layout
@@ -13,8 +14,18 @@ from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.node_rasterizer import JustContent
 from netext.terminal_graph import AutoZoom
 
-g = cast(nx.Graph, nx.binomial_tree(6))
+g = cast(nx.Graph, nx.binomial_tree(7))
 nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
+nx.set_edge_attributes(g, None, "$end-arrow-tip-0")
+nx.set_edge_attributes(g, lambda zoom: 0 if zoom < 0.5 else 1, "$lod-map")
+nx.set_edge_attributes(
+    g, Style(color=Color.from_rgb(red=20, green=80, blue=10), bold=True), "$style-0"
+)
+nx.set_edge_attributes(
+    g, EdgeSegmentDrawingMode.BOX_HEAVY, "$edge-segment-drawing-mode-0"
+)
+
+
 nx.set_edge_attributes(g, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
 nx.set_edge_attributes(
     g, EdgeSegmentDrawingMode.BOX_ROUNDED, "$edge-segment-drawing-mode"
@@ -25,8 +36,13 @@ nx.set_edge_attributes(g, Style(color="purple", bold=True), "$style")
 nx.set_node_attributes(g, Style(color="green"), "$style")
 nx.set_node_attributes(g, lambda zoom: 0 if zoom < 0.5 else 1, "$lod-map")
 nx.set_node_attributes(g, JustContent(), "$shape-0")
-nx.set_node_attributes(g, lambda _, __, ___: ".", "$content-renderer-0")
+nx.set_node_attributes(g, lambda _, __, ___: "⏺", "$content-renderer-0")
 
+for u, v in g.edges:
+    if u == 0 and v == 4:
+        g.edges[(u, v)]["$style"] = Style(color="red")
+        g.edges[(u, v)]["$style-0"] = Style(color="red")
+        g.edges[(u, v)]["$special"] = True
 
 layout = Layout()
 
