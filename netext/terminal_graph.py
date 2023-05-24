@@ -172,6 +172,7 @@ class TerminalGraph(Generic[G]):
             u_lod = lod_for_node(self._nx_graph.nodes[u], zoom)
             v_lod = lod_for_node(self._nx_graph.nodes[v], zoom)
 
+            # TODO: Also get a lod for the edge and pass it to the rasterizer
             result = rasterize_edge(
                 console,
                 self.node_buffers_per_lod[u_lod][u],
