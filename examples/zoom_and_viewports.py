@@ -1,7 +1,7 @@
 from typing import cast
 
 import networkx as nx
-from rich import print
+from rich.console import Console
 from rich.color import Color
 from rich.panel import Panel
 from rich.style import Style
@@ -11,10 +11,11 @@ from netext import TerminalGraph
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_rendering.arrow_tips import ArrowTip
+from netext.geometry import Region
 from netext.node_rasterizer import JustContent
 from netext.terminal_graph import AutoZoom
 
-g = cast(nx.Graph, nx.binomial_tree(7))
+g = cast(nx.Graph, nx.binomial_tree(5))
 nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
 nx.set_edge_attributes(g, None, "$end-arrow-tip-0")
 nx.set_edge_attributes(g, lambda zoom: 0 if zoom < 0.5 else 1, "$lod-map")
@@ -38,11 +39,6 @@ nx.set_node_attributes(g, lambda zoom: 0 if zoom < 0.5 else 1, "$lod-map")
 nx.set_node_attributes(g, JustContent(), "$shape-0")
 nx.set_node_attributes(g, lambda _, __, ___: "⏺", "$content-renderer-0")
 
-for u, v in g.edges:
-    if u == 0 and v == 4:
-        g.edges[(u, v)]["$style"] = Style(color="red")
-        g.edges[(u, v)]["$style-0"] = Style(color="red")
-        g.edges[(u, v)]["$special"] = True
 
 layout = Layout()
 
@@ -52,19 +48,49 @@ layout.split_column(
 )
 
 layout["top"].split_row(
-    Layout(Panel(TerminalGraph(g), style=Style(color="blue")), name="top_left"),
+    Layout(
+        Panel(TerminalGraph(g), style=Style(color="blue")), name="top_left", size=120
+    ),
     Layout(
         Panel(TerminalGraph(g, zoom=(AutoZoom.FIT)), style=Style(color="blue")),
         name="top_right",
-        size=50,
+        size=40,
     ),
 )
 
 layout["bottom"].split_row(
-    Layout(name="bottom_1"),
-    Layout(name="bottom_2"),
-    Layout(name="bottom_3"),
-    Layout(name="bottom_4"),
+    Layout(
+        Panel(
+            TerminalGraph(g, viewport=Region(-10, -10, 40, 15)),
+            style=Style(color="blue"),
+        ),
+        name="bottom_1",
+        size=40,
+    ),
+    Layout(
+        Panel(
+            TerminalGraph(g, viewport=Region(-20, -20, 40, 15)),
+            style=Style(color="blue"),
+        ),
+        name="bottom_1",
+        size=40,
+    ),
+    Layout(
+        Panel(
+            TerminalGraph(g, viewport=Region(0, 0, 40, 15)), style=Style(color="blue")
+        ),
+        name="bottom_1",
+        size=40,
+    ),
+    Layout(
+        Panel(
+            TerminalGraph(g, viewport=Region(5, -10, 40, 15)), style=Style(color="blue")
+        ),
+        name="bottom_1",
+        size=40,
+    ),
 )
 
-print(layout)
+console = Console()
+
+console.print(layout, height=30)

@@ -106,11 +106,7 @@ def rasterize_edge(
     )
 
     # Then we cut the edge with the node boundaries.
-
     edge_segments = edge_segments.cut_with_nodes([u_buffer, v_buffer])
-
-    if data.get("$special", None) and lod == 0:
-        print(edge_segments)
 
     if not edge_segments.segments:
         return None

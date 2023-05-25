@@ -91,35 +91,39 @@ def orthogonal_segments_to_strips_with_box_characters(
             end=Point(
                 edge_segment.end.x - min_point.x, edge_segment.end.y - min_point.y
             ),
+            # We keep the parent segments in the original coordinate sp
+            _parent=edge_segment._parent
+            if edge_segment._parent is not None
+            else edge_segment,
         )
         for edge_segment in edge_segments
     ]
     last_segment: EdgeSegment | None = None
     for edge_segment in offset_edge_segments:
-        start, end = edge_segment.start, edge_segment.end
+        start = edge_segment.start
         first_character = True
-        if edge_segment.vertical:
+        if edge_segment.parent.vertical:
             for y in edge_segment.vertical_range():
                 if (
                     first_character
                     and last_segment is not None
-                    and last_segment.horizontal
+                    and last_segment.parent.horizontal
                 ):
-                    if last_segment.start.x < start.x:
-                        if end.y > last_segment.end.y:
+                    if last_segment.parent.start.x < edge_segment.parent.start.x:
+                        if edge_segment.parent.end.y > last_segment.parent.end.y:
                             char_buffer[y][start.x] = edge_characters[drawing_mode][
                                 EdgeCharacters.CORNER_UPPER_RIGHT
                             ]
-                        else:
+                        elif edge_segment.parent.end.y > last_segment.parent.end.y:
                             char_buffer[y][start.x] = edge_characters[drawing_mode][
                                 EdgeCharacters.CORNER_LOWER_RIGHT
                             ]
                     else:
-                        if end.y > last_segment.end.y:
+                        if edge_segment.parent.end.y > last_segment.parent.end.y:
                             char_buffer[y][start.x] = edge_characters[drawing_mode][
                                 EdgeCharacters.CORNER_UPPER_LEFT
                             ]
-                        else:
+                        elif edge_segment.parent.end.y < last_segment.parent.end.y:
                             char_buffer[y][start.x] = edge_characters[drawing_mode][
                                 EdgeCharacters.CORNER_LOWER_LEFT
                             ]
@@ -128,28 +132,28 @@ def orthogonal_segments_to_strips_with_box_characters(
                         EdgeCharacters.VERTICAL
                     ]
                 first_character = False
-        elif edge_segment.horizontal:
+        elif edge_segment.parent.horizontal:
             for x in edge_segment.horizontal_range():
                 if (
                     first_character
                     and last_segment is not None
-                    and last_segment.vertical
+                    and last_segment.parent.vertical
                 ):
-                    if last_segment.start.y > start.y:
-                        if end.x < last_segment.end.x:
+                    if last_segment.parent.start.y > edge_segment.parent.start.y:
+                        if edge_segment.parent.end.x < last_segment.parent.end.x:
                             char_buffer[start.y][x] = edge_characters[drawing_mode][
                                 EdgeCharacters.CORNER_UPPER_RIGHT
                             ]
-                        else:
+                        elif edge_segment.parent.end.x > last_segment.parent.end.x:
                             char_buffer[start.y][x] = edge_characters[drawing_mode][
                                 EdgeCharacters.CORNER_UPPER_LEFT
                             ]
                     else:
-                        if end.x < last_segment.end.x:
+                        if edge_segment.parent.end.x < last_segment.parent.end.x:
                             char_buffer[start.y][x] = edge_characters[drawing_mode][
                                 EdgeCharacters.CORNER_LOWER_RIGHT
                             ]
-                        else:
+                        elif edge_segment.parent.end.x > last_segment.parent.end.x:
                             char_buffer[start.y][x] = edge_characters[drawing_mode][
                                 EdgeCharacters.CORNER_LOWER_LEFT
                             ]

@@ -59,6 +59,7 @@ class EdgeSegment(LineSegment):
                             end=Point.from_shapely(
                                 line.interpolate(1, normalized=True)
                             ),
+                            _parent=self.parent,
                         )
                     )
             else:
@@ -70,6 +71,7 @@ class EdgeSegment(LineSegment):
                         end=Point.from_shapely(
                             remaining.interpolate(1, normalized=True)
                         ),
+                        _parent=self.parent,
                     )
                 )
             return result
@@ -157,16 +159,14 @@ class RoutedEdgeSegments:
     def cut_with_nodes(
         self, node_buffers: Iterable[NodeBuffer]
     ) -> "RoutedEdgeSegments":
+        # We remove any edge segments that were cut to a single point.
         return RoutedEdgeSegments(
             segments=list(
-                filter(
-                    lambda segment: not segment.is_point,
-                    itertools.chain(
-                        *[
-                            segment.cut_multiple(iter(node_buffers))
-                            for segment in self.segments
-                        ]
-                    ),
+                itertools.chain(
+                    *[
+                        segment.cut_multiple(iter(node_buffers))
+                        for segment in self.segments
+                    ]
                 )
             ),
             intersections=self.intersections,

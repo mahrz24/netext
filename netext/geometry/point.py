@@ -39,6 +39,9 @@ class Point:
     def distance_to(self, other: "Point") -> int:
         return max(abs(self.x - other.x), abs(self.y - other.y))
 
+    def min_distance_to(self, other: "Point") -> int:
+        return min(abs(self.x - other.x), abs(self.y - other.y))
+
     @staticmethod
     def min_point(points: list["Point"]) -> "Point":
         return Point(

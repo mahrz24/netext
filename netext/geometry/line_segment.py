@@ -8,6 +8,7 @@ import shapely as sp
 class LineSegment:
     start: Point
     end: Point
+    _parent: "LineSegment | None" = None
     _shapely: sp.LineString = field(init=False, repr=False)
 
     def __post_init__(self):
@@ -83,6 +84,12 @@ class LineSegment:
     @property
     def horizontal(self) -> bool:
         return self.start.y == self.end.y
+
+    @property
+    def parent(self) -> "LineSegment":
+        if self._parent is None:
+            return self
+        return self._parent
 
     @property
     def is_point(self) -> bool:
