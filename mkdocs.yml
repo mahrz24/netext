@@ -5,6 +5,7 @@ nav:
   - tutorial.md
   - 'User Guide':
     - user-guide/styling-graphs.md
+    - user-guide/zoom-and-viewport.md
   - 'Reference':
     - reference/edges.md
     - reference/nodes.md

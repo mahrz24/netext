@@ -3,7 +3,7 @@ from collections.abc import Hashable
 from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
-from typing import Any, Generic, Iterable, Protocol, cast
+from typing import Any, Generic, Iterable, cast
 
 import networkx as nx
 from rich.console import Console, ConsoleOptions, RenderResult
@@ -25,23 +25,19 @@ from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
 from netext.node_rasterizer import NodeBuffer, rasterize_node
 
 
-class GraphProfiler(Protocol):
-    def start(self) -> None:
-        raise NotImplementedError()
-
-    def stop(self) -> None:
-        raise NotImplementedError()
-
-
 class AutoZoom(Enum):
     FIT = "fit"
+    """Fit the graph into the viewport."""
     FIT_PROPORTIONAL = "fit_proportional"
+    """Fit the graph into the viewport, but keep the aspect ratio."""
 
 
 @dataclass
 class ZoomSpec:
     x: float
+    """Scaling along the x-axis."""
     y: float
+    """Scaling along the y-axis."""
 
 
 class TerminalGraph(Generic[G]):
@@ -68,6 +64,9 @@ class TerminalGraph(Generic[G]):
             g (G): A networkx graph object (see [networkx.Graph][] or [networkx.DiGraph][]).
             layout_engine (LayoutEngine[G], optional): The layout engine used.
             console (Console, optional): The rich console driver used to render.
+            viewport (Region, optional): The viewport to render. Defaults to the whole graph.
+            zoom (float | tuple[float, float] | ZoomSpec | AutoZoom, optional): The zoom level, either a float, a
+                tuple of zoom in x and y direction or a zoom spec / auto zoom mode. Defaults to 1.0.
         """
         self._viewport = viewport
 
@@ -240,6 +239,18 @@ class TerminalGraph(Generic[G]):
 
     def _unconstrained_viewport(self) -> Region:
         return Region.union([buffer.region for buffer in self._all_buffers()])
+
+    @property
+    def full_viewport(self) -> Region:
+        """The full viewport of the graph, including all nodes and edges."""
+        # TODO: This is not computed correctly as edges are only computed at render time
+        # we need to precompute the edges and then we can use the unconstrained viewport
+        # but for that we need a console, and that is not necessarily available at that
+        # point. So we need to refactor this a bit.
+        #
+        # My current idea is to pass the console already to the constructor and then
+        # check at render time if the console is still the same / compatible.
+        return self._unconstrained_viewport()
 
     def _viewport_with_constraints(self) -> Region:
         if self._viewport is not None:
