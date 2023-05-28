@@ -25,4 +25,13 @@ You can specify the zoom of the rendered graph with respect to the default zoom 
 
 ## Level of Detail
 
-The zoom level by default only changes how
+The zoom level by default only changes how nodes are placed, but not the size or shape of nodes. This can be changes by introducing a mapping from zoom level to level of detail (lod). Such a map can be supplied to edges and nodes as an attribute. The default level of detail is one. For level of detail values other than one, the styling can be changed be adding `-{lod}` suffix to the attributes. For example, if you want to replace all nodes by small circles once you zoom our more than 50% you can do the following:
+
+```python
+# Add a mapping from zoom level ot level of detail.
+nx.set_node_attributes(g, lambda zoom: 0 if zoom < 0.5 else 1, "$lod-map")
+# For lod 0, remove the shape.
+nx.set_node_attributes(g, JustContent(), "$shape-0")
+# For lod 0, replace the content by a circle.
+nx.set_node_attributes(g, lambda _, __, ___: "⏺", "$content-renderer-0")
+```

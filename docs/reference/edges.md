@@ -6,6 +6,12 @@ The `show` attribute determines if edges are rendered. Hidden edges are not cons
 
 Type: bool.
 
+## Level of Detail
+
+The `lod-map` attribute can be set to a function mapping zoom levels to discrete level of detail values. The function takes a single float parameter and returns an integer value. See [Zoom and Viewport](./user-guide/zoom-and-viewport.md) for details on how to use the level of detail to change the appearance of edges on different zoom levels.
+
+Type: Callable | None
+
 ## Arrow Tips
 
 The `start-arrow-tip` and `end-arrow-tip` attribute determines if edges are rendered with arrow tips.
