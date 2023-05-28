@@ -148,7 +148,7 @@ class TerminalGraph(Generic[G]):
 
         # Store the node positions in the node buffers
         for node, pos in self.node_positions.items():
-            buffer: NodeBuffer = self._nx_graph.nodes[node]["_netext_node_buffer"]
+            buffer = self._nx_graph.nodes[node]["_netext_node_buffer"]
             buffer.center = Point(x=round(zoom_x * pos[0]), y=round(zoom_y * pos[1]))
 
         return zoom_x, zoom_y
@@ -195,7 +195,7 @@ class TerminalGraph(Generic[G]):
 
     def _all_buffers(
         self, console: Console | None = None, zoom: float = 1.0
-    ) -> Iterable[NodeBuffer]:
+    ) -> Iterable[StripBuffer]:
         # Get graph subview
         visible_nodes = nx.subgraph_view(
             self._nx_graph,

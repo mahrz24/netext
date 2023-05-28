@@ -218,10 +218,10 @@ def rasterize_node(
     content_renderable = content_renderer(str(node), data, content_style)
 
     if lod != 1:
-        shape: Shape = data.get(f"$shape-{lod}", shape)
-        style: Style = data.get(f"$style-{lod}", style)
+        shape = data.get(f"$shape-{lod}", shape)
+        style = data.get(f"$style-{lod}", style)
         content_style = data.get(f"$content-style-{lod}", content_style)
-        margin: int = data.get(f"$margin-{lod}", margin)
+        margin = data.get(f"$margin-{lod}", margin)
         content_renderer = data.get(f"$content-renderer-{lod}", content_renderer)
         content_renderable = content_renderer(str(node), data, content_style)
 
