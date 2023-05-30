@@ -49,7 +49,9 @@ def import_graph(path: str) -> TerminalGraph:
     source_code = spec.loader.get_source(script_name)
 
     # Replace the original function with the new one
-    source_code = source_code.replace("print(", "_print_intercept(")
+    source_code = source_code.replace("console.print(", "_print_intercept(").replace(
+        "print(", "_print_intercept("
+    )
 
     module = types.ModuleType(script_name)
 

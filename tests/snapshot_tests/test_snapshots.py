@@ -20,8 +20,12 @@ def test_routing_example(snap_compare):
 
 
 def test_hypercube_example(snap_compare):
-    assert snap_compare(EXAMPLES_DIR / "hypercube.py")
+    assert snap_compare(EXAMPLES_DIR / "hypercube.py", terminal_size=(170, 35))
 
 
 def test_mst_example(snap_compare):
     assert snap_compare(EXAMPLES_DIR / "mst.py")
+
+
+def test_zoom_and_viewports_example(snap_compare):
+    assert snap_compare(EXAMPLES_DIR / "zoom_and_viewports.py", terminal_size=(160, 40))

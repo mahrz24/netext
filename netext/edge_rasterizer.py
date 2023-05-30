@@ -32,19 +32,12 @@ def rasterize_edge(
     data: Any,
     node_idx: Index | None = None,
     edge_idx: Index | None = None,
+    lod: int = 1,
 ) -> tuple[EdgeBuffer, EdgeLayout, list[StripBuffer]] | None:
     show = data.get("$show", True)
 
     if not show:
         return None
-
-    start = u_buffer.get_magnet_position(
-        v_buffer.center, data.get("$magnet", Magnet.CENTER)
-    )
-
-    end = v_buffer.get_magnet_position(
-        u_buffer.center, data.get("$magnet", Magnet.CENTER)
-    )
 
     end_arrow_tip = data.get("$end-arrow-tip", None)
     start_arrow_tip = data.get("$start-arrow-tip", None)
@@ -58,6 +51,26 @@ def rasterize_edge(
 
     label = data.get("$label", None)
     style = data.get("$style", None)
+
+    if lod != 1:
+        end_arrow_tip = data.get(f"$end-arrow-tip-{lod}", end_arrow_tip)
+        start_arrow_tip = data.get(f"$start-arrow-tip-{lod}", start_arrow_tip)
+
+        routing_mode = data.get(f"$edge-routing-mode-{lod}", routing_mode)
+        edge_segment_drawing_mode = data.get(
+            f"$edge-segment-drawing-mode-{lod}", edge_segment_drawing_mode
+        )
+
+        label = data.get(f"$label-{lod}", label)
+        style = data.get(f"$style-{lod}", style)
+
+    start = u_buffer.get_magnet_position(
+        v_buffer.center, data.get("$magnet", Magnet.CENTER)
+    )
+
+    end = v_buffer.get_magnet_position(
+        u_buffer.center, data.get("$magnet", Magnet.CENTER)
+    )
 
     edge_input = EdgeInput(
         start=start,
@@ -93,7 +106,6 @@ def rasterize_edge(
     )
 
     # Then we cut the edge with the node boundaries.
-
     edge_segments = edge_segments.cut_with_nodes([u_buffer, v_buffer])
 
     if not edge_segments.segments:

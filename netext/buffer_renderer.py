@@ -3,19 +3,26 @@ from collections.abc import Iterable, Iterator
 from heapq import merge
 
 from rich.segment import Segment
+from netext.geometry import Region
 
 from netext.rendering.segment_buffer import StripBuffer, Spacer
 
 
 def render_buffers(
-    buffers: Iterable[StripBuffer], width: int, height: int
+    buffers: Iterable[StripBuffer], viewport: Region
 ) -> Iterator[Segment]:
+    full_width = viewport.x + viewport.width
+    full_height = viewport.y + viewport.height
+
     buffers_by_row: dict[int, list[StripBuffer]] = defaultdict(list)
     for buffer in buffers:
-        buffers_by_row[buffer.top_y] = sorted(buffers_by_row[buffer.top_y] + [buffer])
+        if buffer.bottom_y >= viewport.y and buffer.top_y < full_height:
+            buffers_by_row[buffer.top_y] = sorted(
+                buffers_by_row[buffer.top_y] + [buffer]
+            )
 
     active_buffers: list[tuple[int, list[Segment | Spacer], int, StripBuffer]] = []
-    for row in range(height):
+    for row in range(min(buffers_by_row.keys()), full_height):
         # This contains information where the segments for the currently
         # active buffers start (active buffer == intersects with current line)
         active_buffers = sorted(
@@ -49,17 +56,19 @@ def render_buffers(
             merge(active_buffers, new_active_buffers, key=lambda buffer: buffer[0])
         )
 
-        if not active_buffers:
-            yield Segment(" " * width + "\n")
+        if row < viewport.y:
             continue
 
-        current_x = 0
+        if not active_buffers:
+            yield Segment(" " * full_width + "\n")
+            continue
+
+        current_x = viewport.x
         working_buffers = list(active_buffers)
         while working_buffers:
             line_left_x, segments, buffer_row, buffer = working_buffers.pop(0)
             full_segments_cell_length = sum(segment.cell_length for segment in segments)
-            # The final position is allowed to be the first element outside of the
-            # canvas. Otherwise it's an overflow.
+
             assert (
                 line_left_x + full_segments_cell_length <= buffer.right_x + 1
             ), "Segment overflow."
@@ -84,9 +93,10 @@ def render_buffers(
                 if current_x > segment_left_x:
                     segment = segment.split_cells(current_x - segment_left_x)[1]
                 elif current_x < segment_left_x:
+                    next_x = min(full_width, segment_left_x)
                     # Pad to the left boundary of the segment
-                    yield Segment(" " * (segment_left_x - current_x))
-                    current_x = segment_left_x
+                    yield Segment(" " * (next_x - current_x))
+                    current_x = next_x
 
                 # Perform a look ahead, and if the left boundary of any of the next active buffers
                 # intersects with the current buffer & length (and has a smaller z-index), we split the
@@ -145,8 +155,10 @@ def render_buffers(
                 )
 
                 # Do not render over the right boundary of the canvas
-                if current_x + segment.cell_length > width:
-                    segment = segment.split_cells(width - current_x)[0]
+                if current_x > full_width:
+                    raise RuntimeError(f"{current_x} already past {full_width}")
+                if current_x + segment.cell_length > full_width:
+                    segment = segment.split_cells(full_width - current_x)[0]
 
                 # If the overlap from a prior segment or the overlap of an upcoming
                 # segment (with lower z-index) cut the segment to disappear, nothing
@@ -159,6 +171,6 @@ def render_buffers(
                     current_x += segment.cell_length
                 segment_left_x += full_segment_cell_length
 
-        if current_x < width:
-            yield Segment(" " * (width - current_x))
+        if current_x < full_width:
+            yield Segment(" " * (full_width - current_x))
         yield Segment("\n")
