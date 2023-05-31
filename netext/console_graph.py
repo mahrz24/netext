@@ -40,10 +40,10 @@ class ZoomSpec:
     """Scaling along the y-axis."""
 
 
-class TerminalGraph(Generic[G]):
+class ConsoleGraph(Generic[G]):
     def __init__(
         self,
-        g: G,
+        graph: G,
         # see https://github.com/python/mypy/issues/3737
         layout_engine: LayoutEngine[G] = GrandalfSugiyamaLayout[G](),  # type: ignore
         console: Console = Console(),
@@ -51,7 +51,7 @@ class TerminalGraph(Generic[G]):
         zoom: float | tuple[float, float] | ZoomSpec | AutoZoom = 1.0,
     ):
         """
-        A terminal representation of a networkx graph.
+        A console representation of a networkx graph.
 
         The class conforms to the rich console protocol and can be printed
         as any other rich renderable. You can pass a layout engine and a
@@ -61,7 +61,7 @@ class TerminalGraph(Generic[G]):
         object size is determined by the graph (no reactive rendering).
 
         Args:
-            g (G): A networkx graph object (see [networkx.Graph][] or [networkx.DiGraph][]).
+            graph (G): A networkx graph object (see [networkx.Graph][] or [networkx.DiGraph][]).
             layout_engine (LayoutEngine[G], optional): The layout engine used.
             console (Console, optional): The rich console driver used to render.
             viewport (Region, optional): The viewport to render. Defaults to the whole graph.
@@ -75,8 +75,9 @@ class TerminalGraph(Generic[G]):
         elif isinstance(zoom, tuple):
             zoom = ZoomSpec(zoom[0], zoom[1])
 
-        self._zoom = zoom
-        self._nx_graph: G = cast(G, g.copy())
+        self.console = console
+        self.zoom = zoom
+        self._nx_graph: G = cast(G, graph.copy())
         # First we create the node buffers, this allows us to pass the sizing information to the
         # layout engine. For each node in the graph we generate a node buffer that contains the
         # segments to render the node and metadata where to place the buffer.
@@ -132,7 +133,7 @@ class TerminalGraph(Generic[G]):
         )
 
         # TODO Up until here everything could be precomputed
-        match self._zoom:
+        match self.zoom:
             case AutoZoom.FIT:
                 zoom_x = (max_width - max_buffer_width / 2 - 1) / vp.width
                 zoom_y = (max_height - max_buffer_height / 2 - 1) / vp.height
@@ -173,7 +174,6 @@ class TerminalGraph(Generic[G]):
 
             edge_lod = determine_lod(data, zoom)
 
-            # TODO: Also get a lod for the edge and pass it to the rasterizer
             result = rasterize_edge(
                 console,
                 self.node_buffers_per_lod[u_lod][u],
@@ -256,6 +256,10 @@ class TerminalGraph(Generic[G]):
         if self._viewport is not None:
             return self._viewport
         return self._unconstrained_viewport()
+
+    @property
+    def viewport(self) -> Region:
+        return self._viewport_with_constraints()
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions

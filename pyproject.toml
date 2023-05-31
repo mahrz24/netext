@@ -11,28 +11,32 @@ keywords = ['network', 'graph', 'terminal', 'rich']
 [tool.poetry.dependencies]
 python = "^3.10"
 rich = "^13"
-networkx = {extras = ["default"], version="^3.0"}
+networkx = { extras = ["default"], version = "^3.0" }
 grandalf = "^0.7"
 bitarray = "^2.6.2"
 networkx-stubs = "^0.0.1"
 shapely = "^2.0.1"
 rtree = "^1.0.1"
 cachetools = "^5.3.0"
+textual = { version = "^0", optional = true }
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.2"
-black = {version = "^22.6.0", allow-prereleases = true}
-mkdocstrings = {extras = ["python"], version = "^0.20.0"}
+black = { version = "^22.6.0", allow-prereleases = true }
+mkdocstrings = { extras = ["python"], version = "^0.20.0" }
 pre-commit = "^2.20.0"
 pytest-cov = "^3.0.0"
-coverage = {extras = ["toml"], version = "^6.4.2"}
+coverage = { extras = ["toml"], version = "^6.4.2" }
 asv = "^0.5.1"
 mkdocs-material = "^9.0.5"
 importlib-metadata = "*"
 ruff = "^0.0.254"
 mypy = "^0.991"
-textual = {extras = ["dev"], version = "^0.22"}
+textual = { extras = ["dev"], version = "^0" }
 pyinstrument = "^4.4.0"
+
+[tool.poetry.extras]
+textual = ["textual"]
 
 
 [tool.poetry.group.dev.dependencies]

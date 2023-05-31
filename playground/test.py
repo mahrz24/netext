@@ -8,7 +8,7 @@ from rich.pretty import Pretty
 from rich.style import Style
 from rich.table import Table
 
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_rendering.arrow_tips import ArrowTip
@@ -60,8 +60,8 @@ nx.set_node_attributes(g, True, "$show")
 # nx.set_edge_attributes(g, False, "$show")
 g.edges[8, 10]["$show"] = True
 
-print(Panel(TerminalGraph(g), title="Binomial Tree", expand=False))
-print(Panel(TerminalGraph(g1), title="Payley Graph", expand=False))
+print(Panel(ConsoleGraph(g), title="Binomial Tree", expand=False))
+print(Panel(ConsoleGraph(g1), title="Payley Graph", expand=False))
 
 console = Console(record=True, width=80, height=60)
 
@@ -80,5 +80,5 @@ nx.set_edge_attributes(g, ArrowTip.ARROW, "$start-arrow-tip")
 nx.set_node_attributes(g, _render2, "$content-renderer")
 nx.set_node_attributes(g, True, "$show")
 
-console.print(TerminalGraph(g, console=console))
+console.print(ConsoleGraph(g, console=console))
 console.save_svg("test.svg", title="Binomial Tree")

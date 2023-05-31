@@ -15,7 +15,7 @@ from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
 from netext.layout_engines.static import StaticLayout
 from pyinstrument.processors import aggregate_repeated_calls
 
-from netext.terminal_graph import GraphProfiler, TerminalGraph
+from netext.console_graph import GraphProfiler, ConsoleGraph
 
 import networkx as nx
 from rich import box
@@ -32,7 +32,7 @@ class Graph(Widget):
     """Display a graph."""
 
     graph: Reactive[nx.DiGraph | nx.Graph | None] = reactive(None)
-    terminal_graph: TerminalGraph | None = None
+    terminal_graph: ConsoleGraph | None = None
 
     class Profiled(Message):
         """Color selected message."""
@@ -73,7 +73,7 @@ class Graph(Widget):
         if nx.get_node_attributes(graph, "$x") and nx.get_node_attributes(graph, "$y"):
             engine = StaticLayout()
 
-        self.terminal_graph = TerminalGraph(
+        self.terminal_graph = ConsoleGraph(
             graph,
             layout_engine=engine,
             layout_profiler=cast(GraphProfiler, layout_profiler),

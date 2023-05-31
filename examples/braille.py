@@ -1,5 +1,5 @@
 from rich.style import Style
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.node_rasterizer import JustContent
 from rich import print
@@ -15,4 +15,4 @@ nx.set_node_attributes(g, Style(color="purple", bold=True), "$content-style")
 
 nx.set_edge_attributes(g, EdgeSegmentDrawingMode.BRAILLE, "$edge-segment-drawing-mode")
 
-print(TerminalGraph(g))
+print(ConsoleGraph(g))

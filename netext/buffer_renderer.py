@@ -1,5 +1,5 @@
 from collections import defaultdict
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 from heapq import merge
 
 from rich.segment import Segment
@@ -10,7 +10,7 @@ from netext.rendering.segment_buffer import StripBuffer, Spacer
 
 def render_buffers(
     buffers: Iterable[StripBuffer], viewport: Region
-) -> Iterator[Segment]:
+) -> list[list[Segment]]:
     full_width = viewport.x + viewport.width
     full_height = viewport.y + viewport.height
 
@@ -21,8 +21,12 @@ def render_buffers(
                 buffers_by_row[buffer.top_y] + [buffer]
             )
 
+    result_strips = []
+
     active_buffers: list[tuple[int, list[Segment | Spacer], int, StripBuffer]] = []
     for row in range(min(buffers_by_row.keys()), full_height):
+        current_strip = []
+        result_strips.append(current_strip)
         # This contains information where the segments for the currently
         # active buffers start (active buffer == intersects with current line)
         active_buffers = sorted(
@@ -60,7 +64,8 @@ def render_buffers(
             continue
 
         if not active_buffers:
-            yield Segment(" " * full_width + "\n")
+            segment_content = " " * full_width
+            current_strip.append(Segment(segment_content))
             continue
 
         current_x = viewport.x
@@ -95,7 +100,8 @@ def render_buffers(
                 elif current_x < segment_left_x:
                     next_x = min(full_width, segment_left_x)
                     # Pad to the left boundary of the segment
-                    yield Segment(" " * (next_x - current_x))
+                    segment_content = " " * (next_x - current_x)
+                    current_strip.append(Segment(segment_content))
                     current_x = next_x
 
                 # Perform a look ahead, and if the left boundary of any of the next active buffers
@@ -165,12 +171,15 @@ def render_buffers(
                 # will be yielded.
                 if segment.cell_length > 0:
                     if isinstance(segment, Spacer):
-                        yield Segment(" " * segment.cell_length)
+                        out_segment = Segment(" " * segment.cell_length)
+                        current_strip.append(out_segment)
                     else:
-                        yield segment
+                        current_strip.append(segment)
                     current_x += segment.cell_length
                 segment_left_x += full_segment_cell_length
 
         if current_x < full_width:
-            yield Segment(" " * (full_width - current_x))
-        yield Segment("\n")
+            segment = Segment(" " * (full_width - current_x))
+            current_strip.append(segment)
+
+    return result_strips

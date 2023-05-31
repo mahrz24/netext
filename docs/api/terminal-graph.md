@@ -18,7 +18,7 @@
       members: ["FIT", "FIT_PROPORTIONAL"]
 
 
-::: netext.TerminalGraph
+::: netext.ConsoleGraph
     handler: python
     options:
       show_source: false

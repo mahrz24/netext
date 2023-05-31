@@ -3,7 +3,7 @@ import networkx as nx
 from rich import print
 from rich.table import Table
 from rich.text import Text
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.node_rasterizer import JustContent
 
 
@@ -49,4 +49,4 @@ def _render(n, d, s):
 nx.set_node_attributes(ast_graph, _render, "$content-renderer")
 nx.set_node_attributes(ast_graph, JustContent(), "$shape")
 
-print(TerminalGraph(ast_graph))
+print(ConsoleGraph(ast_graph))
