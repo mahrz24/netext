@@ -25,6 +25,20 @@ from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
 from netext.node_rasterizer import NodeBuffer, rasterize_node
 
 
+class RenderState(Enum):
+    INITIAL = "initial"
+    """The initial state, no rendering has happened yet."""
+
+    NODE_BUFFERS_RENDERED_1_LOD = "node_buffers_rendered_1_lod"
+    """The node buffers have been rendered for 1 lod."""
+
+    NODE_LAYOUT_COMPUTED = "node_layout_computed"
+    """The node layout has been computed."""
+
+    EDGES_RENDERED_1_LOD = "edges_rendered_1_lod"
+    """The edges have been rendered for 1 lod."""
+
+
 class AutoZoom(Enum):
     FIT = "fit"
     """Fit the graph into the viewport."""

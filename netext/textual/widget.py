@@ -27,10 +27,14 @@ class Graph(ScrollView, Generic[G]):
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
         self.graph = graph
         self._strips = None
+        self._timer = None
 
     def on_resize(self, message: Resize):
         self.log("Graph was resized.")
         # For now we simply update the graph as well
+        if self._timer is not None:
+            self._timer.stop()
+        self._timer = self.set_timer(1, self._graph_was_updated)
         self._graph_was_updated()
 
     def watch_graph(self, old_graph: G | None, new_graph: G | None) -> None:
