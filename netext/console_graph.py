@@ -38,6 +38,24 @@ class RenderState(Enum):
     EDGES_RENDERED_1_LOD = "edges_rendered_1_lod"
     """The edges have been rendered for 1 lod."""
 
+    ZOOMED_POSITIONS_COMPUTED = "zoomed_positions_computed"
+    """The zoomed node positions have been computed."""
+
+    NODE_BUFFERS_RENDERED_CURRENT_LOD = "node_buffers_rendered_current_lod"
+    """The node buffers have ben rendered for the current lod."""
+
+    EDGES_RENDERED_CURRENT_LOD = "edges_rendered_current_lod"
+    """The edges have ben rendered for the current lod."""
+
+transition_graph = nx.DiGraph()
+
+transition_graph.add_edge(RenderState.INITIAL, RenderState.NODE_BUFFERS_RENDERED_1_LOD, transition="render_node_buffers_1_lod")
+transition_graph.add_edge(RenderState.NODE_BUFFERS_RENDERED_1_LOD, RenderState.NODE_LAYOUT_COMPUTED, transition="compute_node_layout")
+transition_graph.add_edge(RenderState.NODE_LAYOUT_COMPUTED, RenderState.EDGES_RENDERED_1_LOD, transition="render_edges_1_lod")
+transition_graph.add_edge(RenderState.EDGES_RENDERED_1_LOD, RenderState.ZOOMED_POSITIONS_COMPUTED, transition="compute_zoomed_positions")
+transition_graph.add_edge(RenderState.ZOOMED_POSITIONS_COMPUTED, RenderState.NODE_BUFFERS_RENDERED_CURRENT_LOD, transition="render_node_buffers_current_lod")
+transition_graph.add_edge(RenderState.NODE_BUFFERS_RENDERED_CURRENT_LOD, RenderState.EDGES_RENDERED_CURRENT_LOD, transition="render_edges_current_lod")
+
 
 class AutoZoom(Enum):
     FIT = "fit"
@@ -83,6 +101,7 @@ class ConsoleGraph(Generic[G]):
                 tuple of zoom in x and y direction or a zoom spec / auto zoom mode. Defaults to 1.0.
         """
         self._viewport = viewport
+        self._render_state = RenderState.INITIAL
 
         if isinstance(zoom, float):
             zoom = ZoomSpec(zoom, zoom)
@@ -91,23 +110,52 @@ class ConsoleGraph(Generic[G]):
 
         self.console = console
         self.zoom = zoom
+
+        self.layout_engine = layout_engine
         self._nx_graph: G = cast(G, graph.copy())
+
+        self.node_buffers: dict[Hashable, NodeBuffer] = dict()
+        self.node_buffers_per_lod = defaultdict(dict)
+
+        self.node_positions: dict[Hashable, tuple[float, float]] = dict()
+
+        self.edge_buffers_per_lod: dict[int, list[EdgeBuffer]] = defaultdict(list)
+        self.edge_buffers: list[EdgeBuffer] = []
+
+        self.edge_layouts: list[EdgeLayout] = []
+        self.edge_layouts_per_lod: dict[int, list[EdgeLayout]] = defaultdict(list)
+
+        self.label_buffers: list[StripBuffer] = []
+        self.label_buffers_per_lod: dict[int, list[StripBuffer]] = defaultdict(list)
+
+    def _require(self, required_state: RenderState):
+        if required_state in nx.descendants(transition_graph, self._render_state):
+            self._transition_to(required_state)
+
+    def _transition_to(self, target_state: RenderState):
+        path = nx.shortest_path(transition_graph, self._render_state, target_state)
+        for el in path:
+            transition = el["transition"]
+            transition_func = getattr(self, f"_transition_{transition}")
+            transition_func()
+
+    def _transition_render_node_buffers_1_lod(self):
         # First we create the node buffers, this allows us to pass the sizing information to the
         # layout engine. For each node in the graph we generate a node buffer that contains the
         # segments to render the node and metadata where to place the buffer.
 
         self.node_buffers: dict[Hashable, NodeBuffer] = {
-            node: rasterize_node(console, node, cast(dict[Hashable, Any], data))
+            node: rasterize_node(self.console, node, cast(dict[Hashable, Any], data))
             for node, data in self._nx_graph.nodes(data=True)
         }
-
-        self.node_buffers_per_lod = defaultdict(dict, {1: self.node_buffers})
+        self.node_buffers_per_lod[1] = self.node_buffers
 
         # Store the node buffers in the graph itself
         nx.set_node_attributes(self._nx_graph, self.node_buffers, "_netext_node_buffer")
 
+    def _transition_compute_node_layout(self):
         # Position the nodes and store these original positions
-        self.node_positions: dict[Hashable, tuple[float, float]] = layout_engine(
+        self.node_positions: dict[Hashable, tuple[float, float]] = self.layout_engine(
             self._nx_graph
         )
 
@@ -124,13 +172,50 @@ class ConsoleGraph(Generic[G]):
             for node, (x, y) in self.node_positions.items()
         }
 
-        self.edge_buffers: list[EdgeBuffer] = []
-        self.edge_layouts: list[EdgeLayout] = []
-        self.label_buffers: list[StripBuffer] = []
+    def _transition_render_edges_1_lod(self):
+        # Iterate over all edges (so far in no particular order)
+        node_idx = index.Index()
+        edge_idx = index.Index()
+
+        all_node_buffers = []
+        for i, (node, node_buffer) in enumerate(self.node_buffers.items()):
+            node_idx.insert(i, node_buffer.bounding_box)
+            all_node_buffers.append(node_buffer)
+
+        for u, v, data in self._nx_graph.edges(data=True):
+            result = rasterize_edge(
+                self.console,
+                self.node_buffers[u],
+                self.node_buffers[v],
+                all_node_buffers,
+                self.edge_layouts,
+                data,
+                node_idx,
+                edge_idx,
+                lod=1,
+            )
+            if result is not None:
+                edge_buffer, edge_layout, label_nodes = result
+                edge_idx.insert(len(self.edge_buffers), edge_buffer.bounding_box)
+
+                self.edge_buffers.append(edge_buffer)
+                self.edge_layouts.append(edge_layout)
+                self.label_buffers.extend(label_nodes)
+
+
 
     def _project_positions(
         self, max_width: int, max_height: int
     ) -> tuple[float, float]:
+
+        # TODO:
+        # Split this into two parts, the first which can be precomputed
+        # Should be a cached property based on the 1 lod computed parts
+
+        # The viewports should also have two versions 1 lod / current lod
+
+        # END TODO
+
         # Reset all node positions to the original, non zoomed position
         # from the layout engine
         for node, pos in self.node_positions.items():
