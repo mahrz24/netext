@@ -80,6 +80,8 @@ class ConsoleGraph(Generic[G]):
         layout_engine: LayoutEngine[G] = GrandalfSugiyamaLayout[G](),  # type: ignore
         console: Console = Console(),
         viewport: Region | None = None,
+        max_width: int | None = None,
+        max_height: int | None = None,
         zoom: float | tuple[float, float] | ZoomSpec | AutoZoom = 1.0,
     ):
         """
@@ -111,22 +113,32 @@ class ConsoleGraph(Generic[G]):
         self.console = console
         self.zoom = zoom
 
+        self.max_width = max_width
+        self.max_height = max_height
+
         self.layout_engine = layout_engine
         self._nx_graph: G = cast(G, graph.copy())
 
         self.node_buffers: dict[Hashable, NodeBuffer] = dict()
         self.node_buffers_per_lod = defaultdict(dict)
+        self.node_buffers_current_lod: dict[Hashable, NodeBuffer] = dict()
+
 
         self.node_positions: dict[Hashable, tuple[float, float]] = dict()
 
-        self.edge_buffers_per_lod: dict[int, list[EdgeBuffer]] = defaultdict(list)
         self.edge_buffers: list[EdgeBuffer] = []
+        self.edge_buffers_per_lod: dict[int, list[EdgeBuffer]] = defaultdict(list)
+        self.edge_buffers_current_lod: list[EdgeBuffer] = []
+
 
         self.edge_layouts: list[EdgeLayout] = []
         self.edge_layouts_per_lod: dict[int, list[EdgeLayout]] = defaultdict(list)
+        self.edge_layouts_current_lod: list[EdgeLayout] = []
 
         self.label_buffers: list[StripBuffer] = []
         self.label_buffers_per_lod: dict[int, list[StripBuffer]] = defaultdict(list)
+        self.label_buffers_current_lod: list[StripBuffer] = []
+
 
     def _require(self, required_state: RenderState):
         if required_state in nx.descendants(transition_graph, self._render_state):
@@ -150,9 +162,6 @@ class ConsoleGraph(Generic[G]):
         }
         self.node_buffers_per_lod[1] = self.node_buffers
 
-        # Store the node buffers in the graph itself
-        nx.set_node_attributes(self._nx_graph, self.node_buffers, "_netext_node_buffer")
-
     def _transition_compute_node_layout(self):
         # Position the nodes and store these original positions
         self.node_positions: dict[Hashable, tuple[float, float]] = self.layout_engine(
@@ -172,10 +181,16 @@ class ConsoleGraph(Generic[G]):
             for node, (x, y) in self.node_positions.items()
         }
 
+
+
     def _transition_render_edges_1_lod(self):
         # Iterate over all edges (so far in no particular order)
         node_idx = index.Index()
         edge_idx = index.Index()
+
+        # Make sure we use the lod 1 positions:
+        for node, node_buffer in self.node_buffers.items():
+            node_buffer.center = Point(*map(round, self.node_positions[node]))
 
         all_node_buffers = []
         for i, (node, node_buffer) in enumerate(self.node_buffers.items()):
@@ -202,28 +217,12 @@ class ConsoleGraph(Generic[G]):
                 self.edge_layouts.append(edge_layout)
                 self.label_buffers.extend(label_nodes)
 
+        self.edge_buffers_per_lod[1] = self.edge_buffers
+        self.edge_layouts_per_lod[1] = self.edge_layouts
+        self.label_buffers_per_lod[1] = self.label_buffers
 
-
-    def _project_positions(
-        self, max_width: int, max_height: int
-    ) -> tuple[float, float]:
-
-        # TODO:
-        # Split this into two parts, the first which can be precomputed
-        # Should be a cached property based on the 1 lod computed parts
-
-        # The viewports should also have two versions 1 lod / current lod
-
-        # END TODO
-
-        # Reset all node positions to the original, non zoomed position
-        # from the layout engine
-        for node, pos in self.node_positions.items():
-            buffer: NodeBuffer = self._nx_graph.nodes[node]["_netext_node_buffer"]
-            buffer.center = Point(x=round(pos[0]), y=round(pos[1]))
-
-        # Get the unconstrined full viewport given the current positions
-        vp = self._unconstrained_viewport()
+    def _transition_compute_zoomed_positions(self):
+        viewport = self._unconstrained_lod_1_viewport()
 
         # Compute the zoom value for both axes
         max_buffer_width = max([buffer.width for buffer in self.node_buffers.values()])
@@ -231,14 +230,17 @@ class ConsoleGraph(Generic[G]):
             [buffer.height for buffer in self.node_buffers.values()]
         )
 
-        # TODO Up until here everything could be precomputed
         match self.zoom:
             case AutoZoom.FIT:
-                zoom_x = (max_width - max_buffer_width / 2 - 1) / vp.width
-                zoom_y = (max_height - max_buffer_height / 2 - 1) / vp.height
+                if self.max_width is None or self.max_height is None:
+                    raise ValueError("AutoZoom.FIT is onlye allowed if the maximum renderable width and height is known.")
+                zoom_x = (self.max_width - max_buffer_width / 2 - 1) / viewport.width
+                zoom_y = (self.max_height - max_buffer_height / 2 - 1) / viewport.height
             case AutoZoom.FIT_PROPORTIONAL:
-                zoom_x = max_width / vp.width
-                zoom_y = max_height / vp.height
+                if self.max_width is None or self.max_height is None:
+                    raise ValueError("AutoZoom.FIT is onlye allowed if the maximum renderable width and height is known.")
+                zoom_x = self.max_width / viewport.width
+                zoom_y = self.max_height / viewport.height
                 zoom_y = zoom_x = min(zoom_x, zoom_y)
             case ZoomSpec(x, y):
                 zoom_x = x
@@ -246,12 +248,25 @@ class ConsoleGraph(Generic[G]):
             case _:
                 raise ValueError("Invalid zoom value")
 
-        # Store the node positions in the node buffers
-        for node, pos in self.node_positions.items():
-            buffer = self._nx_graph.nodes[node]["_netext_node_buffer"]
-            buffer.center = Point(x=round(zoom_x * pos[0]), y=round(zoom_y * pos[1]))
+        self.zoom_x = zoom_x
+        self.zoom_y = zoom_y
 
-        return zoom_x, zoom_y
+    def _unconstrained_lod_1_viewport(self) -> Region:
+        return Region.union([buffer.region for buffer in self._all_lod_1_buffers()])
+
+    def _all_lod_1_buffers(
+        self
+    ) -> Iterable[StripBuffer]:
+        # Get graph subview
+        visible_nodes = nx.subgraph_view(
+            self._nx_graph,
+            filter_node=lambda n: self._nx_graph.nodes[n].get("$show", True),
+        )
+
+        node_buffers = [node_buffer for node, node_buffer in self.node_buffers.items() if node in visible_nodes]
+        return chain(node_buffers, self.edge_buffers, self.label_buffers)
+
+
 
     def _render_edges(self, console: Console, zoom: float = 1.0) -> None:
         # Now we rasterize the edges
@@ -292,31 +307,6 @@ class ConsoleGraph(Generic[G]):
                 self.edge_layouts.append(edge_layout)
                 self.label_buffers.extend(label_nodes)
 
-    def _all_buffers(
-        self, console: Console | None = None, zoom: float = 1.0
-    ) -> Iterable[StripBuffer]:
-        # Get graph subview
-        visible_nodes = nx.subgraph_view(
-            self._nx_graph,
-            filter_node=lambda n: self._nx_graph.nodes[n].get("$show", True),
-        )
-
-        if zoom != 1.0:
-            if console is None:
-                raise RuntimeError(
-                    "Cannot generate ad-hoc zoomed node buffers without a console."
-                )
-            node_buffers = [
-                node_buffer
-                for node, node_buffer in self.render_lod_buffers(console, zoom).items()
-                if node in visible_nodes
-            ]
-        else:
-            node_buffers = nx.get_node_attributes(
-                visible_nodes, "_netext_node_buffer"
-            ).values()  # type: ignore
-
-        return chain(node_buffers, self.edge_buffers, self.label_buffers)
 
     def render_lod_buffers(self, console: Console, zoom) -> dict[Hashable, NodeBuffer]:
         nodebuffers_at_current_lod = dict()
