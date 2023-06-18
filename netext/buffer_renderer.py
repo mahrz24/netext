@@ -8,6 +8,17 @@ from netext.geometry import Region
 from netext.rendering.segment_buffer import StripBuffer, Spacer
 
 
+def flatten_strips(strips: list[list[Segment]]) -> list[Segment]:
+    """Returns a flattened list of segments with interspersed newlines."""
+
+    result = []
+    for strip in strips:
+        result.extend(strip)
+        result.append(Segment("\n"))
+
+    return result
+
+
 def render_buffers(
     buffers: Iterable[StripBuffer], viewport: Region
 ) -> list[list[Segment]]:
@@ -25,8 +36,7 @@ def render_buffers(
 
     active_buffers: list[tuple[int, list[Segment | Spacer], int, StripBuffer]] = []
     for row in range(min(buffers_by_row.keys()), full_height):
-        current_strip = []
-        result_strips.append(current_strip)
+        current_strip: list[Segment] = []
         # This contains information where the segments for the currently
         # active buffers start (active buffer == intersects with current line)
         active_buffers = sorted(
@@ -62,6 +72,8 @@ def render_buffers(
 
         if row < viewport.y:
             continue
+
+        result_strips.append(current_strip)
 
         if not active_buffers:
             segment_content = " " * full_width

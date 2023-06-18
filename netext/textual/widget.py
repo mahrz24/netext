@@ -1,7 +1,6 @@
 from typing import Generic
 
 from textual.events import Resize
-from textual.geometry import Size
 from textual.reactive import reactive
 from textual.scroll_view import ScrollView
 from textual.strip import Strip
@@ -41,38 +40,20 @@ class Graph(ScrollView, Generic[G]):
         self._graph_was_updated()
 
     def _graph_was_updated(self):
-        if self.graph is not None:
-            self.log("Console graph updated.")
+        if self.graph is not None and self.size.width != 0 and self.size.height != 0:
             self._console_graph = ConsoleGraph(
-                self.graph, console=self.app.console, **self._console_graph_kwargs
+                self.graph,
+                console=self.app.console,
+                max_width=self.size.width,
+                max_height=self.size.height,
+                **self._console_graph_kwargs
             )
 
-            # TODO this needs to be cleaned up, better state management of the console graph
-            # Also there is some itneraction between the sizes
-            zoom_x, zoom_y = self._console_graph._project_positions(
-                self.size.width, self.size.height
-            )
-
-            zoom = min([zoom_x, zoom_y])
-
-            viewport = self._console_graph.viewport
-            self.virtual_size = Size(viewport.width, viewport.height)
-
-            all_buffers = self._console_graph._all_buffers(
-                console=self._console_graph.console, zoom=zoom
-            )
-
-            self._console_graph._render_edges(self._console_graph.console, zoom=zoom)
-
-            all_buffers = self._console_graph._all_buffers(
-                console=self._console_graph.console, zoom=zoom
-            )
-
-            # In case the graph changes we want to render it fully (at least the full viewport that
-            # was specified.
+            all_buffers = list(self._console_graph._all_current_lod_buffers())
             self._strip_segments = render_buffers(
                 all_buffers, self._console_graph._viewport_with_constraints()
             )
+            self.refresh()
         else:
             self._console_graph = None
             self._strip_segments = []

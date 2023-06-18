@@ -162,7 +162,13 @@ class ConsoleGraph(Generic[G]):
             tuple[Hashable, Hashable], EdgeBuffer
         ] = dict()
 
-        self.edge_layouts: list[EdgeLayout] = []
+        self.edge_layouts: dict[tuple[Hashable, Hashable], EdgeLayout] = dict()
+        self.edge_layouts_per_lod: dict[
+            int, dict[tuple[Hashable, Hashable], EdgeLayout]
+        ] = defaultdict(dict)
+        self.edge_layouts_current_lod: dict[
+            tuple[Hashable, Hashable], EdgeLayout
+        ] = dict()
 
         self.label_buffers: dict[tuple[Hashable, Hashable], list[StripBuffer]] = dict()
         self.label_buffers_per_lod: dict[
@@ -241,7 +247,7 @@ class ConsoleGraph(Generic[G]):
     def _transition_render_edges_1_lod(self) -> None:
         self.edge_buffers = dict()
         self.label_buffers = dict()
-        self.edge_layouts = []
+        self.edge_layouts = dict()
 
         # Iterate over all edges (so far in no particular order)
         node_idx = index.Index()
@@ -262,7 +268,7 @@ class ConsoleGraph(Generic[G]):
                 self.node_buffers[u],
                 self.node_buffers[v],
                 all_node_buffers,
-                self.edge_layouts,
+                list(self.edge_layouts.values()),
                 data,
                 node_idx,
                 edge_idx,
@@ -273,10 +279,11 @@ class ConsoleGraph(Generic[G]):
                 edge_idx.insert(len(self.edge_buffers), edge_buffer.bounding_box)
 
                 self.edge_buffers[(u, v)] = edge_buffer
-                self.edge_layouts.append(edge_layout)
+                self.edge_layouts[(u, v)] = edge_layout
                 self.label_buffers[(u, v)] = label_nodes
 
         self.edge_buffers_per_lod[1] = self.edge_buffers
+        self.edge_layouts_per_lod[1] = self.edge_layouts
         self.label_buffers_per_lod[1] = self.label_buffers
 
     def _transition_compute_zoomed_positions(self) -> None:
@@ -357,7 +364,12 @@ class ConsoleGraph(Generic[G]):
                     self.console, node, cast(dict[Hashable, Any], data), lod=lod
                 )
                 self.node_buffers_per_lod[lod][node] = node_buffer
-            node_buffer.center = position
+            if node_buffer.center != position:
+                node_buffer.center = position
+                for v in nx.all_neighbors(self._nx_graph, node):
+                    self.edge_buffers_per_lod[lod].pop((node, v), None)
+                    self.edge_buffers_per_lod[lod].pop((v, node), None)
+                self._nx_graph.nodes[node]
             self.node_buffers_current_lod[node] = node_buffer
 
     def _transition_render_edges_current_lod(self) -> None:
@@ -373,6 +385,8 @@ class ConsoleGraph(Generic[G]):
         node_idx = index.Index()
         edge_idx = index.Index()
 
+        edge_layouts = []
+
         all_node_buffers = []
         for i, (node, node_buffer) in enumerate(self.node_buffers_current_lod.items()):
             node_idx.insert(i, node_buffer.bounding_box)
@@ -383,16 +397,17 @@ class ConsoleGraph(Generic[G]):
             v_lod = determine_lod(self._nx_graph.nodes[v], self._zoom)
 
             edge_lod = determine_lod(data, self._zoom)
-
             edge_buffer = self.edge_buffers_per_lod[edge_lod].get((u, v))
+            edge_layout = self.edge_layouts_per_lod[edge_lod].get((u, v))
+            label_nodes = self.label_buffers_per_lod[edge_lod].get((u, v))
 
-            if edge_buffer is None:
+            if edge_buffer is None or label_nodes is None or edge_layout is None:
                 result = rasterize_edge(
                     self.console,
                     self.node_buffers_per_lod[u_lod][u],
                     self.node_buffers_per_lod[v_lod][v],
                     all_node_buffers,
-                    self.edge_layouts,
+                    edge_layouts,
                     data,
                     node_idx,
                     edge_idx,
@@ -400,19 +415,24 @@ class ConsoleGraph(Generic[G]):
                 )
                 if result is not None:
                     edge_buffer, edge_layout, label_nodes = result
-                    edge_idx.insert(len(self.edge_buffers), edge_buffer.bounding_box)
+                    edge_idx.insert(
+                        len(self.edge_buffers_current_lod), edge_buffer.bounding_box
+                    )
 
                     self.edge_buffers_per_lod[edge_lod][(u, v)] = edge_buffer
+                    self.edge_layouts_per_lod[edge_lod][(u, v)] = edge_layout
                     self.label_buffers_per_lod[edge_lod][(u, v)] = label_nodes
 
-                self.edge_buffers_current_lod[(u, v)] = self.edge_buffers_per_lod[
-                    edge_lod
-                ][(u, v)]
-                self.label_buffers_current_lod[(u, v)] = self.label_buffers_per_lod[
-                    edge_lod
-                ][(u, v)]
+            if edge_buffer is not None:
+                self.edge_buffers_current_lod[(u, v)] = edge_buffer
+            if label_nodes is not None:
+                self.label_buffers_current_lod[(u, v)] = label_nodes
+            if edge_layout is not None:
+                edge_layouts.append(edge_layout)
+                self.edge_layouts_current_lod[(u, v)] = edge_layout
 
     def _all_current_lod_buffers(self) -> Iterable[StripBuffer]:
+        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
         # Get graph subview
         visible_nodes = nx.subgraph_view(
             self._nx_graph,
@@ -437,7 +457,6 @@ class ConsoleGraph(Generic[G]):
 
     @property
     def full_viewport(self) -> Region:
-        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
         return self._unconstrained_viewport()
 
     def _viewport_with_constraints(self) -> Region:
@@ -458,10 +477,13 @@ class ConsoleGraph(Generic[G]):
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
         yield from itertools.chain(
-            *render_buffers(
-                self._all_current_lod_buffers(),
-                self._viewport_with_constraints(),
-            )
+            *[
+                strip + [""]
+                for strip in render_buffers(
+                    self._all_current_lod_buffers(),
+                    self._viewport_with_constraints(),
+                )
+            ]
         )
 
     def __rich_measure__(

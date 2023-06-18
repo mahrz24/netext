@@ -21,6 +21,11 @@ class Point:
     def from_shapely(cls, point: sp.Point) -> "Point":
         return cls(x=round(point.x), y=round(point.y))
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Point):
+            return False
+        return self.x == other.x and self.y == other.y
+
     def __add__(self, other: "Point") -> "Point":
         return Point(x=self.x + other.x, y=self.y + other.y)
 
