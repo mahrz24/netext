@@ -1,5 +1,5 @@
 Graph {
-    /*width: 20;*/
-    /*height: 30;*/
+    overflow-x: auto;
+    overflow-y: auto;
     border: heavy blue;
 }
