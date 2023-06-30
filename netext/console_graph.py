@@ -96,8 +96,6 @@ class ZoomSpec:
     """Scaling along the x-axis."""
     y: float
     """Scaling along the y-axis."""
-
-
 class ConsoleGraph(Generic[G]):
     def __init__(
         self,
@@ -137,9 +135,9 @@ class ConsoleGraph(Generic[G]):
             zoom = ZoomSpec(zoom[0], zoom[1])
 
         self.console = console
-        self.zoom = zoom
+        self._zoom: float | tuple[float, float] | ZoomSpec | AutoZoom = zoom
 
-        self._zoom: float | None = None
+        self._zoom_factor: float | None = None
         self._max_width = max_width
         self._max_height = max_height
 
@@ -189,6 +187,18 @@ class ConsoleGraph(Generic[G]):
             transition = el["transition"]
             transition_func = getattr(self, f"_transition_{transition}")
             transition_func()
+
+    @property
+    def zoom(self) -> float | tuple[float, float] | ZoomSpec | AutoZoom:
+        return self._zoom
+
+    @zoom.setter
+    def zoom(self, value: float | tuple[float, float] | ZoomSpec | AutoZoom) -> None:
+        self._zoom = value
+        if self._render_state in nx.descendants(
+            transition_graph, RenderState.EDGES_RENDERED_1_LOD
+        ):
+            self._render_state = RenderState.EDGES_RENDERED_1_LOD
 
     @property
     def max_width(self) -> int | None:
@@ -295,7 +305,7 @@ class ConsoleGraph(Generic[G]):
             [buffer.height for buffer in self.node_buffers.values()]
         )
 
-        match self.zoom:
+        match self._zoom:
             case AutoZoom.FIT:
                 if self.max_width is None or self.max_height is None:
                     raise ValueError(
@@ -321,7 +331,7 @@ class ConsoleGraph(Generic[G]):
 
         self.zoom_x = zoom_x
         self.zoom_y = zoom_y
-        self._zoom = min([zoom_x, zoom_y])
+        self._zoom_factor = min([zoom_x, zoom_y])
 
     def _unconstrained_lod_1_viewport(self) -> Region:
         return Region.union([buffer.region for buffer in self._all_lod_1_buffers()])
@@ -345,14 +355,14 @@ class ConsoleGraph(Generic[G]):
         )
 
     def _transition_render_node_buffers_current_lod(self) -> None:
-        if self._zoom is None:
+        if self._zoom_factor is None:
             raise RuntimeError(
                 "Invalid transition, lod buffers can only be rendered once zoom is"
                 " computed."
             )
 
         for node, data in self._nx_graph.nodes(data=True):
-            lod = determine_lod(data, self._zoom)
+            lod = determine_lod(data, self._zoom_factor)
             # Get the zoomed position of the node
             coords = self.node_positions[node]
             position = Point(
@@ -373,7 +383,7 @@ class ConsoleGraph(Generic[G]):
             self.node_buffers_current_lod[node] = node_buffer
 
     def _transition_render_edges_current_lod(self) -> None:
-        if self._zoom is None:
+        if self._zoom_factor is None:
             raise RuntimeError(
                 "Invalid transition, lod buffers can only be rendered once zoom is"
                 " computed."
@@ -393,10 +403,10 @@ class ConsoleGraph(Generic[G]):
             all_node_buffers.append(node_buffer)
 
         for u, v, data in self._nx_graph.edges(data=True):
-            u_lod = determine_lod(self._nx_graph.nodes[u], self._zoom)
-            v_lod = determine_lod(self._nx_graph.nodes[v], self._zoom)
+            u_lod = determine_lod(self._nx_graph.nodes[u], self._zoom_factor)
+            v_lod = determine_lod(self._nx_graph.nodes[v], self._zoom_factor)
 
-            edge_lod = determine_lod(data, self._zoom)
+            edge_lod = determine_lod(data, self._zoom_factor)
             edge_buffer = self.edge_buffers_per_lod[edge_lod].get((u, v))
             edge_layout = self.edge_layouts_per_lod[edge_lod].get((u, v))
             label_nodes = self.label_buffers_per_lod[edge_lod].get((u, v))
