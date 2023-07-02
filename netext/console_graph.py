@@ -96,6 +96,8 @@ class ZoomSpec:
     """Scaling along the x-axis."""
     y: float
     """Scaling along the y-axis."""
+
+
 class ConsoleGraph(Generic[G]):
     def __init__(
         self,
@@ -135,7 +137,7 @@ class ConsoleGraph(Generic[G]):
             zoom = ZoomSpec(zoom[0], zoom[1])
 
         self.console = console
-        self._zoom: float | tuple[float, float] | ZoomSpec | AutoZoom = zoom
+        self._zoom: ZoomSpec | AutoZoom = zoom
 
         self._zoom_factor: float | None = None
         self._max_width = max_width
@@ -194,6 +196,11 @@ class ConsoleGraph(Generic[G]):
 
     @zoom.setter
     def zoom(self, value: float | tuple[float, float] | ZoomSpec | AutoZoom) -> None:
+        if isinstance(value, float):
+            value = ZoomSpec(value, value)
+        elif isinstance(value, tuple):
+            value = ZoomSpec(value[0], value[1])
+
         self._zoom = value
         if self._render_state in nx.descendants(
             transition_graph, RenderState.EDGES_RENDERED_1_LOD

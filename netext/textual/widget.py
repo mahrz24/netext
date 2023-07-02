@@ -38,9 +38,11 @@ def _setup_console_graph(graph: "Graph[G]") -> TypeGuard[SetupGraph[G]]:
             console=graph.app.console,
             max_width=graph.size.width,
             max_height=graph.size.height,
+            zoom=graph.zoom,
             **graph._console_graph_kwargs
         )
     return graph._console_graph is not None
+
 
 class Graph(ScrollView, Generic[G]):
     graph: reactive[G | None] = reactive(cast(G | None, None))
@@ -88,7 +90,7 @@ class Graph(ScrollView, Generic[G]):
         new_zoom: float | tuple[float, float] | ZoomSpec | AutoZoom,
     ) -> None:
         if _setup_console_graph(self):
-            self._console_graph._zoom = new_zoom
+            self._console_graph.zoom = new_zoom
             self._graph_was_updated()
 
     def _graph_was_updated(self):
