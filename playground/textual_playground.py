@@ -9,7 +9,7 @@ from netext.edge_rendering.arrow_tips import ArrowTip
 from textual.containers import Horizontal
 import networkx as nx
 
-g = cast(nx.Graph, nx.binomial_tree(6))
+g = cast(nx.Graph, nx.binomial_tree(4))
 
 nx.set_node_attributes(g, Style(color="blue"), "$content-style")
 nx.set_node_attributes(g, box.SQUARE, "$box-type")
@@ -24,7 +24,7 @@ class GraphApp(App):
     CSS_PATH = "textual_playground.css"
 
     BINDINGS = [
-        ("+", "zoom_out()", "Zoom In"),
+        ("=", "zoom_out()", "Zoom In"),
         ("-", "zoom_in()", "Zoom Out"),
     ]
 
@@ -33,11 +33,11 @@ class GraphApp(App):
 
     def action_zoom_in(self) -> None:
         g = self.query_one(Graph)
-        g.zoom = g.zoom * 1.1
+        g.zoom = g.zoom / 1.1
 
     def action_zoom_out(self) -> None:
         g = self.query_one(Graph)
-        g.zoom = g.zoom * 0.9
+        g.zoom = g.zoom / 0.9
 
 
 app = GraphApp()
