@@ -7,6 +7,9 @@ from netext.edge_routing.modes import EdgeRoutingMode
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_rendering.arrow_tips import ArrowTip
 from textual.containers import Horizontal
+from textual.widget import Widget
+from textual.widgets import ListView, Static, ListItem
+from textual.reactive import reactive
 import networkx as nx
 
 g = cast(nx.Graph, nx.binomial_tree(4))
@@ -19,6 +22,29 @@ nx.set_edge_attributes(g, EdgeSegmentDrawingMode.BOX, "$edge-segment-drawing-mod
 nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
 nx.set_edge_attributes(g, ArrowTip.ARROW, "$start-arrow-tip")
 
+class GraphInspector(Widget):
+    graph: reactive[Graph | None] = reactive(None)
+
+    def __init__(self, graph: Graph, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.graph = graph
+
+    def compose(self) -> ComposeResult:
+        yield ListView(id="edge-list")
+
+    def update(self) -> None:
+        edge_list: ListView = self.query_one("#edge-list")
+        edge_list.clear()
+        if self.graph and self.graph._console_graph is not None:
+            for key, value in self.graph._console_graph.edge_buffers_current_lod.items():
+                boundary = f"{value.boundary_1} {value.boundary_2}"
+                edge_list.append(ListItem(Static(f"{key}: [{boundary}]")))
+            for key, value in self.graph._console_graph.label_buffers_current_lod.items():
+                for label in value:
+                    boundary = f"{label.bounding_box}"
+                    edge_list.append(ListItem(Static(f"{key}: [{boundary}]")))
+
+
 
 class GraphApp(App):
     CSS_PATH = "textual_playground.css"
@@ -29,15 +55,19 @@ class GraphApp(App):
     ]
 
     def compose(self) -> ComposeResult:
-        yield Horizontal(Graph(g, zoom=1))
+        graph = Graph(g, zoom=1)
+        yield Horizontal(graph, GraphInspector(graph))
 
     def action_zoom_in(self) -> None:
         g = self.query_one(Graph)
         g.zoom = g.zoom / 1.1
+        self.query_one(GraphInspector).update()
 
     def action_zoom_out(self) -> None:
         g = self.query_one(Graph)
         g.zoom = g.zoom / 0.9
+        self.query_one(GraphInspector).update()
+
 
 
 app = GraphApp()

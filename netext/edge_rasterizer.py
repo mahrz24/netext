@@ -182,6 +182,9 @@ def rasterize_edge(
     boundary_1 = edge_segments.min_bound
     boundary_2 = edge_segments.max_bound
 
+    if boundary_1 == boundary_2:
+        return None
+
     edge_buffer = EdgeBuffer(
         z_index=edge_layout.z_index,
         boundary_1=boundary_1,

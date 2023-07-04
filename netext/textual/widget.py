@@ -104,9 +104,11 @@ class Graph(ScrollView, Generic[G]):
     def pre_render_strips(self) -> list[list[Segment]]:
         if self._console_graph is not None:
             all_buffers = list(self._console_graph._all_current_lod_buffers())
-            return render_buffers(
+            self.log(len(all_buffers))
+            strips = render_buffers(
                 all_buffers, self._console_graph._viewport_with_constraints()
             )
+            return strips
         else:
             return []
 

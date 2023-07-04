@@ -3,3 +3,7 @@ Graph {
     overflow-y: auto;
     border: heavy blue;
 }
+
+GraphInspector {
+    width: 50%;
+}

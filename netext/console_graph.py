@@ -36,11 +36,11 @@ class RenderState(Enum):
     NODE_LAYOUT_COMPUTED = "node_layout_computed"
     """The node layout has been computed."""
 
-    EDGES_RENDERED_1_LOD = "edges_rendered_1_lod"
-    """The edges have been rendered for 1 lod."""
-
     ZOOMED_POSITIONS_COMPUTED = "zoomed_positions_computed"
     """The zoomed node positions have been computed."""
+
+    EDGES_RENDERED_1_LOD = "edges_rendered_1_lod"
+    """The edges have been rendered for 1 lod."""
 
     NODE_BUFFERS_RENDERED_CURRENT_LOD = "node_buffers_rendered_current_lod"
     """The node buffers have ben rendered for the current lod."""
@@ -63,13 +63,13 @@ transition_graph.add_edge(
 )
 transition_graph.add_edge(
     RenderState.NODE_LAYOUT_COMPUTED,
-    RenderState.EDGES_RENDERED_1_LOD,
-    transition="render_edges_1_lod",
-)
-transition_graph.add_edge(
-    RenderState.EDGES_RENDERED_1_LOD,
     RenderState.ZOOMED_POSITIONS_COMPUTED,
     transition="compute_zoomed_positions",
+)
+transition_graph.add_edge(
+    RenderState.ZOOMED_POSITIONS_COMPUTED,
+    RenderState.EDGES_RENDERED_1_LOD,
+    transition="render_edges_1_lod",
 )
 transition_graph.add_edge(
     RenderState.ZOOMED_POSITIONS_COMPUTED,
@@ -203,9 +203,9 @@ class ConsoleGraph(Generic[G]):
 
         self._zoom = value
         if self._render_state in nx.descendants(
-            transition_graph, RenderState.EDGES_RENDERED_1_LOD
+            transition_graph, RenderState.NODE_LAYOUT_COMPUTED
         ):
-            self._render_state = RenderState.EDGES_RENDERED_1_LOD
+            self._render_state = RenderState.NODE_LAYOUT_COMPUTED
 
     @property
     def max_width(self) -> int | None:
@@ -215,9 +215,9 @@ class ConsoleGraph(Generic[G]):
     def max_width(self, value: int | None) -> None:
         self._max_width = value
         if self._render_state in nx.descendants(
-            transition_graph, RenderState.EDGES_RENDERED_1_LOD
+            transition_graph, RenderState.NODE_LAYOUT_COMPUTED
         ):
-            self._render_state = RenderState.EDGES_RENDERED_1_LOD
+            self._render_state = RenderState.NODE_LAYOUT_COMPUTED
 
     @property
     def max_height(self) -> int | None:
@@ -265,6 +265,15 @@ class ConsoleGraph(Generic[G]):
         self.edge_buffers = dict()
         self.label_buffers = dict()
         self.edge_layouts = dict()
+
+        self.edge_buffers_per_lod = dict()
+        self.edge_buffers_current_lod = dict()
+
+        self.label_buffers_per_lod = dict()
+        self.label_buffers_current_lod = dict()
+
+        self.edge_layouts_per_lod = dict()
+        self.edge_layouts_current_lod = dict()
 
         # Iterate over all edges (so far in no particular order)
         node_idx = index.Index()
