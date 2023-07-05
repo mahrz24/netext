@@ -2,7 +2,8 @@ from typing import Generic, Protocol, TypeGuard, cast
 
 from textual.events import Resize
 from textual.reactive import reactive
-from textual.scroll_view import ScrollView, Size
+from textual.scroll_view import ScrollView
+from textual.geometry import Size
 from textual.strip import Strip
 
 from netext import ConsoleGraph
@@ -11,7 +12,7 @@ from netext.console_graph import G, AutoZoom, ZoomSpec
 from rich.segment import Segment
 
 
-class SetupGraph(Protocol[G]):
+class InitializedGraphView(Protocol[G]):
     _console_graph: ConsoleGraph[G]
     _strip_segments: list[Strip]
     size: Size
@@ -26,7 +27,7 @@ class SetupGraph(Protocol[G]):
         ...
 
 
-def _setup_console_graph(graph: "Graph[G]") -> TypeGuard[SetupGraph[G]]:
+def _setup_console_graph(graph: "GraphView[G]") -> TypeGuard[InitializedGraphView[G]]:
     if (
         graph.graph is not None
         and graph._console_graph is None
@@ -44,7 +45,7 @@ def _setup_console_graph(graph: "Graph[G]") -> TypeGuard[SetupGraph[G]]:
     return graph._console_graph is not None
 
 
-class Graph(ScrollView, Generic[G]):
+class GraphView(ScrollView, Generic[G]):
     graph: reactive[G | None] = reactive(cast(G | None, None))
     zoom: reactive[float | tuple[float, float] | ZoomSpec | AutoZoom] = reactive(
         cast(float | tuple[float, float] | ZoomSpec | AutoZoom, 1.0)
@@ -104,7 +105,6 @@ class Graph(ScrollView, Generic[G]):
     def pre_render_strips(self) -> list[list[Segment]]:
         if self._console_graph is not None:
             all_buffers = list(self._console_graph._all_current_lod_buffers())
-            self.log(len(all_buffers))
             strips = render_buffers(
                 all_buffers, self._console_graph._viewport_with_constraints()
             )

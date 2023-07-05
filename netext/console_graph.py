@@ -25,6 +25,8 @@ from netext.layout_engines.engine import LayoutEngine, G
 from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
 from netext.node_rasterizer import NodeBuffer, rasterize_node
 
+from textual import log
+
 
 class RenderState(Enum):
     INITIAL = "initial"
@@ -72,7 +74,7 @@ transition_graph.add_edge(
     transition="render_edges_1_lod",
 )
 transition_graph.add_edge(
-    RenderState.ZOOMED_POSITIONS_COMPUTED,
+    RenderState.EDGES_RENDERED_1_LOD,
     RenderState.NODE_BUFFERS_RENDERED_CURRENT_LOD,
     transition="render_node_buffers_current_lod",
 )
@@ -188,7 +190,9 @@ class ConsoleGraph(Generic[G]):
             el = transition_graph.edges[u, v]
             transition = el["transition"]
             transition_func = getattr(self, f"_transition_{transition}")
+            log(f"Transitioning from {u} to {v} using {transition}")
             transition_func()
+            self._render_state = v
 
     @property
     def zoom(self) -> float | tuple[float, float] | ZoomSpec | AutoZoom:
@@ -200,12 +204,13 @@ class ConsoleGraph(Generic[G]):
             value = ZoomSpec(value, value)
         elif isinstance(value, tuple):
             value = ZoomSpec(value[0], value[1])
-
+        log(f"Render state pre zoom {self._render_state}")
         self._zoom = value
         if self._render_state in nx.descendants(
             transition_graph, RenderState.NODE_LAYOUT_COMPUTED
         ):
             self._render_state = RenderState.NODE_LAYOUT_COMPUTED
+        log(f"Render state post zoom {self._render_state}")
 
     @property
     def max_width(self) -> int | None:
@@ -261,7 +266,49 @@ class ConsoleGraph(Generic[G]):
             for node, (x, y) in self.node_positions.items()
         }
 
+    def _transition_compute_zoomed_positions(self) -> None:
+        viewport = self._unconstrained_lod_1_viewport()
+
+        # Compute the zoom value for both axes
+        max_buffer_width = max([buffer.width for buffer in self.node_buffers.values()])
+        max_buffer_height = max(
+            [buffer.height for buffer in self.node_buffers.values()]
+        )
+
+        match self._zoom:
+            case AutoZoom.FIT:
+                if self.max_width is None or self.max_height is None:
+                    raise ValueError(
+                        "AutoZoom.FIT is onlye allowed if the maximum renderable width"
+                        " and height is known."
+                    )
+                zoom_x = (self.max_width - max_buffer_width / 2 - 1) / viewport.width
+                zoom_y = (self.max_height - max_buffer_height / 2 - 1) / viewport.height
+            case AutoZoom.FIT_PROPORTIONAL:
+                if self.max_width is None or self.max_height is None:
+                    raise ValueError(
+                        "AutoZoom.FIT is onlye allowed if the maximum renderable width"
+                        " and height is known."
+                    )
+                zoom_x = self.max_width / viewport.width
+                zoom_y = self.max_height / viewport.height
+                zoom_y = zoom_x = min(zoom_x, zoom_y)
+            case ZoomSpec(x, y):
+                zoom_x = x
+                zoom_y = y
+            case _:
+                raise ValueError("Invalid zoom value")
+
+        self.zoom_x = zoom_x
+        self.zoom_y = zoom_y
+        self._zoom_factor = min([zoom_x, zoom_y])
+
     def _transition_render_edges_1_lod(self) -> None:
+        if self._zoom_factor is None:
+            raise RuntimeError(
+                "Invalid transition, edges can only be rendered once zoom is computed."
+            )
+
         self.edge_buffers = dict()
         self.label_buffers = dict()
         self.edge_layouts = dict()
@@ -312,64 +359,6 @@ class ConsoleGraph(Generic[G]):
         self.edge_layouts_per_lod[1] = self.edge_layouts
         self.label_buffers_per_lod[1] = self.label_buffers
 
-    def _transition_compute_zoomed_positions(self) -> None:
-        viewport = self._unconstrained_lod_1_viewport()
-
-        # Compute the zoom value for both axes
-        max_buffer_width = max([buffer.width for buffer in self.node_buffers.values()])
-        max_buffer_height = max(
-            [buffer.height for buffer in self.node_buffers.values()]
-        )
-
-        match self._zoom:
-            case AutoZoom.FIT:
-                if self.max_width is None or self.max_height is None:
-                    raise ValueError(
-                        "AutoZoom.FIT is onlye allowed if the maximum renderable width"
-                        " and height is known."
-                    )
-                zoom_x = (self.max_width - max_buffer_width / 2 - 1) / viewport.width
-                zoom_y = (self.max_height - max_buffer_height / 2 - 1) / viewport.height
-            case AutoZoom.FIT_PROPORTIONAL:
-                if self.max_width is None or self.max_height is None:
-                    raise ValueError(
-                        "AutoZoom.FIT is onlye allowed if the maximum renderable width"
-                        " and height is known."
-                    )
-                zoom_x = self.max_width / viewport.width
-                zoom_y = self.max_height / viewport.height
-                zoom_y = zoom_x = min(zoom_x, zoom_y)
-            case ZoomSpec(x, y):
-                zoom_x = x
-                zoom_y = y
-            case _:
-                raise ValueError("Invalid zoom value")
-
-        self.zoom_x = zoom_x
-        self.zoom_y = zoom_y
-        self._zoom_factor = min([zoom_x, zoom_y])
-
-    def _unconstrained_lod_1_viewport(self) -> Region:
-        return Region.union([buffer.region for buffer in self._all_lod_1_buffers()])
-
-    def _all_lod_1_buffers(self) -> Iterable[StripBuffer]:
-        # Get graph subview
-        visible_nodes = nx.subgraph_view(
-            self._nx_graph,
-            filter_node=lambda n: self._nx_graph.nodes[n].get("$show", True),
-        )
-
-        node_buffers = [
-            node_buffer
-            for node, node_buffer in self.node_buffers.items()
-            if node in visible_nodes
-        ]
-        return chain(
-            node_buffers,
-            self.edge_buffers.values(),
-            itertools.chain(*self.label_buffers.values()),
-        )
-
     def _transition_render_node_buffers_current_lod(self) -> None:
         if self._zoom_factor is None:
             raise RuntimeError(
@@ -395,7 +384,8 @@ class ConsoleGraph(Generic[G]):
                 for v in nx.all_neighbors(self._nx_graph, node):
                     self.edge_buffers_per_lod[lod].pop((node, v), None)
                     self.edge_buffers_per_lod[lod].pop((v, node), None)
-                self._nx_graph.nodes[node]
+                    self.label_buffers_per_lod[lod].pop((node, v), None)
+                    self.label_buffers_per_lod[lod].pop((v, node), None)
             self.node_buffers_current_lod[node] = node_buffer
 
     def _transition_render_edges_current_lod(self) -> None:
@@ -411,7 +401,7 @@ class ConsoleGraph(Generic[G]):
         node_idx = index.Index()
         edge_idx = index.Index()
 
-        edge_layouts = []
+        edge_layouts: list[EdgeLayout] = []
 
         all_node_buffers = []
         for i, (node, node_buffer) in enumerate(self.node_buffers_current_lod.items()):
@@ -456,6 +446,27 @@ class ConsoleGraph(Generic[G]):
             if edge_layout is not None:
                 edge_layouts.append(edge_layout)
                 self.edge_layouts_current_lod[(u, v)] = edge_layout
+
+    def _unconstrained_lod_1_viewport(self) -> Region:
+        return Region.union([buffer.region for buffer in self._all_lod_1_buffers()])
+
+    def _all_lod_1_buffers(self) -> Iterable[StripBuffer]:
+        # Get graph subview
+        visible_nodes = nx.subgraph_view(
+            self._nx_graph,
+            filter_node=lambda n: self._nx_graph.nodes[n].get("$show", True),
+        )
+
+        node_buffers = [
+            node_buffer
+            for node, node_buffer in self.node_buffers.items()
+            if node in visible_nodes
+        ]
+        return chain(
+            node_buffers,
+            self.edge_buffers.values(),
+            itertools.chain(*self.label_buffers.values()),
+        )
 
     def _all_current_lod_buffers(self) -> Iterable[StripBuffer]:
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
