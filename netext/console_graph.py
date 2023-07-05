@@ -192,6 +192,7 @@ class ConsoleGraph(Generic[G]):
             transition_func = getattr(self, f"_transition_{transition}")
             log(f"Transitioning from {u} to {v} using {transition}")
             transition_func()
+            log(f"Transitioned to {transition}")
             self._render_state = v
 
     @property
@@ -204,13 +205,11 @@ class ConsoleGraph(Generic[G]):
             value = ZoomSpec(value, value)
         elif isinstance(value, tuple):
             value = ZoomSpec(value[0], value[1])
-        log(f"Render state pre zoom {self._render_state}")
         self._zoom = value
         if self._render_state in nx.descendants(
             transition_graph, RenderState.NODE_LAYOUT_COMPUTED
         ):
             self._render_state = RenderState.NODE_LAYOUT_COMPUTED
-        log(f"Render state post zoom {self._render_state}")
 
     @property
     def max_width(self) -> int | None:
@@ -502,8 +501,16 @@ class ConsoleGraph(Generic[G]):
         return self._unconstrained_viewport()
 
     @property
-    def viewport(self) -> Region:
+    def viewport(self) -> Region | None:
         return self._viewport_with_constraints()
+
+    @viewport.setter
+    def viewport(self, value: Region | None) -> None:
+        self._viewport = value
+        if self._render_state in nx.descendants(
+            transition_graph, RenderState.ZOOMED_POSITIONS_COMPUTED
+        ):
+            self._render_state = RenderState.ZOOMED_POSITIONS_COMPUTED
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions

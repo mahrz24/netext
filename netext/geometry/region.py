@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from netext.geometry.point import Point
+from netext.geometry.size import Size
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +30,10 @@ class Region:
     @property
     def bounding_box(self) -> tuple[int, int, int, int]:
         return self.x, self.y, self.x + self.width - 1, self.y + self.height - 1
+
+    @property
+    def size(self) -> Size:
+        return Size(width=self.width, height=self.height)
 
     @staticmethod
     def union(regions: list["Region"]) -> "Region":
