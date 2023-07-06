@@ -363,13 +363,20 @@ class ConsoleGraph(Generic[G]):
         self._zoom_factor = min([zoom_x, zoom_y])
 
     def _compute_current_zoom(self):
-        viewport = self._unconstrained_lod_1_viewport()
+        max_node_x = max([x for x, _ in self.node_positions.values()])
+        max_node_y = max([y for _, y in self.node_positions.values()])
+        min_node_x = min([x for x, _ in self.node_positions.values()])
+        min_node_y = min([y for _, y in self.node_positions.values()])
+
 
         # Compute the zoom value for both axes
         max_buffer_width = max([buffer.width for buffer in self.node_buffers.values()])
         max_buffer_height = max(
             [buffer.height for buffer in self.node_buffers.values()]
         )
+
+        max_width = (max_node_x - min_node_x)+max_buffer_width
+        max_height = (max_node_y - min_node_y)+max_buffer_height
 
         match self._zoom:
             case AutoZoom.FIT:
@@ -378,16 +385,16 @@ class ConsoleGraph(Generic[G]):
                         "AutoZoom.FIT is onlye allowed if the maximum renderable width"
                         " and height is known."
                     )
-                zoom_x = (self.max_width - max_buffer_width / 2 - 1) / viewport.width
-                zoom_y = (self.max_height - max_buffer_height / 2 - 1) / viewport.height
+                zoom_x = self.max_width / max_width
+                zoom_y = self.max_height / max_height
             case AutoZoom.FIT_PROPORTIONAL:
                 if self.max_width is None or self.max_height is None:
                     raise ValueError(
                         "AutoZoom.FIT is only allowed if the maximum renderable width"
                         " and height is known."
                     )
-                zoom_x = self.max_width / viewport.width
-                zoom_y = self.max_height / viewport.height
+                zoom_x = self.max_width / max_width
+                zoom_y = self.max_height / max_height
                 zoom_y = zoom_x = min(zoom_x, zoom_y)
             case ZoomSpec(x, y):
                 zoom_x = x
