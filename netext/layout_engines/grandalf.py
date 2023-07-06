@@ -13,7 +13,7 @@ class GrandalfView:
     xy = (0, 0)
 
 
-def _create_vertex(node: Hashable, data: dict[Hashable, Any]) -> Vertex:
+def _create_vertex(node: Hashable, data: dict[str, Any]) -> Vertex:
     v = Vertex(node)
 
     # The API is a bit weird that it assumes to just add some members externally.

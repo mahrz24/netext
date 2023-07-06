@@ -47,6 +47,9 @@ class Point:
     def min_distance_to(self, other: "Point") -> int:
         return min(abs(self.x - other.x), abs(self.y - other.y))
 
+    def as_tuple(self) -> tuple[int, int]:
+        return self.x, self.y
+
     @staticmethod
     def min_point(points: list["Point"]) -> "Point":
         return Point(

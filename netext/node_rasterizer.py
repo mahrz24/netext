@@ -29,7 +29,7 @@ class Shape(Protocol):
         console: Console,
         content_renderable: RenderableType,
         style: Style,
-        data: dict[Hashable, Any],
+        data: dict[str, Any],
     ) -> list[Strip]:
         return NotImplemented
 
@@ -109,7 +109,7 @@ class JustContent(RectangularShapeMixin):
         console: Console,
         content_renderable: RenderableType,
         style: Style,
-        data: dict[Hashable, Any],
+        data: dict[str, Any],
     ) -> list[Strip]:
         return self._renderable_type_to_strips(console, content_renderable)
 
@@ -120,7 +120,7 @@ class Box(RectangularShapeMixin):
         console: Console,
         content_renderable: RenderableType,
         style: Style,
-        data: dict[Hashable, Any],
+        data: dict[str, Any],
     ) -> list[Strip]:
         box_type = data.get("$box-type", box.ROUNDED)
         return self._renderable_type_to_strips(
@@ -202,13 +202,13 @@ class NodeBuffer(StripBuffer):
 
 
 def _default_content_renderer(
-    node_str: str, data: dict[Hashable, Any], content_style: Style
+    node_str: str, data: dict[str, Any], content_style: Style
 ) -> RenderableType:
     return Text(node_str, style=content_style)
 
 
 def rasterize_node(
-    console: Console, node: Hashable, data: dict[Hashable, Any], lod: int = 1
+    console: Console, node: Hashable, data: dict[str, Any], lod: int = 1
 ) -> NodeBuffer:
     shape: Shape = data.get("$shape", Box())
     style: Style = data.get("$style", Style())

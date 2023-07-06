@@ -1,3 +1,4 @@
+from netext.console_graph import AutoZoom
 from netext.textual.widget import GraphView
 from textual.app import App, ComposeResult
 from typing import cast
@@ -10,7 +11,8 @@ from textual.containers import Horizontal
 from textual.widget import Widget
 from textual.widgets import ListView, Static, ListItem
 from textual.reactive import reactive
-from textual.geometry import Region
+from textual.geometry import Region, Offset
+from textual.events import Click
 import networkx as nx
 
 g = cast(nx.Graph, nx.binomial_tree(4))
@@ -62,8 +64,10 @@ class GraphApp(App):
         ("c", "crop()", "Crop"),
     ]
 
+    counter: int = 0
+
     def compose(self) -> ComposeResult:
-        graph = GraphView(g, zoom=1, scroll_via_viewport=True, id="graph")
+        graph = GraphView(g, zoom=AutoZoom.FIT, scroll_via_viewport=False, id="graph")
         yield graph
 
     def action_zoom_in(self) -> None:
@@ -82,6 +86,13 @@ class GraphApp(App):
             )
         else:
             g.viewport = None
+
+    def on_click(self, click: Click):
+        g = self.query_one(GraphView)
+        g.add_node(
+            f"New #{self.counter} with a long label", position=Offset(click.x, click.y)
+        )
+        self.counter += 1
 
 
 app = GraphApp()

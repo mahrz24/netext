@@ -1,9 +1,9 @@
-from typing import Generic, Protocol, Self, TypeGuard, cast
+from typing import Any, Generic, Hashable, Protocol, Self, TypeGuard, cast
 
 from textual.events import Resize
 from textual.reactive import reactive
 from textual.scroll_view import ScrollView
-from textual.geometry import Region, Size
+from textual.geometry import Region, Size, Offset
 from textual.strip import Strip
 
 from netext import ConsoleGraph
@@ -11,6 +11,7 @@ from netext.buffer_renderer import render_buffers
 from netext.console_graph import G, AutoZoom, ZoomSpec
 from rich.segment import Segment
 from netext.geometry.region import Region as NetextRegion
+from netext.geometry.point import Point
 
 
 class InitializedGraphView(Protocol[G]):
@@ -87,6 +88,23 @@ class GraphView(ScrollView, Generic[G]):
             self._timer.stop()
         self._timer = self.set_timer(0.1, self._resized)
 
+    def add_node(
+        self,
+        node: Hashable,
+        position: Offset | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> None:
+        if self._console_graph is not None:
+            if position is not None:
+                full_viewport = self._console_graph.full_viewport
+                node_position: Point | None = Point(
+                    full_viewport.x + position.x, full_viewport.y + position.y
+                )
+            else:
+                node_position = position
+            self._console_graph.add_node(node, node_position, data)
+            self._graph_was_updated()
+
     def _resized(self):
         if _setup_console_graph(self):
             self._console_graph.max_width = self.size.width
@@ -111,17 +129,17 @@ class GraphView(ScrollView, Generic[G]):
     ) -> None:
         if _setup_console_graph(self):
             if new_viewport is None:
-                self._console_graph.viewport = None
+                self._console_graph.reset_viewport()
             else:
                 if self._scroll_via_viewport:
                     raise ValueError(
                         "Cannot specify both viewport and scroll_via_viewport=True"
                     )
 
-                base_viewport = self._console_graph.full_viewport
+                full_viewport = self._console_graph.full_viewport
                 self._console_graph.viewport = NetextRegion(
-                    x=base_viewport.x + new_viewport.x,
-                    y=base_viewport.y + new_viewport.y,
+                    x=full_viewport.x + new_viewport.x,
+                    y=full_viewport.y + new_viewport.y,
                     width=new_viewport.width,
                     height=new_viewport.height,
                 )
@@ -140,22 +158,18 @@ class GraphView(ScrollView, Generic[G]):
     ) -> Self:
         if self._console_graph is not None:
             if not self._scroll_via_viewport:
-                self.virtual_size = Size(
-                    *self._console_graph.viewport.size.as_tuple()
-                )
+                new_size = Size(*self._console_graph.viewport.size.as_tuple())
+            else:
+                new_size = Size(*self._console_graph.full_viewport.size.as_tuple())
+            if new_size != self.virtual_size:
+                self.virtual_size = new_size
+                self._refresh_scrollbars()
         return super().refresh(*regions, repaint=repaint, layout=layout)
 
     def pre_render_strips(self) -> list[list[Segment]]:
         if self._console_graph is not None:
-            if self._scroll_via_viewport:
-                self.virtual_size = Size(
-                    *self._console_graph.full_viewport.size.as_tuple()
-                )
-
             all_buffers = list(self._console_graph._all_current_lod_buffers())
-            strips = render_buffers(
-                all_buffers, self._console_graph.viewport
-            )
+            strips = render_buffers(all_buffers, self._console_graph.viewport)
             return strips
         else:
             return []
@@ -175,10 +189,10 @@ class GraphView(ScrollView, Generic[G]):
     def _update_scroll_viewport(self) -> None:
         if self._console_graph is not None:
             scroll_x, scroll_y = self.scroll_offset
-            base_viewport = self._console_graph.full_viewport
+            full_viewport = self._console_graph.full_viewport
             self._console_graph.viewport = NetextRegion(
-                x=base_viewport.x + scroll_x,
-                y=base_viewport.y + scroll_y,
+                x=full_viewport.x + scroll_x,
+                y=full_viewport.y + scroll_y,
                 width=self.size.width,
                 height=self.size.height,
             )
