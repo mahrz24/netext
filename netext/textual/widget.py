@@ -84,9 +84,7 @@ class GraphView(ScrollView, Generic[G]):
 
     def on_resize(self, message: Resize):
         self.log("Graph was resized.")
-        if self._timer is not None:
-            self._timer.stop()
-        self._timer = self.set_timer(0.1, self._resized)
+        self._resized()
 
     def add_node(
         self,
@@ -102,6 +100,7 @@ class GraphView(ScrollView, Generic[G]):
                 )
             else:
                 node_position = position
+            self.log(f"Adding node {node} at {node_position}")
             self._console_graph.add_node(node, node_position, data)
             self._graph_was_updated()
 
@@ -111,6 +110,14 @@ class GraphView(ScrollView, Generic[G]):
             self._console_graph.max_height = self.size.height
             self._strip_segments = self.pre_render_strips()
             self.refresh()
+            self.log(
+                f"RESIZED | size: {self.size}, virtual: {self.virtual_size}, max_width:"
+                f" {self._console_graph.max_width}, max_height:"
+                f" {self._console_graph.max_height}, zoom_factor:"
+                f" {self._console_graph._zoom_factor}, viewport:"
+                f" {self._console_graph.viewport}, full_viewport:"
+                f" {self._console_graph.full_viewport}"
+            )
 
     def watch_graph(self, old_graph: G | None, new_graph: G | None) -> None:
         self._graph_was_updated()

@@ -292,8 +292,12 @@ class ConsoleGraph(Generic[G]):
                 zoom_factor = min([zoom_x, zoom_y])
 
             if zoom_factor != self._zoom_factor:
+                log(
+                    "RESETTING RENDER STATE AS ZOOM FACTOR CHANGED FROM"
+                    f" {self._zoom_factor} to {zoom_factor}"
+                )
                 self._zoom_factor = zoom_factor
-                self._reset_render_state(RenderState.ZOOMED_POSITIONS_COMPUTED)
+                self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
             else:
                 lod = determine_lod(data, zoom_factor)
                 position = Point(
@@ -368,15 +372,14 @@ class ConsoleGraph(Generic[G]):
         min_node_x = min([x for x, _ in self.node_positions.values()])
         min_node_y = min([y for _, y in self.node_positions.values()])
 
-
         # Compute the zoom value for both axes
         max_buffer_width = max([buffer.width for buffer in self.node_buffers.values()])
         max_buffer_height = max(
             [buffer.height for buffer in self.node_buffers.values()]
         )
 
-        max_width = (max_node_x - min_node_x)+max_buffer_width
-        max_height = (max_node_y - min_node_y)+max_buffer_height
+        max_width = (max_node_x - min_node_x) + max_buffer_width + 2
+        max_height = (max_node_y - min_node_y) + max_buffer_height + 2
 
         match self._zoom:
             case AutoZoom.FIT:
