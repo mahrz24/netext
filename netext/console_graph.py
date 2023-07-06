@@ -195,6 +195,10 @@ class ConsoleGraph(Generic[G]):
             log(f"Transitioned to {transition}")
             self._render_state = v
 
+    def _reset_render_state(self, new_state: RenderState) -> None:
+        if self._render_state in nx.descendants(transition_graph, new_state):
+            self._render_state = new_state
+
     @property
     def zoom(self) -> float | tuple[float, float] | ZoomSpec | AutoZoom:
         return self._zoom
@@ -205,11 +209,9 @@ class ConsoleGraph(Generic[G]):
             value = ZoomSpec(value, value)
         elif isinstance(value, tuple):
             value = ZoomSpec(value[0], value[1])
-        self._zoom = value
-        if self._render_state in nx.descendants(
-            transition_graph, RenderState.NODE_LAYOUT_COMPUTED
-        ):
-            self._render_state = RenderState.NODE_LAYOUT_COMPUTED
+        if self._zoom != value:
+            self._zoom = value
+            self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
 
     @property
     def max_width(self) -> int | None:
@@ -217,11 +219,10 @@ class ConsoleGraph(Generic[G]):
 
     @max_width.setter
     def max_width(self, value: int | None) -> None:
-        self._max_width = value
-        if self._render_state in nx.descendants(
-            transition_graph, RenderState.NODE_LAYOUT_COMPUTED
-        ):
-            self._render_state = RenderState.NODE_LAYOUT_COMPUTED
+        if self._max_width != value:
+            self._max_width = value
+            if self._zoom is AutoZoom.FIT or self._zoom is AutoZoom.FIT_PROPORTIONAL:
+                self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
 
     @property
     def max_height(self) -> int | None:
@@ -229,11 +230,68 @@ class ConsoleGraph(Generic[G]):
 
     @max_height.setter
     def max_height(self, value: int | None) -> None:
-        self._max_height = value
-        if self._render_state in nx.descendants(
-            transition_graph, RenderState.EDGES_RENDERED_1_LOD
-        ):
-            self._render_state = RenderState.EDGES_RENDERED_1_LOD
+        if self._max_height != value:
+            self._max_height = value
+            if self._zoom is AutoZoom.FIT or self._zoom is AutoZoom.FIT_PROPORTIONAL:
+                self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
+
+    @property
+    def full_viewport(self) -> Region:
+        return self._unconstrained_viewport()
+
+    @property
+    def viewport(self) -> Region | None:
+        if self._viewport is not None:
+            return self._viewport
+        return self._unconstrained_viewport()
+
+    @viewport.setter
+    def viewport(self, value: Region | None) -> None:
+        self._viewport = value
+        self._reset_render_state(RenderState.ZOOMED_POSITIONS_COMPUTED)
+
+    def add_node(
+        self,
+        node: Hashable,
+        position: Point | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> None:
+        if data is None:
+            data = dict()
+
+        self._nx_graph.add_node(node, **data)
+
+        self.node_buffers[node] = rasterize_node(self.console, node, cast(dict[Hashable, Any], data))
+
+        if position is not None:
+            self.node_positions[node] = position
+            zoom_x, zoom_y = self._compute_current_zoom()
+            zoom_factor = min([zoom_x, zoom_y])
+            if zoom_factor != self._zoom_factor:
+                self._zoom_factor = zoom_factor
+                self._reset_render_state(RenderState.ZOOMED_POSITIONS_COMPUTED)
+            else:
+
+        else:
+            self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_1_LOD)
+
+    def add_edge(u: Hashable, v: Hashable, data: dict[str, Any] | None = None) -> None:
+        pass
+
+    def remove_node(self, node: Hashable) -> None:
+        pass
+
+    def remove_edge(self, u: Hashable, v: Hashable) -> None:
+        pass
+
+    def update_node(self, node: Hashable, data: dict[str, Any]) -> None:
+        pass
+
+    def update_edge(self, u: Hashable, v: Hashable, data: dict[str, Any]) -> None:
+        pass
+
+    def layout(self) -> None:
+        pass
 
     def _transition_render_node_buffers_1_lod(self) -> None:
         # First we create the node buffers, this allows us to pass the sizing information to the
@@ -266,6 +324,13 @@ class ConsoleGraph(Generic[G]):
         }
 
     def _transition_compute_zoomed_positions(self) -> None:
+        zoom_x, zoom_y = self._compute_current_zoom()
+
+        self.zoom_x = zoom_x
+        self.zoom_y = zoom_y
+        self._zoom_factor = min([zoom_x, zoom_y])
+
+    def _compute_current_zoom(self):
         viewport = self._unconstrained_lod_1_viewport()
 
         # Compute the zoom value for both axes
@@ -297,10 +362,7 @@ class ConsoleGraph(Generic[G]):
                 zoom_y = y
             case _:
                 raise ValueError("Invalid zoom value")
-
-        self.zoom_x = zoom_x
-        self.zoom_y = zoom_y
-        self._zoom_factor = min([zoom_x, zoom_y])
+        return zoom_x,zoom_y
 
     def _transition_render_edges_1_lod(self) -> None:
         if self._zoom_factor is None:
@@ -491,27 +553,6 @@ class ConsoleGraph(Generic[G]):
             [buffer.region for buffer in self._all_current_lod_buffers()]
         )
 
-    @property
-    def full_viewport(self) -> Region:
-        return self._unconstrained_viewport()
-
-    def _viewport_with_constraints(self) -> Region:
-        if self._viewport is not None:
-            return self._viewport
-        return self._unconstrained_viewport()
-
-    @property
-    def viewport(self) -> Region | None:
-        return self._viewport_with_constraints()
-
-    @viewport.setter
-    def viewport(self, value: Region | None) -> None:
-        self._viewport = value
-        if self._render_state in nx.descendants(
-            transition_graph, RenderState.ZOOMED_POSITIONS_COMPUTED
-        ):
-            self._render_state = RenderState.ZOOMED_POSITIONS_COMPUTED
-
     def __rich_console__(
         self, console: Console, options: ConsoleOptions
     ) -> RenderResult:
@@ -525,7 +566,7 @@ class ConsoleGraph(Generic[G]):
                 strip + [""]
                 for strip in render_buffers(
                     self._all_current_lod_buffers(),
-                    self._viewport_with_constraints(),
+                    self.viewport,
                 )
             ]
         )
@@ -536,7 +577,7 @@ class ConsoleGraph(Generic[G]):
         self.max_width = options.max_width
         self.max_height = options.max_height
 
-        viewport = self._viewport_with_constraints()
+        viewport = self.viewport
 
         return Measurement(viewport.width, options.max_width)
 

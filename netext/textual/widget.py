@@ -141,7 +141,7 @@ class GraphView(ScrollView, Generic[G]):
         if self._console_graph is not None:
             if not self._scroll_via_viewport:
                 self.virtual_size = Size(
-                    *self._console_graph._viewport_with_constraints().size.as_tuple()
+                    *self._console_graph.viewport.size.as_tuple()
                 )
         return super().refresh(*regions, repaint=repaint, layout=layout)
 
@@ -154,7 +154,7 @@ class GraphView(ScrollView, Generic[G]):
 
             all_buffers = list(self._console_graph._all_current_lod_buffers())
             strips = render_buffers(
-                all_buffers, self._console_graph._viewport_with_constraints()
+                all_buffers, self._console_graph.viewport
             )
             return strips
         else:
