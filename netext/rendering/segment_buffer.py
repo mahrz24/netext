@@ -30,6 +30,10 @@ class StripBuffer:
     z_index: float
 
     @property
+    def reference(self) -> Any:
+        return None
+
+    @property
     def left_x(self) -> int:
         return NotImplemented  # pragma: no cover
 

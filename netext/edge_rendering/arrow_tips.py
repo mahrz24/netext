@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Hashable
 from rich.segment import Segment
 from rich.style import Style
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
@@ -74,6 +75,7 @@ ARROW_TIPS = {
 
 
 def render_arrow_tip_buffer(
+    edge: tuple[Hashable, Hashable],
     arrow_tip: ArrowTip,
     arrow_tip_position: Point,
     arrow_tip_dir: Point,
@@ -96,6 +98,7 @@ def render_arrow_tip_buffer(
     tip_character = ARROW_TIPS[arrow_tip][edge_segment_drawing_mode][direction]
 
     return EdgeBuffer(
+        edge=edge,
         z_index=-1,
         boundary_1=arrow_tip_position,
         boundary_2=arrow_tip_position,
@@ -104,6 +107,7 @@ def render_arrow_tip_buffer(
 
 
 def render_arrow_tip_buffers(
+    edge: tuple[Hashable, Hashable],
     end_arrow_tip: ArrowTip | None,
     start_arrow_tip: ArrowTip | None,
     edge_segments: RoutedEdgeSegments,
@@ -118,6 +122,7 @@ def render_arrow_tip_buffers(
     if start_arrow_tip is not None:
         buffers.append(
             render_arrow_tip_buffer(
+                edge,
                 start_arrow_tip,
                 start_arrow_tip_position,
                 start_arrow_tip_dir,
@@ -132,6 +137,7 @@ def render_arrow_tip_buffers(
     if end_arrow_tip is not None:
         buffers.append(
             render_arrow_tip_buffer(
+                edge,
                 end_arrow_tip,
                 end_arrow_tip_position,
                 end_arrow_tip_dir,

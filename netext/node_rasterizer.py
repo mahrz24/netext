@@ -130,6 +130,7 @@ class Box(RectangularShapeMixin):
 
 @dataclass
 class NodeBuffer(StripBuffer):
+    node: Hashable
     center: Point
     node_width: int
     node_height: int
@@ -138,10 +139,15 @@ class NodeBuffer(StripBuffer):
 
     shape: Shape = JustContent()
 
+    @property
+    def reference(self) -> Any:
+        return self.node
+
     @classmethod
     def from_strips(
         cls,
         strips: list[Strip],
+        node: Hashable,
         center: Point,
         shape: Shape,
         z_index: int = 0,
@@ -153,6 +159,7 @@ class NodeBuffer(StripBuffer):
         )
 
         return cls(
+            node=node,
             shape=shape,
             center=center,
             z_index=z_index,
@@ -228,5 +235,11 @@ def rasterize_node(
     strips = shape.render_shape(console, content_renderable, style=style, data=data)
 
     return NodeBuffer.from_strips(
-        strips, center=Point(x=0, y=0), z_index=-1, shape=shape, margin=margin, lod=lod
+        strips,
+        node=node,
+        center=Point(x=0, y=0),
+        z_index=-1,
+        shape=shape,
+        margin=margin,
+        lod=lod,
     )

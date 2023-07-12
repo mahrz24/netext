@@ -307,23 +307,208 @@ class ConsoleGraph(Generic[G]):
         else:
             self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_1_LOD)
 
-    def add_edge(u: Hashable, v: Hashable, data: dict[str, Any] | None = None) -> None:
-        pass
+    def add_edge(
+        self, u: Hashable, v: Hashable, data: dict[str, Any] | None = None
+    ) -> None:
+        # TODO a lot of code duplication with the edge rendering
+        edge_buffer: EdgeBuffer | None = None
+        edge_layout: EdgeLayout | None = None
+        label_nodes: list[StripBuffer] | None = None
+
+        if self._zoom_factor is None:
+            raise RuntimeError(
+                "You can only add edges once the zoom factor has been computed"
+            )
+
+        if u not in self._nx_graph.nodes:
+            raise ValueError(f"Node {u} does not exist in graph")
+        if v not in self._nx_graph.nodes:
+            raise ValueError(f"Node {v} does not exist in graph")
+
+        if data is None:
+            data = dict()
+
+        self._nx_graph.add_edge(u, v, **data)
+
+        result = rasterize_edge(
+            self.console,
+            self.node_buffers[u],
+            self.node_buffers[v],
+            list(self.node_buffers.values()),
+            list(self.edge_layouts.values()),
+            data,
+            self.node_idx_1_lod,
+            self.edge_idx_1_lod,
+            lod=1,
+        )
+
+        if result is not None:
+            edge_buffer, edge_layout, label_nodes = result
+
+            # This works because insertion order is sort order for dicts
+            self.edge_idx_1_lod.insert(len(self.edge_buffers), edge_buffer.bounding_box)
+
+            self.edge_buffers[(u, v)] = edge_buffer
+            self.edge_layouts[(u, v)] = edge_layout
+            self.label_buffers[(u, v)] = label_nodes
+
+        u_lod = determine_lod(self._nx_graph.nodes[u], self._zoom_factor)
+        v_lod = determine_lod(self._nx_graph.nodes[v], self._zoom_factor)
+
+        edge_lod = determine_lod(data, self._zoom_factor)
+
+        edge_buffer = self.edge_buffers_per_lod[edge_lod].get((u, v))
+        edge_layout = self.edge_layouts_per_lod[edge_lod].get((u, v))
+        label_nodes = self.label_buffers_per_lod[edge_lod].get((u, v))
+
+        result = rasterize_edge(
+            self.console,
+            self.node_buffers_per_lod[u_lod][u],
+            self.node_buffers_per_lod[v_lod][v],
+            list(self.node_buffers_current_lod.values()),
+            list(self.edge_layouts_current_lod.values()),
+            data,
+            self.node_idx_current_lod,
+            self.edge_idx_current_lod,
+            edge_lod,
+        )
+
+        if result is not None:
+            edge_buffer, edge_layout, label_nodes = result
+            self.edge_idx_current_lod.insert(
+                len(self.edge_buffers_current_lod), edge_buffer.bounding_box
+            )
+
+            self.edge_buffers_per_lod[edge_lod][(u, v)] = edge_buffer
+            self.edge_layouts_per_lod[edge_lod][(u, v)] = edge_layout
+            self.label_buffers_per_lod[edge_lod][(u, v)] = label_nodes
+
+        if edge_buffer is not None:
+            self.edge_buffers_current_lod[(u, v)] = edge_buffer
+        if label_nodes is not None:
+            self.label_buffers_current_lod[(u, v)] = label_nodes
+        if edge_layout is not None:
+            self.edge_layouts_current_lod[(u, v)] = edge_layout
 
     def remove_node(self, node: Hashable) -> None:
-        pass
+        self.node_positions.pop(node)
+        self.node_buffers.pop(node)
+        self.node_buffers_current_lod.pop(node)
+
+        for lod in self.node_buffers_per_lod.keys():
+            self.node_buffers_per_lod[lod].pop(node)
+
+        # Rebuild indices
+        # TODO: this is not very efficient
+        self.node_idx_1_lod = index.Index()
+        for i, (node, node_buffer) in enumerate(self.node_buffers.items()):
+            self.node_idx_1_lod.insert(i, node_buffer.bounding_box)
+
+        self.node_idx_current_lod = index.Index()
+        for i, (node, node_buffer) in enumerate(self.node_buffers_current_lod.items()):
+            self.node_idx_current_lod.insert(i, node_buffer.bounding_box)
+
+        for u, v in self._nx_graph.edges():
+            if u == node or v == node:
+                self.remove_edge(u, v)
+
+        self._nx_graph.remove_node(node)
 
     def remove_edge(self, u: Hashable, v: Hashable) -> None:
-        pass
+        self.edge_buffers.pop((u, v))
+        self.edge_buffers_current_lod.pop((u, v))
 
-    def update_node(self, node: Hashable, data: dict[str, Any]) -> None:
-        pass
+        for lod in self.edge_buffers_per_lod.keys():
+            self.edge_buffers_per_lod[lod].pop((u, v))
+
+        # Rebuild indices
+        # TODO: this is not very efficient
+        self.edge_idx_1_lod = index.Index()
+        for i, (edge, edge_buffer) in enumerate(self.edge_buffers.items()):
+            self.edge_idx_1_lod.insert(i, edge_buffer.bounding_box)
+
+        self.edge_idx_current_lod = index.Index()
+        for i, (edge, edge_buffer) in enumerate(self.edge_buffers_current_lod.items()):
+            self.edge_idx_current_lod.insert(i, edge_buffer.bounding_box)
+
+    def update_node(
+        self,
+        node: Hashable,
+        position: Point | None = None,
+        data: dict[str, Any] | None = None,
+        updata_data: bool = True,
+    ) -> None:
+        if data is None and position is None:
+            return
+
+        if data is not None:
+            # Replace the data of the node with the new data
+            if updata_data:
+                new_data = dict(self._nx_graph.nodes[node], **data)
+            else:
+                new_data = data
+            log("Updating node data", node=node, data=new_data)
+            self._nx_graph.nodes[node].update(new_data)
+            self.node_buffers[node] = rasterize_node(self.console, node, new_data)
+
+        data = cast(dict[str, Any], self._nx_graph.nodes(data=True)[node])
+
+        if position is None:
+            coords = self.node_positions[node]
+            zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
+        else:
+            # TODO same as in add_node
+            pos_x, pos_y = position.as_tuple()
+            # We add a new node and first need to transform the point from the buffer space to the not zoomed
+            # coordinate space of the nodes
+            # TODO these should probably be points
+            coords = (pos_x / self.zoom_x, pos_y / self.zoom_y)
+            self.node_positions[node] = coords
+            self.node_buffers[node].center = Point(round(coords[0]), round(coords[1]))
+
+            # Then we recompute zoom (in case we have a zoom to fit)
+            zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
+            if (
+                self._zoom is AutoZoom.FIT
+                or self._zoom is AutoZoom.FIT_PROPORTIONAL
+                or self._zoom_factor is None
+            ):
+                zoom_x, zoom_y = self._compute_current_zoom()
+                zoom_factor = min([zoom_x, zoom_y])
+
+            if zoom_factor != self._zoom_factor:
+                log(
+                    "RESETTING RENDER STATE AS ZOOM FACTOR CHANGED FROM"
+                    f" {self._zoom_factor} to {zoom_factor}"
+                )
+                self._zoom_factor = zoom_factor
+                self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
+                return
+
+        lod = determine_lod(data, zoom_factor)
+        position = Point(
+            x=round(coords[0] * self.zoom_x), y=round(coords[1] * self.zoom_y)
+        )
+        self._render_node_buffer_current_lod(node, data, lod, coords)
+
+        # Rebuild indices
+        # TODO: this is not very efficient
+        self.node_idx_1_lod = index.Index()
+        for i, (node, node_buffer) in enumerate(self.node_buffers.items()):
+            self.node_idx_1_lod.insert(i, node_buffer.bounding_box)
+
+        self.node_idx_current_lod = index.Index()
+        for i, (node, node_buffer) in enumerate(self.node_buffers_current_lod.items()):
+            self.node_idx_current_lod.insert(i, node_buffer.bounding_box)
 
     def update_edge(self, u: Hashable, v: Hashable, data: dict[str, Any]) -> None:
-        pass
+        # For now we remove the edge and re-add it
+        # TODO: This is not efficient and does indeed rebuild the indices twice
+        self.remove_edge(u, v)
+        self.add_edge(u, v, data)
 
     def layout(self) -> None:
-        pass
+        self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_1_LOD)
 
     def _transition_render_node_buffers_1_lod(self) -> None:
         # First we create the node buffers, this allows us to pass the sizing information to the
@@ -431,7 +616,10 @@ class ConsoleGraph(Generic[G]):
 
         # Make sure we use the lod 1 positions:
         for node, node_buffer in self.node_buffers.items():
-            node_buffer.center = Point(*map(round, self.node_positions[node]))
+            node_buffer.center = Point(
+                x=round(self.node_positions[node][0]),
+                y=round(self.node_positions[node][0]),
+            )
 
         all_node_buffers = []
         for i, (node, node_buffer) in enumerate(self.node_buffers.items()):
@@ -612,15 +800,12 @@ class ConsoleGraph(Generic[G]):
 
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
-        yield from itertools.chain(
-            *[
-                strip + [""]
-                for strip in render_buffers(
-                    self._all_current_lod_buffers(),
-                    self.viewport,
-                )
-            ]
+        strips, _ = render_buffers(
+            self._all_current_lod_buffers(),
+            self.viewport,
         )
+
+        yield from itertools.chain(*[strip + [""] for strip in strips])
 
     def __rich_measure__(
         self, console: Console, options: ConsoleOptions

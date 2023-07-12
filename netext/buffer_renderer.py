@@ -1,6 +1,7 @@
 from collections import defaultdict
 from collections.abc import Iterable
 from heapq import merge
+from typing import Any
 
 from rich.segment import Segment
 from netext.geometry import Region
@@ -8,7 +9,7 @@ from netext.geometry import Region
 from netext.rendering.segment_buffer import StripBuffer, Spacer
 
 
-def flatten_strips(strips: list[list[Segment]]) -> list[Segment]:
+def flatten_strips(strips: list[list[Segment]], *reverse_map: Any) -> list[Segment]:
     """Returns a flattened list of segments with interspersed newlines."""
 
     result = []
@@ -21,9 +22,11 @@ def flatten_strips(strips: list[list[Segment]]) -> list[Segment]:
 
 def render_buffers(
     buffers: Iterable[StripBuffer], viewport: Region
-) -> list[list[Segment]]:
+) -> tuple[list[list[Segment]], dict[tuple[int, int], StripBuffer]]:
     full_width = viewport.x + viewport.width
     full_height = viewport.y + viewport.height
+
+    reverse_buffer_map: dict[tuple[int, int], StripBuffer] = {}
 
     buffers_by_row: dict[int, list[StripBuffer]] = defaultdict(list)
     for buffer in buffers:
@@ -186,6 +189,8 @@ def render_buffers(
                         out_segment = Segment(" " * segment.cell_length)
                         current_strip.append(out_segment)
                     else:
+                        for x in range(current_x, current_x + segment.cell_length):
+                            reverse_buffer_map[x, row] = buffer.reference
                         current_strip.append(segment)
                     current_x += segment.cell_length
                 segment_left_x += full_segment_cell_length
@@ -194,4 +199,4 @@ def render_buffers(
             segment = Segment(" " * (full_width - current_x))
             current_strip.append(segment)
 
-    return result_strips
+    return result_strips, reverse_buffer_map

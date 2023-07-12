@@ -165,12 +165,17 @@ def rasterize_edge(
         label_position = edge_segments.edge_iter_point(round(edge_segments.length / 2))
 
         label_buffer = NodeBuffer.from_strips(
-            label_strips, z_index=1, shape=shape, center=label_position
+            label_strips,
+            node=("label", u_buffer.node, v_buffer.node),
+            z_index=1,
+            shape=shape,
+            center=label_position,
         )
         label_buffers.append(label_buffer)
 
     label_buffers.extend(
         render_arrow_tip_buffers(
+            (u_buffer.node, v_buffer.node),
             end_arrow_tip,
             start_arrow_tip,
             edge_segments,
@@ -186,6 +191,7 @@ def rasterize_edge(
         return None
 
     edge_buffer = EdgeBuffer(
+        edge=(u_buffer.node, v_buffer.node),
         z_index=edge_layout.z_index,
         boundary_1=boundary_1,
         boundary_2=boundary_2,

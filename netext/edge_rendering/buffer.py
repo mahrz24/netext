@@ -1,3 +1,4 @@
+from typing import Any, Hashable
 from netext.geometry import Point
 from netext.rendering.segment_buffer import StripBuffer
 
@@ -7,8 +8,13 @@ from dataclasses import dataclass
 
 @dataclass
 class EdgeBuffer(StripBuffer):
+    edge: tuple[Hashable, Hashable]
     boundary_1: Point
     boundary_2: Point
+
+    @property
+    def reference(self) -> Any:
+        return self.edge
 
     @property
     def left_x(self) -> int:

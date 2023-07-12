@@ -5,6 +5,7 @@ from textual.reactive import reactive
 from textual.scroll_view import ScrollView
 from textual.geometry import Region, Size, Offset
 from textual.strip import Strip
+from textual.widget import Widget
 
 from netext import ConsoleGraph
 from netext.buffer_renderer import render_buffers
@@ -69,6 +70,7 @@ class GraphView(ScrollView, Generic[G]):
         scroll_via_viewport: bool = False,
         **console_graph_kwargs,
     ):
+        self._reverse_click_map = dict()
         self._console_graph_kwargs = console_graph_kwargs
         self._console_graph: ConsoleGraph[G] | None = None
         self._scroll_via_viewport = scroll_via_viewport
@@ -85,6 +87,9 @@ class GraphView(ScrollView, Generic[G]):
     def on_resize(self, message: Resize):
         self.log("Graph was resized.")
         self._resized()
+
+    def attach_widget(self, widget: Widget, node: Hashable) -> None:
+        pass
 
     def add_node(
         self,
@@ -104,20 +109,55 @@ class GraphView(ScrollView, Generic[G]):
             self._console_graph.add_node(node, node_position, data)
             self._graph_was_updated()
 
+    def add_edge(
+        self,
+        u: Hashable,
+        v: Hashable,
+        data: dict[str, Any] | None = None,
+    ) -> None:
+        if self._console_graph is not None:
+            self._console_graph.add_edge(u, v, data)
+            self._graph_was_updated()
+
+    def remove_node(self, node: Hashable) -> None:
+        if self._console_graph is not None:
+            self._console_graph.remove_node(node)
+            self._graph_was_updated()
+
+    def remove_edge(self, u: Hashable, v: Hashable) -> None:
+        if self._console_graph is not None:
+            self._console_graph.remove_edge(u, v)
+            self._graph_was_updated()
+
+    def update_node(
+        self,
+        node: Hashable,
+        position: Offset | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> None:
+        if self._console_graph is not None:
+            if position is not None:
+                full_viewport = self._console_graph.full_viewport
+                node_position: Point | None = Point(
+                    full_viewport.x + position.x, full_viewport.y + position.y
+                )
+            else:
+                node_position = position
+            self.log(f"Adding node {node} at {node_position}")
+            self._console_graph.update_node(node, node_position, data)
+            self._graph_was_updated()
+
+    def update_edge(self, u: Hashable, v: Hashable, data: dict[str, Any]) -> None:
+        if self._console_graph is not None:
+            self._console_graph.update_edge(u, v, data)
+            self._graph_was_updated()
+
     def _resized(self):
         if _setup_console_graph(self):
             self._console_graph.max_width = self.size.width
             self._console_graph.max_height = self.size.height
             self._strip_segments = self.pre_render_strips()
             self.refresh()
-            self.log(
-                f"RESIZED | size: {self.size}, virtual: {self.virtual_size}, max_width:"
-                f" {self._console_graph.max_width}, max_height:"
-                f" {self._console_graph.max_height}, zoom_factor:"
-                f" {self._console_graph._zoom_factor}, viewport:"
-                f" {self._console_graph.viewport}, full_viewport:"
-                f" {self._console_graph.full_viewport}"
-            )
 
     def watch_graph(self, old_graph: G | None, new_graph: G | None) -> None:
         self._graph_was_updated()
@@ -176,7 +216,10 @@ class GraphView(ScrollView, Generic[G]):
     def pre_render_strips(self) -> list[list[Segment]]:
         if self._console_graph is not None:
             all_buffers = list(self._console_graph._all_current_lod_buffers())
-            strips = render_buffers(all_buffers, self._console_graph.viewport)
+            strips, self._reverse_click_map = render_buffers(
+                all_buffers, self._console_graph.viewport
+            )
+            self.log(self._reverse_click_map)
             return strips
         else:
             return []
