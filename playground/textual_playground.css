@@ -3,6 +3,38 @@ GraphView {
     overflow-y: auto;
 }
 
+#footer {
+    dock: bottom;
+    height: 1;
+    layers: below above;
+}
+
+.selected-tool {
+    background: red;
+}
+
+Statusbar {
+    height: 1;
+    width: 25%;
+    offset-x: 300%;
+    dock: bottom;
+    layer: above
+}
+
+Toolbar {
+    dock: left;
+    width: 5;
+}
+
+Toolbar > Button {
+    width: 5;
+    min-width: 5;
+}
+
+Footer {
+    layer: below;
+}
+
 GraphInspector {
     width: 50%;
 }

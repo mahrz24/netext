@@ -9,8 +9,9 @@ from netext.edge_rendering.arrow_tips import ArrowTip
 from textual.widgets import Button
 from textual.geometry import Region
 from textual.screen import Screen, ModalScreen
-from textual.widgets import OptionList, Input
-
+from textual.widgets import OptionList, Input, Footer, Placeholder
+from textual.widget import Widget
+from textual.containers import Horizontal, Vertical
 
 import networkx as nx
 
@@ -120,69 +121,63 @@ class SelectDialog(ModalDialog):
             self.args[ix] = self.options[ix][event.option_index]
 
 
+class Toolbar(Widget):
+    current_tool: str = "pointer-tool"
+
+    def compose(self):
+        yield Button(">", id="pointer-tool", classes="selected-tool")
+        yield Button("+O", id="add-node-tool")
+        yield Button("+/", id="add-edge-tool")
+        yield Button("+T", id="add-label-tool")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.query(f"#{self.current_tool}").remove_class("selected-tool")
+        self.query(f"#{event.button.id}").add_class("selected-tool")
+        self.current_tool = event.button.id
+
+
+class Statusbar(Placeholder):
+    pass
+
+
 class MainScreen(Screen):
-    BINDINGS = [
-        ("+", "zoom_out()", "Zoom In"),
-        ("-", "zoom_in()", "Zoom Out"),
-        ("c", "crop()", "Crop"),
-        ("ctrl+e", "add_edge", "Add edge"),
-        ("u", "update_node", "Update node"),
-    ]
-
-    counter: int = 0
-
-    def action_update_node(self) -> None:
-        g = self.query_one(GraphView)
-        g.update_node(0, data={"$style": Style(color="green")})
+    BINDINGS = []
 
     def compose(self) -> ComposeResult:
-        graph = GraphView(g, zoom=1, scroll_via_viewport=False, id="graph")
-        yield graph
+        yield Horizontal(
+            Vertical(
+                Toolbar(), GraphView(g, zoom=1, scroll_via_viewport=False, id="graph")
+            ),
+            Vertical(Footer(), Statusbar("Status"), id="footer"),
+        )
 
-    def action_zoom_in(self) -> None:
-        g = self.query_one(GraphView)
-        g.zoom = g.zoom / 1.1
+    # def action_add_edge(self) -> None:
+    #     """An action to add a node."""
+    #     graph_view = self.query_one(GraphView)
 
-    def action_zoom_out(self) -> None:
-        g = self.query_one(GraphView)
-        g.zoom = g.zoom / 0.9
+    #     if graph_view:
 
-    def action_crop(self) -> None:
-        g = self.query_one(GraphView)
-        if g.viewport is None:
-            g.viewport = Region(
-                10, 10, g.virtual_size.width - 20, g.virtual_size.height - 20
-            )
-        else:
-            g.viewport = None
+    #         def _add_edge(u: Hashable, v: Hashable) -> None:
+    #             graph_view.add_edge(
+    #                 u,
+    #                 v,
+    #                 data={
+    #                     "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
+    #                     "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
+    #                     "$end-arrow-tip": ArrowTip.ARROW,
+    #                     "$show": True,
+    #                 },
+    #             )
 
-    def action_add_edge(self) -> None:
-        """An action to add a node."""
-        graph_view = self.query_one(GraphView)
-
-        if graph_view:
-
-            def _add_edge(u: Hashable, v: Hashable) -> None:
-                graph_view.add_edge(
-                    u,
-                    v,
-                    data={
-                        "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
-                        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
-                        "$end-arrow-tip": ArrowTip.ARROW,
-                        "$show": True,
-                    },
-                )
-
-            self.app.push_screen(
-                SelectDialog(
-                    [
-                        list(graph_view.graph.nodes(data=False)),
-                        list(graph_view.graph.nodes(data=False)),
-                    ],
-                    _add_edge,
-                )
-            )
+    #         self.app.push_screen(
+    #             SelectDialog(
+    #                 [
+    #                     list(graph_view.graph.nodes(data=False)),
+    #                     list(graph_view.graph.nodes(data=False)),
+    #                 ],
+    #                 _add_edge,
+    #             )
+    #         )
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         g = self.query_one(GraphView)
