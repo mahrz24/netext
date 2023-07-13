@@ -12,7 +12,7 @@ from rich.text import Text
 from netext.geometry import Magnet, Point
 from shapely import LineString, Polygon
 
-from netext.rendering.segment_buffer import Strip, StripBuffer, Spacer
+from netext.rendering.segment_buffer import Reference, Strip, StripBuffer, Spacer
 
 
 class Shape(Protocol):
@@ -128,7 +128,7 @@ class Box(RectangularShapeMixin):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeBuffer(StripBuffer):
     node: Hashable
     center: Point
@@ -140,8 +140,8 @@ class NodeBuffer(StripBuffer):
     shape: Shape = JustContent()
 
     @property
-    def reference(self) -> Any:
-        return self.node
+    def reference(self) -> Reference | None:
+        return Reference(type="node", ref=self.node)
 
     @classmethod
     def from_strips(
@@ -243,3 +243,40 @@ def rasterize_node(
         margin=margin,
         lod=lod,
     )
+
+
+@dataclass(kw_only=True)
+class EdgeLabelBuffer(NodeBuffer):
+    edge: tuple[Hashable, Hashable]
+
+    @property
+    def reference(self) -> Reference | None:
+        return Reference(type="edge_label", ref=self.edge)
+
+    @classmethod
+    def from_strips_and_edge(
+        cls,
+        strips: list[Strip],
+        edge: tuple[Hashable, Hashable],
+        center: Point,
+        shape: Shape,
+        z_index: int = 0,
+        margin: int = 0,
+        lod: int = 1,
+    ) -> "EdgeLabelBuffer":
+        width = max(
+            sum(segment.cell_length for segment in strip.segments) for strip in strips
+        )
+
+        return cls(
+            node=edge[0],
+            edge=edge,
+            shape=shape,
+            center=center,
+            z_index=z_index,
+            node_width=width,
+            node_height=len(strips),
+            strips=strips,
+            margin=margin,
+            lod=lod,
+        )

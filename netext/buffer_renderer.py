@@ -6,7 +6,7 @@ from typing import Any
 from rich.segment import Segment
 from netext.geometry import Region
 
-from netext.rendering.segment_buffer import StripBuffer, Spacer
+from netext.rendering.segment_buffer import Reference, StripBuffer, Spacer
 
 
 def flatten_strips(strips: list[list[Segment]], *reverse_map: Any) -> list[Segment]:
@@ -22,7 +22,7 @@ def flatten_strips(strips: list[list[Segment]], *reverse_map: Any) -> list[Segme
 
 def render_buffers(
     buffers: Iterable[StripBuffer], viewport: Region
-) -> tuple[list[list[Segment]], dict[tuple[int, int], StripBuffer]]:
+) -> tuple[list[list[Segment]], dict[tuple[int, int], Reference]]:
     full_width = viewport.x + viewport.width
     full_height = viewport.y + viewport.height
 

@@ -14,7 +14,7 @@ from netext.edge_routing.route import route_edge
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.geometry import Magnet
 
-from netext.node_rasterizer import JustContent, NodeBuffer
+from netext.node_rasterizer import EdgeLabelBuffer, JustContent, NodeBuffer
 from netext.rendering.segment_buffer import StripBuffer
 from rtree.index import Index
 
@@ -164,9 +164,9 @@ def rasterize_edge(
 
         label_position = edge_segments.edge_iter_point(round(edge_segments.length / 2))
 
-        label_buffer = NodeBuffer.from_strips(
+        label_buffer = EdgeLabelBuffer.from_strips_and_edge(
             label_strips,
-            node=("label", u_buffer.node, v_buffer.node),
+            edge=(u_buffer.node, v_buffer.node),
             z_index=1,
             shape=shape,
             center=label_position,

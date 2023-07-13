@@ -1,4 +1,3 @@
-from netext.console_graph import AutoZoom
 from netext.textual.widget import GraphView
 from textual.app import App, ComposeResult
 from typing import Any, Callable, Hashable, cast
@@ -9,7 +8,6 @@ from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_rendering.arrow_tips import ArrowTip
 from textual.widgets import Button
 from textual.geometry import Region
-from textual.events import Click
 from textual.screen import Screen, ModalScreen
 from textual.widgets import OptionList, Input
 
@@ -20,7 +18,7 @@ g = cast(nx.Graph, nx.binomial_tree(4))
 
 
 def _render2(n, d, s):
-    return f"This is node number #N{n}\nMultiline hi"
+    return f"This is node number #N{n}\nMultiline hi {d.get('title')}"
 
 
 nx.set_node_attributes(g, Style(color="blue"), "$content-style")
@@ -138,7 +136,7 @@ class MainScreen(Screen):
         g.update_node(0, data={"$style": Style(color="green")})
 
     def compose(self) -> ComposeResult:
-        graph = GraphView(g, zoom=AutoZoom.FIT, scroll_via_viewport=False, id="graph")
+        graph = GraphView(g, zoom=1, scroll_via_viewport=False, id="graph")
         yield graph
 
     def action_zoom_in(self) -> None:
@@ -186,27 +184,61 @@ class MainScreen(Screen):
                 )
             )
 
-    def on_click(self, click: Click):
+    def on_input_submitted(self, event: Input.Submitted) -> None:
         g = self.query_one(GraphView)
-        if g._console_graph is not None:
-            full_viewport = g._console_graph.full_viewport
+        control = event.control
+        node = g._attached_widgets_lookup.get(control)
 
-            node_or_edge = g._reverse_click_map.get(
-                (full_viewport.x + click.x, full_viewport.y + click.y)
+        if node is not None:
+            g.update_node(node, data={"title": control.value})
+            g.detach_widget_from_node(node)
+
+    def on_graph_view_element_click(self, event: GraphView.ElementClick) -> None:
+        self.log(event.element_reference)
+        g = self.query_one(GraphView)
+        if event.element_reference.type == "node":
+            input_widget = Input(placeholder="First Name")
+            input_widget.focus()
+            g.attach_widget_to_node(
+                widget=input_widget, node=event.element_reference.ref
             )
+        # g = self.query_one(GraphView)
+        # if g._console_graph is not None:
+        #     full_viewport = g._console_graph.full_viewport
 
-            if isinstance(node_or_edge, int):
-                static = Input(placeholder="First Name")
-                g.mount(static.focus())
-                node_buffer = g._console_graph.node_buffers_current_lod[node_or_edge]
+        #     node_or_edge = g._reverse_click_map.get(
+        #         (full_viewport.x + click.x, full_viewport.y + click.y)
+        #     )
 
-                static.styles.width = node_buffer.width
-                static.styles.height = node_buffer.height
-                static.styles.dock = "left"
-                static.styles.offset = (
-                    node_buffer.left_x - full_viewport.x,
-                    node_buffer.top_y - full_viewport.y,
-                )
+        #     if isinstance(node_or_edge, int):
+        #         static = Input(placeholder="First Name")
+        #         g.mount(static.focus())
+        #         node_buffer = g._console_graph.node_buffers_current_lod[node_or_edge]
+
+        #         static.styles.width = node_buffer.width
+        #         static.styles.height = node_buffer.height
+        #         static.styles.dock = "left"
+        #         static.styles.offset = (
+        #             node_buffer.left_x - full_viewport.x,
+        #             node_buffer.top_y - full_viewport.y,
+        #         )
+
+    def on_graph_view_element_move(self, event: GraphView.ElementMove) -> None:
+        self.log(event, event.element_reference)
+
+    def on_graph_view_element_mouse_down(
+        self, event: GraphView.ElementMouseDown
+    ) -> None:
+        self.log(event, event.element_reference)
+
+    def on_graph_view_element_mouse_up(self, event: GraphView.ElementMouseUp) -> None:
+        self.log(event, event.element_reference)
+
+    def on_graph_view_element_enter(self, event: GraphView.ElementEnter) -> None:
+        self.log(event, event.element_reference)
+
+    def on_graph_view_element_leave(self, event: GraphView.ElementLeave) -> None:
+        self.log(event, event.element_reference)
 
 
 class GraphApp(App):
