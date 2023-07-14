@@ -60,6 +60,7 @@ def _setup_console_graph(graph: "GraphView[G]") -> TypeGuard[InitializedGraphVie
 
 
 class GraphView(ScrollView, Generic[G]):
+    # Needs to become a property with getter / setter so that changed
     graph: reactive[G | None] = reactive(cast(G | None, None))
     zoom: reactive[float | tuple[float, float] | ZoomSpec | AutoZoom] = reactive(
         cast(float | tuple[float, float] | ZoomSpec | AutoZoom, 1.0)

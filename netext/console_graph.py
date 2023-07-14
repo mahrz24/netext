@@ -267,7 +267,7 @@ class ConsoleGraph(Generic[G]):
     ) -> None:
         if data is None:
             data = dict()
-
+        # TODO Graph should be rendered by here, also on all other remove/add methods
         self._nx_graph.add_node(node, **data)
 
         self.node_buffers[node] = rasterize_node(self.console, node, data)
