@@ -1,124 +1,41 @@
+import uuid
+from netext.rendering.segment_buffer import Reference
 from netext.textual.widget import GraphView
+from textual import events
 from textual.app import App, ComposeResult
-from typing import Any, Callable, Hashable, cast
+from typing import Hashable, cast
 from rich.style import Style
-from rich import box
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_rendering.arrow_tips import ArrowTip
 from textual.widgets import Button
-from textual.geometry import Region
-from textual.screen import Screen, ModalScreen
-from textual.widgets import OptionList, Input, Footer, Placeholder
+from textual.geometry import Offset
+from textual.screen import Screen
+from textual.widgets import Input, Footer, Placeholder
 from textual.widget import Widget
 from textual.containers import Horizontal, Vertical
+from textual.reactive import reactive, Reactive
 
 import networkx as nx
 
-g = cast(nx.Graph, nx.binomial_tree(4))
+g = nx.DiGraph()
 
 
-def _render2(n, d, s):
-    return f"This is node number #N{n}\nMultiline hi {d.get('title')}"
+def _render(n, d, s):
+    return d.get("title")
 
 
-nx.set_node_attributes(g, Style(color="blue"), "$content-style")
-nx.set_node_attributes(g, box.SQUARE, "$box-type")
-nx.set_edge_attributes(g, Style(color="red"), "$style")
-nx.set_edge_attributes(g, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
-nx.set_edge_attributes(g, EdgeSegmentDrawingMode.BOX, "$edge-segment-drawing-mode")
-nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
-nx.set_edge_attributes(g, ArrowTip.ARROW, "$start-arrow-tip")
-nx.set_node_attributes(g, _render2, "$content-renderer")
-
-# class GraphInspector(Widget):
-#     graph: reactive[GraphView | None] = reactive(None)
-
-#     def __init__(self, graph: GraphView, **kwargs) -> None:
-#         super().__init__(**kwargs)
-#         self.graph = graph
-
-#     def compose(self) -> ComposeResult:
-#         yield ListView(id="edge-list")
-
-#     def update(self) -> None:
-#         edge_list: ListView = self.query_one("#edge-list")
-#         edge_list.clear()
-#         if self.graph and self.graph._console_graph is not None:
-#             for (
-#                 key,
-#                 value,
-#             ) in self.graph._console_graph.edge_buffers_current_lod.items():
-#                 boundary = f"{value.boundary_1} {value.boundary_2}"
-#                 edge_list.append(ListItem(Static(f"{key}: [{boundary}]")))
-#             for (
-#                 key,
-#                 value,
-#             ) in self.graph._console_graph.label_buffers_current_lod.items():
-#                 for label in value:
-#                     boundary = f"{label.bounding_box}"
-#                     edge_list.append(ListItem(Static(f"{key}: [{boundary}]")))
+g.add_node(uuid.uuid4(), **{"title": "Hello World", "$content-renderer": _render})
 
 
-class ModalDialog(ModalScreen):
-    BINDINGS = [
-        ("escape", "close", "Close node select screen"),
-    ]
-
-    def __init__(
-        self,
-        callback: Callable[[Any], None],
-        name: str | None = None,
-        id: str | None = None,
-        classes: str | None = None,
-    ) -> None:
-        super().__init__(name, id, classes)
-        self.callback = callback
-
-    def action_close(self) -> None:
-        self.app.pop_screen()
-
-
-class SelectDialog(ModalDialog):
-    """Option select dialog."""
-
-    def __init__(
-        self,
-        options: list[str] | list[list[str]],
-        callback: Callable[[Any], None],
-        name: str | None = None,
-        id: str | None = None,
-        classes: str | None = None,
-    ) -> None:
-        super().__init__(callback, name, id, classes)
-        self.options = options
-        self.multi_select = isinstance(self.options[0], list)
-        self.lists = []
-        self.args = dict()
-
-    def compose(self) -> ComposeResult:
-        if self.multi_select:
-            for i, options in enumerate(self.options):
-                ol = OptionList(*[str(s) for s in options], id=f"option-list-{i}")
-                self.lists.append(ol)
-                ol.focus()
-                yield ol
-            yield Button("Select", id="select-button")
-        else:
-            yield OptionList(*[str(s) for s in self.options], id="option-list").focus()
-
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        self.app.pop_screen()
-        args = [self.args.get(i) for i, ol in enumerate(self.lists)]
-        self.callback(*args)
-
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        if not self.multi_select:
-            self.app.pop_screen()
-            self.callback(self.options[event.option_index])
-        else:
-            ix = self.lists.index(event.option_list)
-            self.args[ix] = self.options[ix][event.option_index]
+# nx.set_node_attributes(g, Style(color="blue"), "$content-style")
+# nx.set_node_attributes(g, box.SQUARE, "$box-type")
+# nx.set_edge_attributes(g, Style(color="red"), "$style")
+# nx.set_edge_attributes(g, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
+# nx.set_edge_attributes(g, EdgeSegmentDrawingMode.BOX, "$edge-segment-drawing-mode")
+# nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
+# nx.set_edge_attributes(g, ArrowTip.ARROW, "$start-arrow-tip")
+# nx.set_node_attributes(g, _render2, "$content-renderer")
 
 
 class Toolbar(Widget):
@@ -141,6 +58,10 @@ class Statusbar(Placeholder):
 
 
 class MainScreen(Screen):
+    current_editor: tuple[Input, Hashable] | None = None
+    edge_first_click: Hashable | None = None
+    hover_element: Reactive[Reference | None] = reactive(cast(Reference | None, None))
+
     BINDINGS = []
 
     def compose(self) -> ComposeResult:
@@ -151,75 +72,101 @@ class MainScreen(Screen):
             Vertical(Footer(), Statusbar("Status"), id="footer"),
         )
 
-    # def action_add_edge(self) -> None:
-    #     """An action to add a node."""
-    #     graph_view = self.query_one(GraphView)
+    def watch_hover_element(
+        self, old_value: Reference | None, new_value: Reference | None
+    ) -> None:
+        g = self.query_one(GraphView)
+        if old_value is not None and old_value.type == "edge":
+            # TODO updating edges should also be possible partially and resetting as well
+            g.update_edge(*old_value.ref, data={"$style": Style(color="white")})
 
-    #     if graph_view:
+        if new_value is not None and new_value.type == "edge":
+            # TODO updating edges should also be possible partially and resetting as well
+            g.update_edge(*new_value.ref, data={"$style": Style(color="green")})
 
-    #         def _add_edge(u: Hashable, v: Hashable) -> None:
-    #             graph_view.add_edge(
-    #                 u,
-    #                 v,
-    #                 data={
-    #                     "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
-    #                     "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
-    #                     "$end-arrow-tip": ArrowTip.ARROW,
-    #                     "$show": True,
-    #                 },
-    #             )
+        if old_value is not None and old_value.type == "node":
+            # TODO updating edges should also be possible partially and resetting as well
+            g.update_node(old_value.ref, data={"$style": None})
 
-    #         self.app.push_screen(
-    #             SelectDialog(
-    #                 [
-    #                     list(graph_view.graph.nodes(data=False)),
-    #                     list(graph_view.graph.nodes(data=False)),
-    #                 ],
-    #                 _add_edge,
-    #             )
-    #         )
+        if new_value is not None and new_value.type == "node":
+            # TODO updating edges should also be possible partially and resetting as well
+            g.update_node(new_value.ref, data={"$style": Style(color="green")})
+
+    def on_click(self, event: events.Click) -> None:
+        toolbar = self.query_one(Toolbar)
+
+        if toolbar.current_tool == "add-node-tool":
+            self.add_node(event.x, event.y)
+
+    def add_node(self, x: int, y: int) -> None:
+        g = self.query_one(GraphView)
+        node_uuid = uuid.uuid4()
+
+        g.add_node(
+            node_uuid,
+            Offset(x, y),
+            data={"title": "Untitled New Node", "$content-renderer": _render},
+        )
+        self.edit_node_label(node_uuid)
+
+    def add_edge(self, u: Hashable, v: Hashable) -> None:
+        g = self.query_one(GraphView)
+        g.add_edge(
+            u,
+            v,
+            data={
+                "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
+                "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
+                "$end-arrow-tip": ArrowTip.ARROW,
+            },
+        )
+
+    def edit_node_label(self, node: Hashable) -> None:
+        g = self.query_one(GraphView)
+        # TODO: Graph property needs to update
+        if g._console_graph is not None:
+            if self.current_editor is not None:
+                self.end_node_editing(*self.current_editor)
+
+            title = g._console_graph._nx_graph.nodes[node]["title"]
+            input_widget = Input(placeholder=title)
+            input_widget.focus()
+            g.attach_widget_to_node(widget=input_widget, node=node)
+            self.current_editor = input_widget, node
+
+    def end_node_editing(self, input_widget: Input, node: Hashable) -> None:
+        g = self.query_one(GraphView)
+        g.detach_widget_from_node(node)
+        self.current_editor = None
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         g = self.query_one(GraphView)
         control = event.control
         node = g._attached_widgets_lookup.get(control)
-
-        if node is not None:
-            g.update_node(node, data={"title": control.value})
-            g.detach_widget_from_node(node)
+        g.update_node(node, data={"title": control.value})
+        self.end_node_editing(control, node)
 
     def on_graph_view_element_click(self, event: GraphView.ElementClick) -> None:
-        self.log(event.element_reference)
-        g = self.query_one(GraphView)
-        if event.element_reference.type == "node":
-            input_widget = Input(placeholder="First Name")
-            input_widget.focus()
-            g.attach_widget_to_node(
-                widget=input_widget, node=event.element_reference.ref
-            )
-        # g = self.query_one(GraphView)
-        # if g._console_graph is not None:
-        #     full_viewport = g._console_graph.full_viewport
+        toolbar = self.query_one(Toolbar)
 
-        #     node_or_edge = g._reverse_click_map.get(
-        #         (full_viewport.x + click.x, full_viewport.y + click.y)
-        #     )
-
-        #     if isinstance(node_or_edge, int):
-        #         static = Input(placeholder="First Name")
-        #         g.mount(static.focus())
-        #         node_buffer = g._console_graph.node_buffers_current_lod[node_or_edge]
-
-        #         static.styles.width = node_buffer.width
-        #         static.styles.height = node_buffer.height
-        #         static.styles.dock = "left"
-        #         static.styles.offset = (
-        #             node_buffer.left_x - full_viewport.x,
-        #             node_buffer.top_y - full_viewport.y,
-        #         )
+        if (
+            toolbar.current_tool == "add-edge-tool"
+            and event.element_reference.type == "node"
+        ):
+            g = self.query_one(GraphView)
+            if self.edge_first_click is None:
+                self.edge_first_click = event.element_reference.ref
+                g.update_node(
+                    self.edge_first_click, data={"$style": Style(color="red")}
+                )
+            else:
+                g.update_node(self.edge_first_click, data={"$style": None})
+                self.add_edge(self.edge_first_click, event.element_reference.ref)
+                self.edge_first_click = None
 
     def on_graph_view_element_move(self, event: GraphView.ElementMove) -> None:
-        self.log(event, event.element_reference)
+        # self.log(event, event.element_reference)
+        pass
 
     def on_graph_view_element_mouse_down(
         self, event: GraphView.ElementMouseDown
@@ -231,9 +178,11 @@ class MainScreen(Screen):
 
     def on_graph_view_element_enter(self, event: GraphView.ElementEnter) -> None:
         self.log(event, event.element_reference)
+        self.hover_element = event.element_reference
 
     def on_graph_view_element_leave(self, event: GraphView.ElementLeave) -> None:
         self.log(event, event.element_reference)
+        self.hover_element = None
 
 
 class GraphApp(App):

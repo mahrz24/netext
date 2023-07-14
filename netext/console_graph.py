@@ -315,6 +315,9 @@ class ConsoleGraph(Generic[G]):
         edge_layout: EdgeLayout | None = None
         label_nodes: list[StripBuffer] | None = None
 
+        log("Adding edge", u, v, data)
+        log(self.edge_buffers.keys())
+
         if self._zoom_factor is None:
             raise RuntimeError(
                 "You can only add edges once the zoom factor has been computed"
@@ -324,6 +327,9 @@ class ConsoleGraph(Generic[G]):
             raise ValueError(f"Node {u} does not exist in graph")
         if v not in self._nx_graph.nodes:
             raise ValueError(f"Node {v} does not exist in graph")
+
+        if (u, v) in self._nx_graph.edges:
+            return
 
         if data is None:
             data = dict()
@@ -343,6 +349,7 @@ class ConsoleGraph(Generic[G]):
         )
 
         if result is not None:
+            print("ADDING LOD 1")
             edge_buffer, edge_layout, label_nodes = result
 
             # This works because insertion order is sort order for dicts
@@ -390,13 +397,18 @@ class ConsoleGraph(Generic[G]):
         if edge_layout is not None:
             self.edge_layouts_current_lod[(u, v)] = edge_layout
 
+        log("EDGE ADDED")
+        log(self._nx_graph.edges)
+        log(self.edge_buffers.keys())
+        log(self.edge_buffers_current_lod.keys())
+
     def remove_node(self, node: Hashable) -> None:
         self.node_positions.pop(node)
         self.node_buffers.pop(node)
         self.node_buffers_current_lod.pop(node)
 
         for lod in self.node_buffers_per_lod.keys():
-            self.node_buffers_per_lod[lod].pop(node)
+            self.node_buffers_per_lod[lod].pop(node, None)
 
         # Rebuild indices
         # TODO: this is not very efficient
@@ -415,11 +427,16 @@ class ConsoleGraph(Generic[G]):
         self._nx_graph.remove_node(node)
 
     def remove_edge(self, u: Hashable, v: Hashable) -> None:
+        log(self._nx_graph.edges)
+        log(self.edge_buffers.keys())
+        log(self.edge_buffers_current_lod.keys())
+
+        self._nx_graph.remove_edge(u, v)
         self.edge_buffers.pop((u, v))
         self.edge_buffers_current_lod.pop((u, v))
 
         for lod in self.edge_buffers_per_lod.keys():
-            self.edge_buffers_per_lod[lod].pop((u, v))
+            self.edge_buffers_per_lod[lod].pop((u, v), None)
 
         # Rebuild indices
         # TODO: this is not very efficient
@@ -436,20 +453,22 @@ class ConsoleGraph(Generic[G]):
         node: Hashable,
         position: Point | None = None,
         data: dict[str, Any] | None = None,
-        updata_data: bool = True,
+        update_data: bool = True,
     ) -> None:
         if data is None and position is None:
             return
 
         if data is not None:
             # Replace the data of the node with the new data
-            if updata_data:
+            if update_data:
                 new_data = dict(self._nx_graph.nodes[node], **data)
             else:
                 new_data = data
             log("Updating node data", node=node, data=new_data)
             self._nx_graph.nodes[node].update(new_data)
+            old_position = self.node_buffers[node].center
             self.node_buffers[node] = rasterize_node(self.console, node, new_data)
+            self.node_buffers[node].center = old_position
 
         data = cast(dict[str, Any], self._nx_graph.nodes(data=True)[node])
 
@@ -501,10 +520,17 @@ class ConsoleGraph(Generic[G]):
         for i, (node, node_buffer) in enumerate(self.node_buffers_current_lod.items()):
             self.node_idx_current_lod.insert(i, node_buffer.bounding_box)
 
-    def update_edge(self, u: Hashable, v: Hashable, data: dict[str, Any]) -> None:
+        # TODO Update affected edges
+
+    def update_edge(
+        self, u: Hashable, v: Hashable, data: dict[str, Any], update_data: bool = True
+    ) -> None:
+        # Needs also a mode to keep the layout but rerender
         # For now we remove the edge and re-add it
         # TODO: This is not efficient and does indeed rebuild the indices twice
+        old_data = self._nx_graph.edges[u, v]
         self.remove_edge(u, v)
+        data = dict(old_data, **data) if update_data else data
         self.add_edge(u, v, data)
 
     def layout(self) -> None:
@@ -527,18 +553,19 @@ class ConsoleGraph(Generic[G]):
         # Position the nodes and store these original positions
         self.node_positions = self.layout_engine(self._nx_graph)
 
-        x_positions = [x for _, (x, _) in self.node_positions.items()]
-        y_positions = [y for _, (_, y) in self.node_positions.items()]
-        # Center node positions around the midpoint of all nodes
-        min_x = min(x_positions)
-        max_x = max(x_positions)
-        min_y = min(y_positions)
-        max_y = max(y_positions)
+        if self.node_positions:
+            x_positions = [x for _, (x, _) in self.node_positions.items()]
+            y_positions = [y for _, (_, y) in self.node_positions.items()]
+            # Center node positions around the midpoint of all nodes
+            min_x = min(x_positions)
+            max_x = max(x_positions)
+            min_y = min(y_positions)
+            max_y = max(y_positions)
 
-        self.node_positions = {
-            node: (x - min_x - (max_x - min_x) / 2, y - min_y - (max_y - min_y) / 2)
-            for node, (x, y) in self.node_positions.items()
-        }
+            self.node_positions = {
+                node: (x - min_x - (max_x - min_x) / 2, y - min_y - (max_y - min_y) / 2)
+                for node, (x, y) in self.node_positions.items()
+            }
 
         for node, position in self.node_positions.items():
             self.node_buffers[node].center = Point(
@@ -552,43 +579,49 @@ class ConsoleGraph(Generic[G]):
         self._zoom_factor = min([zoom_x, zoom_y])
 
     def _compute_current_zoom(self):
-        max_node_x = max([x for x, _ in self.node_positions.values()])
-        max_node_y = max([y for _, y in self.node_positions.values()])
-        min_node_x = min([x for x, _ in self.node_positions.values()])
-        min_node_y = min([y for _, y in self.node_positions.values()])
+        if self.node_positions:
+            max_node_x = max([x for x, _ in self.node_positions.values()])
+            max_node_y = max([y for _, y in self.node_positions.values()])
+            min_node_x = min([x for x, _ in self.node_positions.values()])
+            min_node_y = min([y for _, y in self.node_positions.values()])
 
-        # Compute the zoom value for both axes
-        max_buffer_width = max([buffer.width for buffer in self.node_buffers.values()])
-        max_buffer_height = max(
-            [buffer.height for buffer in self.node_buffers.values()]
-        )
+            # Compute the zoom value for both axes
+            max_buffer_width = max(
+                [buffer.width for buffer in self.node_buffers.values()]
+            )
+            max_buffer_height = max(
+                [buffer.height for buffer in self.node_buffers.values()]
+            )
 
-        max_width = (max_node_x - min_node_x) + max_buffer_width + 2
-        max_height = (max_node_y - min_node_y) + max_buffer_height + 2
+            max_width = (max_node_x - min_node_x) + max_buffer_width + 2
+            max_height = (max_node_y - min_node_y) + max_buffer_height + 2
 
-        match self._zoom:
-            case AutoZoom.FIT:
-                if self.max_width is None or self.max_height is None:
-                    raise ValueError(
-                        "AutoZoom.FIT is onlye allowed if the maximum renderable width"
-                        " and height is known."
-                    )
-                zoom_x = self.max_width / max_width
-                zoom_y = self.max_height / max_height
-            case AutoZoom.FIT_PROPORTIONAL:
-                if self.max_width is None or self.max_height is None:
-                    raise ValueError(
-                        "AutoZoom.FIT is only allowed if the maximum renderable width"
-                        " and height is known."
-                    )
-                zoom_x = self.max_width / max_width
-                zoom_y = self.max_height / max_height
-                zoom_y = zoom_x = min(zoom_x, zoom_y)
-            case ZoomSpec(x, y):
-                zoom_x = x
-                zoom_y = y
-            case _:
-                raise ValueError("Invalid zoom value")
+            match self._zoom:
+                case AutoZoom.FIT:
+                    if self.max_width is None or self.max_height is None:
+                        raise ValueError(
+                            "AutoZoom.FIT is onlye allowed if the maximum renderable"
+                            " width and height is known."
+                        )
+                    zoom_x = self.max_width / max_width
+                    zoom_y = self.max_height / max_height
+                case AutoZoom.FIT_PROPORTIONAL:
+                    if self.max_width is None or self.max_height is None:
+                        raise ValueError(
+                            "AutoZoom.FIT is only allowed if the maximum renderable"
+                            " width and height is known."
+                        )
+                    zoom_x = self.max_width / max_width
+                    zoom_y = self.max_height / max_height
+                    zoom_y = zoom_x = min(zoom_x, zoom_y)
+                case ZoomSpec(x, y):
+                    zoom_x = x
+                    zoom_y = y
+                case _:
+                    raise ValueError("Invalid zoom value")
+        else:
+            zoom_x = 1
+            zoom_y = 1
         return zoom_x, zoom_y
 
     def _transition_render_edges_1_lod(self) -> None:
@@ -682,10 +715,17 @@ class ConsoleGraph(Generic[G]):
         if node_buffer.center != position:
             node_buffer.center = position
             for v in nx.all_neighbors(self._nx_graph, node):
+                # TODO This really needs to be rerendered if we pop things
                 self.edge_buffers_per_lod[lod].pop((node, v), None)
                 self.edge_buffers_per_lod[lod].pop((v, node), None)
                 self.label_buffers_per_lod[lod].pop((node, v), None)
                 self.label_buffers_per_lod[lod].pop((v, node), None)
+
+                self.edge_buffers_current_lod.pop((node, v), None)
+                self.edge_buffers_current_lod.pop((v, node), None)
+                self.label_buffers_current_lod.pop((node, v), None)
+                self.label_buffers_current_lod.pop((v, node), None)
+
         self.node_buffers_current_lod[node] = node_buffer
 
     def _transition_render_edges_current_lod(self) -> None:
@@ -788,9 +828,12 @@ class ConsoleGraph(Generic[G]):
         )
 
     def _unconstrained_viewport(self) -> Region:
-        return Region.union(
-            [buffer.region for buffer in self._all_current_lod_buffers()]
-        )
+        regions = [buffer.region for buffer in self._all_current_lod_buffers()]
+
+        if not regions:
+            return Region(0, 0, 0, 0)
+
+        return Region.union(regions)
 
     def __rich_console__(
         self, console: Console, options: ConsoleOptions

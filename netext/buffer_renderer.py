@@ -37,6 +37,9 @@ def render_buffers(
 
     result_strips = []
 
+    if not buffers_by_row:
+        return ([], dict())
+
     active_buffers: list[tuple[int, list[Segment | Spacer], int, StripBuffer]] = []
     for row in range(min(buffers_by_row.keys()), full_height):
         current_strip: list[Segment] = []

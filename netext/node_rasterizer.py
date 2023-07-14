@@ -217,6 +217,13 @@ def _default_content_renderer(
 def rasterize_node(
     console: Console, node: Hashable, data: dict[str, Any], lod: int = 1
 ) -> NodeBuffer:
+    # TODO make helper function to get node from data
+    to_be_ignored = []
+    for key, val in data.items():
+        if val is None:
+            to_be_ignored.append(key)
+    for key in to_be_ignored:
+        del data[key]
     shape: Shape = data.get("$shape", Box())
     style: Style = data.get("$style", Style())
     content_style = data.get("$content-style", Style())

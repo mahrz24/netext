@@ -227,6 +227,7 @@ class GraphView(ScrollView, Generic[G]):
         node: Hashable,
         position: Offset | None = None,
         data: dict[str, Any] | None = None,
+        update_data: bool = True,
     ) -> None:
         if self._console_graph is not None:
             if position is not None:
@@ -236,7 +237,9 @@ class GraphView(ScrollView, Generic[G]):
             else:
                 node_position = position
             self.log(f"Adding node {node} at {node_position}")
-            self._console_graph.update_node(node, node_position, data)
+            self._console_graph.update_node(
+                node, node_position, data, update_data=update_data
+            )
             self._graph_was_updated()
 
     def update_edge(self, u: Hashable, v: Hashable, data: dict[str, Any]) -> None:
@@ -387,6 +390,7 @@ class GraphView(ScrollView, Generic[G]):
                 self.post_message(
                     GraphView.ElementLeave(self._last_hover, event.x, event.y)
                 )
+                self._last_hover = None
 
             if ref is not None:
                 if ref != self._last_hover:
