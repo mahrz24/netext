@@ -67,60 +67,31 @@ class GraphView(ScrollView, Generic[G]):
     )
     viewport: reactive[Region | None] = reactive(cast(Region | None, None))
 
-    # TODO: We need to link the parent event here to be able to get modifier keys and such
-    class ElementClick(Message):
+    class ElementEvent(Message):
+        """Element event message."""
+
+        def __init__(self, element_reference: Reference, event: events.Event) -> None:
+            self.event = event
+            self.element_reference = element_reference
+            super().__init__()
+
+    class ElementClick(ElementEvent):
         """Element click message."""
 
-        def __init__(self, element_reference: Reference, x: int, y: int) -> None:
-            self.x = x
-            self.y = y
-            self.element_reference = element_reference
-            super().__init__()
-
-    class ElementMove(Message):
+    class ElementMove(ElementEvent):
         """Element mouse moved message."""
 
-        def __init__(self, element_reference: Reference, x: int, y: int) -> None:
-            self.x = x
-            self.y = y
-            self.element_reference = element_reference
-            super().__init__()
-
-    class ElementEnter(Message):
+    class ElementEnter(ElementEvent):
         """Element mouse enter message."""
 
-        def __init__(self, element_reference: Reference, x: int, y: int) -> None:
-            self.x = x
-            self.y = y
-            self.element_reference = element_reference
-            super().__init__()
-
-    class ElementLeave(Message):
+    class ElementLeave(ElementEvent):
         """Element mouse leave message."""
 
-        def __init__(self, element_reference: Reference, x: int, y: int) -> None:
-            self.x = x
-            self.y = y
-            self.element_reference = element_reference
-            super().__init__()
-
-    class ElementMouseDown(Message):
+    class ElementMouseDown(ElementEvent):
         """Element moused down message."""
 
-        def __init__(self, element_reference: Reference, x: int, y: int) -> None:
-            self.x = x
-            self.y = y
-            self.element_reference = element_reference
-            super().__init__()
-
-    class ElementMouseUp(Message):
+    class ElementMouseUp(ElementEvent):
         """Element moused up message."""
-
-        def __init__(self, element_reference: Reference, x: int, y: int) -> None:
-            self.x = x
-            self.y = y
-            self.element_reference = element_reference
-            super().__init__()
 
     def __init__(
         self,
@@ -388,16 +359,14 @@ class GraphView(ScrollView, Generic[G]):
             )
 
             if ref != self._last_hover and self._last_hover is not None:
-                self.post_message(
-                    GraphView.ElementLeave(self._last_hover, event.x, event.y)
-                )
+                self.post_message(GraphView.ElementLeave(self._last_hover, event))
                 self._last_hover = None
 
             if ref is not None:
                 if ref != self._last_hover:
-                    self.post_message(GraphView.ElementEnter(ref, event.x, event.y))
+                    self.post_message(GraphView.ElementEnter(ref, event))
                 else:
-                    self.post_message(GraphView.ElementMove(ref, event.x, event.y))
+                    self.post_message(GraphView.ElementMove(ref, event))
                 self._last_hover = ref
 
     def on_click(self, event: events.Click) -> None:
@@ -407,7 +376,7 @@ class GraphView(ScrollView, Generic[G]):
             )
 
             if ref is not None:
-                self.post_message(GraphView.ElementClick(ref, event.x, event.y))
+                self.post_message(GraphView.ElementClick(ref, event))
 
     def on_mouse_down(self, event: events.MouseDown) -> None:
         if self._console_graph is not None:
@@ -416,7 +385,7 @@ class GraphView(ScrollView, Generic[G]):
             )
 
             if ref is not None:
-                self.post_message(GraphView.ElementMouseDown(ref, event.x, event.y))
+                self.post_message(GraphView.ElementMouseDown(ref, event))
 
     def on_mouse_up(self, event: events.MouseDown) -> None:
         if self._console_graph is not None:
@@ -425,4 +394,4 @@ class GraphView(ScrollView, Generic[G]):
             )
 
             if ref is not None:
-                self.post_message(GraphView.ElementMouseUp(ref, event.x, event.y))
+                self.post_message(GraphView.ElementMouseUp(ref, event))
