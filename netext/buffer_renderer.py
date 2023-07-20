@@ -26,7 +26,7 @@ def render_buffers(
     full_width = viewport.x + viewport.width
     full_height = viewport.y + viewport.height
 
-    reverse_buffer_map: dict[tuple[int, int], StripBuffer] = {}
+    reverse_buffer_map: dict[tuple[int, int], Reference] = {}
 
     buffers_by_row: dict[int, list[StripBuffer]] = defaultdict(list)
     for buffer in buffers:
@@ -193,7 +193,8 @@ def render_buffers(
                         current_strip.append(out_segment)
                     else:
                         for x in range(current_x, current_x + segment.cell_length):
-                            reverse_buffer_map[x, row] = buffer.reference
+                            if buffer.reference is not None:
+                                reverse_buffer_map[x, row] = buffer.reference
                         current_strip.append(segment)
                     current_x += segment.cell_length
                 segment_left_x += full_segment_cell_length

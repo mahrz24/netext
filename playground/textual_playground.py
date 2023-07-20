@@ -123,16 +123,15 @@ class MainScreen(Screen):
 
     def edit_node_label(self, node: Hashable) -> None:
         g = self.query_one(GraphView)
-        # TODO: Graph property needs to update
-        if g._console_graph is not None:
-            if self.current_editor is not None:
-                self.end_node_editing(*self.current_editor)
 
-            title = g._console_graph._nx_graph.nodes[node]["title"]
-            input_widget = Input(placeholder=title)
-            input_widget.focus()
-            g.attach_widget_to_node(widget=input_widget, node=node)
-            self.current_editor = input_widget, node
+        if self.current_editor is not None:
+            self.end_node_editing(*self.current_editor)
+
+        title = g.graph[node]["title"]
+        input_widget = Input(placeholder=title)
+        input_widget.focus()
+        g.attach_widget_to_node(widget=input_widget, node=node)
+        self.current_editor = input_widget, node
 
     def end_node_editing(self, input_widget: Input, node: Hashable) -> None:
         g = self.query_one(GraphView)

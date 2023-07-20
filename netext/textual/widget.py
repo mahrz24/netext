@@ -1,4 +1,4 @@
-from typing import Any, Generic, Hashable, Protocol, Self, TypeGuard, cast
+from typing import Any, Generic, Hashable, Self, TypeGuard, cast
 
 from textual.events import Resize
 from textual import events
@@ -19,32 +19,9 @@ from textual.message import Message
 from netext.rendering.segment_buffer import Reference
 
 
-class InitializedGraphView(Protocol[G]):
-    _console_graph: ConsoleGraph[G]
-    _strip_segments: list[list[Segment]]
-    _scroll_via_viewport: bool
-    _attached_widgets: dict[Hashable, tuple[Widget, bool]]
-
-    size: Size
-    virtual_size: Size
-
-    def _graph_was_updated(self) -> None:
-        ...
-
-    def refresh(self) -> None:
-        ...
-
-    def pre_render_strips(self) -> list[list[Segment]]:
-        ...
-
-    def _to_view_coordinates(self, x: int, y: int) -> tuple[int, int]:
-        ...
-
-
-def _setup_console_graph(graph: "GraphView[G]") -> TypeGuard[InitializedGraphView[G]]:
+def _setup_console_graph(graph: "GraphView[G]") -> TypeGuard["InitializedGraphView[G]"]:
     if (
-        graph.graph is not None
-        and graph._console_graph is None
+        graph._console_graph is None
         and graph.size.width != 0
         and graph.size.height != 0
     ):
@@ -60,8 +37,6 @@ def _setup_console_graph(graph: "GraphView[G]") -> TypeGuard[InitializedGraphVie
 
 
 class GraphView(ScrollView, Generic[G]):
-    # Needs to become a property with getter / setter so that changed
-    graph: reactive[G | None] = reactive(cast(G | None, None))
     zoom: reactive[float | tuple[float, float] | ZoomSpec | AutoZoom] = reactive(
         cast(float | tuple[float, float] | ZoomSpec | AutoZoom, 1.0)
     )
@@ -95,7 +70,7 @@ class GraphView(ScrollView, Generic[G]):
 
     def __init__(
         self,
-        graph: G | None = None,
+        graph: G,
         name: str | None = None,
         id: str | None = None,
         classes: str | None = None,
@@ -105,7 +80,7 @@ class GraphView(ScrollView, Generic[G]):
         scroll_via_viewport: bool = False,
         **console_graph_kwargs,
     ):
-        self._reverse_click_map = dict()
+        self._reverse_click_map: dict[tuple[int, int], Reference] = dict()
         self._last_hover: Reference | None = None
         self._console_graph_kwargs = console_graph_kwargs
         self._console_graph: ConsoleGraph[G] | None = None
@@ -117,10 +92,20 @@ class GraphView(ScrollView, Generic[G]):
                 "Cannot specify both viewport and scroll_via_viewport=True"
             )
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
-        self.graph = graph
+        self._graph: G = graph
         self._strip_segments: list[list[Segment]] = list()
         self._timer = self.set_timer(0, self._resized)
         self.zoom = zoom
+
+    @property
+    def graph(self) -> G:
+        return self._graph
+
+    @graph.setter
+    def graph(self, graph: G) -> None:
+        self._graph = graph
+        self._console_graph = None
+        self._graph_was_updated()
 
     def on_resize(self, message: Resize):
         self.log("Graph was resized.")
@@ -172,6 +157,7 @@ class GraphView(ScrollView, Generic[G]):
                 node_position = position
             self.log(f"Adding node {node} at {node_position}")
             self._console_graph.add_node(node, node_position, data)
+            self._graph = self._console_graph._nx_graph.copy()
             self._graph_was_updated()
 
     def add_edge(
@@ -182,16 +168,19 @@ class GraphView(ScrollView, Generic[G]):
     ) -> None:
         if self._console_graph is not None:
             self._console_graph.add_edge(u, v, data)
+            self._graph = self._console_graph._nx_graph.copy()
             self._graph_was_updated()
 
     def remove_node(self, node: Hashable) -> None:
         if self._console_graph is not None:
             self._console_graph.remove_node(node)
+            self._graph = self._console_graph._nx_graph.copy()
             self._graph_was_updated()
 
     def remove_edge(self, u: Hashable, v: Hashable) -> None:
         if self._console_graph is not None:
             self._console_graph.remove_edge(u, v)
+            self._graph = self._console_graph._nx_graph.copy()
             self._graph_was_updated()
 
     def update_node(
@@ -212,11 +201,17 @@ class GraphView(ScrollView, Generic[G]):
             self._console_graph.update_node(
                 node, node_position, data, update_data=update_data
             )
+            # External graph should reflect the internal one
+            # TODO: In the future we might keep the graph only once in memory
+            # right now the console graph copies the graph passed to it and hence
+            # we need to copy it back once it's updated.
+            self._graph = self._console_graph._nx_graph.copy()
             self._graph_was_updated()
 
     def update_edge(self, u: Hashable, v: Hashable, data: dict[str, Any]) -> None:
         if self._console_graph is not None:
             self._console_graph.update_edge(u, v, data)
+            self._graph = self._console_graph._nx_graph.copy()
             self._graph_was_updated()
 
     def _resized(self):
@@ -239,9 +234,6 @@ class GraphView(ScrollView, Generic[G]):
             scroll_x, scroll_y = self.scroll_offset
             return x - full_viewport.x - scroll_x, y - full_viewport.y - scroll_y
         return x, y
-
-    def watch_graph(self, old_graph: G | None, new_graph: G | None) -> None:
-        self._graph_was_updated()
 
     def watch_zoom(
         self,
@@ -395,3 +387,7 @@ class GraphView(ScrollView, Generic[G]):
 
             if ref is not None:
                 self.post_message(GraphView.ElementMouseUp(ref, event))
+
+
+class InitializedGraphView(GraphView[G]):
+    _console_graph: ConsoleGraph[G]

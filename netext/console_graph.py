@@ -508,7 +508,7 @@ class ConsoleGraph(Generic[G]):
         position = Point(
             x=round(coords[0] * self.zoom_x), y=round(coords[1] * self.zoom_y)
         )
-        self._render_node_buffer_current_lod(node, data, lod, coords)
+        affected_edges = self._render_node_buffer_current_lod(node, data, lod, coords)
 
         # Rebuild indices
         # TODO: this is not very efficient
@@ -520,7 +520,8 @@ class ConsoleGraph(Generic[G]):
         for i, (node, node_buffer) in enumerate(self.node_buffers_current_lod.items()):
             self.node_idx_current_lod.insert(i, node_buffer.bounding_box)
 
-        # TODO Update affected edges
+        for u, v in affected_edges:
+            self.update_edge(u, v, self._nx_graph.edges[u, v], update_data=False)
 
     def update_edge(
         self, u: Hashable, v: Hashable, data: dict[str, Any], update_data: bool = True
@@ -705,6 +706,7 @@ class ConsoleGraph(Generic[G]):
         lod: int,
         coords: tuple[float, float],
     ):
+        affected_edges: list[tuple[Hashable, Hashable]] = []
         position = Point(
             x=round(coords[0] * self.zoom_x), y=round(coords[1] * self.zoom_y)
         )
@@ -715,7 +717,11 @@ class ConsoleGraph(Generic[G]):
         if node_buffer.center != position:
             node_buffer.center = position
             for v in nx.all_neighbors(self._nx_graph, node):
-                # TODO This really needs to be rerendered if we pop things
+                if (node, v) in self.edge_buffers_per_lod[lod]:
+                    affected_edges.append((node, v))
+                if (v, node) in self.edge_buffers_per_lod[lod]:
+                    affected_edges.append((v, node))
+
                 self.edge_buffers_per_lod[lod].pop((node, v), None)
                 self.edge_buffers_per_lod[lod].pop((v, node), None)
                 self.label_buffers_per_lod[lod].pop((node, v), None)
@@ -727,6 +733,8 @@ class ConsoleGraph(Generic[G]):
                 self.label_buffers_current_lod.pop((v, node), None)
 
         self.node_buffers_current_lod[node] = node_buffer
+
+        return affected_edges
 
     def _transition_render_edges_current_lod(self) -> None:
         if self._zoom_factor is None:
