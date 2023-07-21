@@ -265,11 +265,12 @@ class ConsoleGraph(Generic[G]):
         position: Point | None = None,
         data: dict[str, Any] | None = None,
     ) -> None:
+        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
+
         if data is None:
             data = dict()
-        # TODO Graph should be rendered by here, also on all other remove/add methods
-        self._nx_graph.add_node(node, **data)
 
+        self._nx_graph.add_node(node, **data)
         self.node_buffers[node] = rasterize_node(self.console, node, data)
 
         if position is not None:
@@ -310,6 +311,8 @@ class ConsoleGraph(Generic[G]):
     def add_edge(
         self, u: Hashable, v: Hashable, data: dict[str, Any] | None = None
     ) -> None:
+        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
+
         # TODO a lot of code duplication with the edge rendering
         edge_buffer: EdgeBuffer | None = None
         edge_layout: EdgeLayout | None = None
@@ -349,7 +352,6 @@ class ConsoleGraph(Generic[G]):
         )
 
         if result is not None:
-            print("ADDING LOD 1")
             edge_buffer, edge_layout, label_nodes = result
 
             # This works because insertion order is sort order for dicts
@@ -397,12 +399,9 @@ class ConsoleGraph(Generic[G]):
         if edge_layout is not None:
             self.edge_layouts_current_lod[(u, v)] = edge_layout
 
-        log("EDGE ADDED")
-        log(self._nx_graph.edges)
-        log(self.edge_buffers.keys())
-        log(self.edge_buffers_current_lod.keys())
-
     def remove_node(self, node: Hashable) -> None:
+        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
+
         self.node_positions.pop(node)
         self.node_buffers.pop(node)
         self.node_buffers_current_lod.pop(node)
@@ -427,9 +426,7 @@ class ConsoleGraph(Generic[G]):
         self._nx_graph.remove_node(node)
 
     def remove_edge(self, u: Hashable, v: Hashable) -> None:
-        log(self._nx_graph.edges)
-        log(self.edge_buffers.keys())
-        log(self.edge_buffers_current_lod.keys())
+        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
         self._nx_graph.remove_edge(u, v)
         self.edge_buffers.pop((u, v))
@@ -455,6 +452,9 @@ class ConsoleGraph(Generic[G]):
         data: dict[str, Any] | None = None,
         update_data: bool = True,
     ) -> None:
+        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
+        force_edge_rerender = False
+
         if data is None and position is None:
             return
 
@@ -464,10 +464,14 @@ class ConsoleGraph(Generic[G]):
                 new_data = dict(self._nx_graph.nodes[node], **data)
             else:
                 new_data = data
-            log("Updating node data", node=node, data=new_data)
+
             self._nx_graph.nodes[node].update(new_data)
             old_position = self.node_buffers[node].center
-            self.node_buffers[node] = rasterize_node(self.console, node, new_data)
+            new_node = rasterize_node(self.console, node, new_data)
+            old_node = self.node_buffers[node]
+            # If the data change, triggered a change of the shape, we need to rerender the edges
+            if new_node.shape.polygon(new_node) != old_node.shape.polygon(old_node):
+                force_edge_rerender = True
             self.node_buffers[node].center = old_position
 
         data = cast(dict[str, Any], self._nx_graph.nodes(data=True)[node])
@@ -508,7 +512,7 @@ class ConsoleGraph(Generic[G]):
         position = Point(
             x=round(coords[0] * self.zoom_x), y=round(coords[1] * self.zoom_y)
         )
-        affected_edges = self._render_node_buffer_current_lod(node, data, lod, coords)
+        affected_edges = self._render_node_buffer_current_lod(node, data, lod, coords, force_edge_rerender)
 
         # Rebuild indices
         # TODO: this is not very efficient
@@ -526,6 +530,8 @@ class ConsoleGraph(Generic[G]):
     def update_edge(
         self, u: Hashable, v: Hashable, data: dict[str, Any], update_data: bool = True
     ) -> None:
+        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
+
         # Needs also a mode to keep the layout but rerender
         # For now we remove the edge and re-add it
         # TODO: This is not efficient and does indeed rebuild the indices twice
@@ -705,6 +711,7 @@ class ConsoleGraph(Generic[G]):
         data: dict[str, Any],
         lod: int,
         coords: tuple[float, float],
+        force_edge_rerender: bool = False,
     ):
         affected_edges: list[tuple[Hashable, Hashable]] = []
         position = Point(
@@ -714,7 +721,9 @@ class ConsoleGraph(Generic[G]):
         if node_buffer is None:
             node_buffer = rasterize_node(self.console, node, data, lod=lod)
             self.node_buffers_per_lod[lod][node] = node_buffer
-        if node_buffer.center != position:
+            force_edge_rerender = True
+        # Node moved, we need to re-render the edges
+        if node_buffer.center != position or force_edge_rerender:
             node_buffer.center = position
             for v in nx.all_neighbors(self._nx_graph, node):
                 if (node, v) in self.edge_buffers_per_lod[lod]:

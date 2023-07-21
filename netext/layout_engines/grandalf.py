@@ -38,7 +38,6 @@ class GrandalfSugiyamaLayout(LayoutEngine[G]):
         graph = Graph(vertices.values(), edges)
 
         # TODO Open up settings to netext
-        # TODO Draw components next to each other.
         for c in graph.components():
             sug = SugiyamaLayout(c)
             sug.init_all()
