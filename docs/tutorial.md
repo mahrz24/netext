@@ -40,7 +40,7 @@ You can easily style the graph by adding attributes to the nodes and edges (see 
 import networkx as nx
 from rich.style import Style
 from rich.table import Table
-from rich import box
+from rich import box, print
 
 from netext import TerminalGraph
 from netext.edge_rasterizer import EdgeRoutingMode
