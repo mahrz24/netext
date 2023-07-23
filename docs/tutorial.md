@@ -39,11 +39,9 @@ You can easily style the graph by adding attributes to the nodes and edges (see 
 ```python
 import networkx as nx
 from rich.style import Style
-from rich.table import Table
-from rich import box
+from rich import box, print
 
 from netext import TerminalGraph
-from netext.edge_rasterizer import EdgeRoutingMode
 
 g = nx.binomial_tree(3)
 
@@ -60,11 +58,9 @@ print(TerminalGraph(g))
 ```{.rich title='Binomial Tree' }
 import networkx as nx
 from rich.style import Style
-from rich.table import Table
 from rich import box
 
 from netext import TerminalGraph
-from netext.edge_rasterizer import EdgeRoutingMode
 
 g = nx.binomial_tree(3)
 
