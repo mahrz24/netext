@@ -10,12 +10,11 @@ import networkx as nx
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.measure import Measurement
 
-from rtree import index
-
 from netext.geometry import Point, Region
 
 from netext.edge_rendering.buffer import EdgeBuffer
 from netext.edge_routing.edge import EdgeLayout
+from netext.geometry.index import BufferIndex
 
 from netext.rendering.segment_buffer import StripBuffer
 
@@ -180,11 +179,11 @@ class ConsoleGraph(Generic[G]):
             tuple[Hashable, Hashable], list[StripBuffer]
         ] = dict()
 
-        self.node_idx_1_lod = index.Index()
-        self.edge_idx_1_lod = index.Index()
+        self.node_idx_1_lod: BufferIndex[NodeBuffer, None] = BufferIndex()
+        self.edge_idx_1_lod: BufferIndex[EdgeBuffer, EdgeLayout] = BufferIndex()
 
-        self.node_idx_current_lod = index.Index()
-        self.edge_idx_current_lod = index.Index()
+        self.node_idx_current_lod: BufferIndex[NodeBuffer, None] = BufferIndex()
+        self.edge_idx_current_lod: BufferIndex[EdgeBuffer, EdgeLayout] = BufferIndex()
 
     def _require(self, required_state: RenderState):
         if required_state in nx.descendants(transition_graph, self._render_state):
@@ -305,6 +304,9 @@ class ConsoleGraph(Generic[G]):
                     x=round(coords[0] * self.zoom_x), y=round(coords[1] * self.zoom_y)
                 )
                 self._render_node_buffer_current_lod(node, data, lod, coords)
+
+                self.node_idx_1_lod.insert(self.node_buffers[node])
+                self.node_idx_current_lod.insert(self.node_buffers_current_lod[node])
         else:
             self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_1_LOD)
 
@@ -355,7 +357,7 @@ class ConsoleGraph(Generic[G]):
             edge_buffer, edge_layout, label_nodes = result
 
             # This works because insertion order is sort order for dicts
-            self.edge_idx_1_lod.insert(len(self.edge_buffers), edge_buffer.bounding_box)
+            self.edge_idx_1_lod.insert(edge_buffer)
 
             self.edge_buffers[(u, v)] = edge_buffer
             self.edge_layouts[(u, v)] = edge_layout
@@ -384,9 +386,7 @@ class ConsoleGraph(Generic[G]):
 
         if result is not None:
             edge_buffer, edge_layout, label_nodes = result
-            self.edge_idx_current_lod.insert(
-                len(self.edge_buffers_current_lod), edge_buffer.bounding_box
-            )
+            self.edge_idx_current_lod.insert(edge_buffer, edge_layout)
 
             self.edge_buffers_per_lod[edge_lod][(u, v)] = edge_buffer
             self.edge_layouts_per_lod[edge_lod][(u, v)] = edge_layout
@@ -403,21 +403,16 @@ class ConsoleGraph(Generic[G]):
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
         self.node_positions.pop(node)
-        self.node_buffers.pop(node)
-        self.node_buffers_current_lod.pop(node)
+        node_buffer_1_lod = self.node_buffers.pop(node)
+        node_buffer_current_lod = self.node_buffers_current_lod.pop(node)
 
         for lod in self.node_buffers_per_lod.keys():
             self.node_buffers_per_lod[lod].pop(node, None)
 
-        # Rebuild indices
-        # TODO: this is not very efficient
-        self.node_idx_1_lod = index.Index()
-        for i, (node, node_buffer) in enumerate(self.node_buffers.items()):
-            self.node_idx_1_lod.insert(i, node_buffer.bounding_box)
-
-        self.node_idx_current_lod = index.Index()
-        for i, (node, node_buffer) in enumerate(self.node_buffers_current_lod.items()):
-            self.node_idx_current_lod.insert(i, node_buffer.bounding_box)
+        if node_buffer_1_lod is not None:
+            self.node_idx_1_lod.delete(node_buffer_1_lod)
+        if node_buffer_current_lod is not None:
+            self.node_idx_current_lod.delete(node_buffer_current_lod)
 
         for u, v in self._nx_graph.edges():
             if u == node or v == node:
@@ -429,21 +424,16 @@ class ConsoleGraph(Generic[G]):
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
         self._nx_graph.remove_edge(u, v)
-        self.edge_buffers.pop((u, v))
-        self.edge_buffers_current_lod.pop((u, v))
+        edge_buffer_1_lod = self.edge_buffers.pop((u, v))
+        edge_buffer_current_lod = self.edge_buffers_current_lod.pop((u, v))
 
         for lod in self.edge_buffers_per_lod.keys():
             self.edge_buffers_per_lod[lod].pop((u, v), None)
 
-        # Rebuild indices
-        # TODO: this is not very efficient
-        self.edge_idx_1_lod = index.Index()
-        for i, (edge, edge_buffer) in enumerate(self.edge_buffers.items()):
-            self.edge_idx_1_lod.insert(i, edge_buffer.bounding_box)
-
-        self.edge_idx_current_lod = index.Index()
-        for i, (edge, edge_buffer) in enumerate(self.edge_buffers_current_lod.items()):
-            self.edge_idx_current_lod.insert(i, edge_buffer.bounding_box)
+        if edge_buffer_1_lod is not None:
+            self.edge_idx_1_lod.delete(edge_buffer_1_lod)
+        if edge_buffer_current_lod is not None:
+            self.edge_idx_current_lod.delete(edge_buffer_current_lod)
 
     def update_node(
         self,
@@ -512,17 +502,12 @@ class ConsoleGraph(Generic[G]):
         position = Point(
             x=round(coords[0] * self.zoom_x), y=round(coords[1] * self.zoom_y)
         )
-        affected_edges = self._render_node_buffer_current_lod(node, data, lod, coords, force_edge_rerender)
+        affected_edges = self._render_node_buffer_current_lod(
+            node, data, lod, coords, force_edge_rerender
+        )
 
-        # Rebuild indices
-        # TODO: this is not very efficient
-        self.node_idx_1_lod = index.Index()
-        for i, (node, node_buffer) in enumerate(self.node_buffers.items()):
-            self.node_idx_1_lod.insert(i, node_buffer.bounding_box)
-
-        self.node_idx_current_lod = index.Index()
-        for i, (node, node_buffer) in enumerate(self.node_buffers_current_lod.items()):
-            self.node_idx_current_lod.insert(i, node_buffer.bounding_box)
+        self.node_idx_1_lod.update(self.node_buffers[node])
+        self.node_idx_current_lod.update(self.node_buffers_current_lod[node])
 
         for u, v in affected_edges:
             self.update_edge(u, v, self._nx_graph.edges[u, v], update_data=False)
@@ -534,7 +519,7 @@ class ConsoleGraph(Generic[G]):
 
         # Needs also a mode to keep the layout but rerender
         # For now we remove the edge and re-add it
-        # TODO: This is not efficient and does indeed rebuild the indices twice
+        # TODO: This is not efficient
         old_data = self._nx_graph.edges[u, v]
         self.remove_edge(u, v)
         data = dict(old_data, **data) if update_data else data
@@ -651,8 +636,8 @@ class ConsoleGraph(Generic[G]):
         self.edge_layouts_current_lod = dict()
 
         # Iterate over all edges (so far in no particular order)
-        self.node_idx_1_lod = index.Index()
-        self.edge_idx_1_lod = index.Index()
+        self.node_idx_1_lod.reset()
+        self.edge_idx_1_lod.reset()
 
         # Make sure we use the lod 1 positions:
         for node, node_buffer in self.node_buffers.items():
@@ -663,7 +648,7 @@ class ConsoleGraph(Generic[G]):
 
         all_node_buffers = []
         for i, (node, node_buffer) in enumerate(self.node_buffers.items()):
-            self.node_idx_1_lod.insert(i, node_buffer.bounding_box)
+            self.node_idx_1_lod.insert(node_buffer)
             all_node_buffers.append(node_buffer)
 
         for u, v, data in self._nx_graph.edges(data=True):
@@ -712,7 +697,7 @@ class ConsoleGraph(Generic[G]):
         lod: int,
         coords: tuple[float, float],
         force_edge_rerender: bool = False,
-    ):
+    ) -> list[tuple[Hashable, Hashable]]:
         affected_edges: list[tuple[Hashable, Hashable]] = []
         position = Point(
             x=round(coords[0] * self.zoom_x), y=round(coords[1] * self.zoom_y)
@@ -755,14 +740,14 @@ class ConsoleGraph(Generic[G]):
         # Now we rasterize the edges
 
         # Iterate over all edges (so far in no particular order)
-        self.node_idx_current_lod = index.Index()
-        self.edge_idx_current_lod = index.Index()
+        self.node_idx_current_lod.reset()
+        self.edge_idx_current_lod.reset()
 
         edge_layouts: list[EdgeLayout] = []
 
         all_node_buffers = []
-        for i, (node, node_buffer) in enumerate(self.node_buffers_current_lod.items()):
-            self.node_idx_current_lod.insert(i, node_buffer.bounding_box)
+        for _, node_buffer in self.node_buffers_current_lod.items():
+            self.node_idx_current_lod.insert(node_buffer)
             all_node_buffers.append(node_buffer)
 
         for u, v, data in self._nx_graph.edges(data=True):
@@ -788,9 +773,7 @@ class ConsoleGraph(Generic[G]):
                 )
                 if result is not None:
                     edge_buffer, edge_layout, label_nodes = result
-                    self.edge_idx_current_lod.insert(
-                        len(self.edge_buffers_current_lod), edge_buffer.bounding_box
-                    )
+                    self.edge_idx_current_lod.insert(edge_buffer, edge_layout)
 
                     self.edge_buffers_per_lod[edge_lod][(u, v)] = edge_buffer
                     self.edge_layouts_per_lod[edge_lod][(u, v)] = edge_layout

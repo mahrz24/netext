@@ -2,10 +2,8 @@ from netext.edge_routing.edge import EdgeLayout, EdgeSegment, RoutedEdgeSegments
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.edge_routing.orthogonal import route_orthogonal_edge
 from netext.geometry import Point
+from netext.geometry.index import BufferIndex
 from netext.node_rasterizer import NodeBuffer
-
-
-from rtree.index import Index
 
 
 def route_edge(
@@ -14,10 +12,8 @@ def route_edge(
     routing_mode: EdgeRoutingMode,
     all_nodes: list[NodeBuffer] = [],
     routed_edges: list[EdgeLayout] = [],
-    node_view: list[int] = [],
-    edge_view: list[int] = [],
-    node_idx: Index | None = None,
-    edge_idx: Index | None = None,
+    node_idx: BufferIndex | None = None,
+    edge_idx: BufferIndex | None = None,
 ) -> RoutedEdgeSegments:
     match routing_mode:
         case EdgeRoutingMode.STRAIGHT:
@@ -31,8 +27,6 @@ def route_edge(
                 end=end,
                 all_nodes=all_nodes,
                 routed_edges=routed_edges,
-                node_view=node_view,
-                edge_view=edge_view,
                 node_idx=node_idx,
                 edge_idx=edge_idx,
             )

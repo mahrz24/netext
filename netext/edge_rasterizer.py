@@ -13,10 +13,10 @@ from netext.edge_routing.edge import EdgeInput
 from netext.edge_routing.route import route_edge
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.geometry import Magnet
+from netext.geometry.index import BufferIndex
 
 from netext.node_rasterizer import EdgeLabelBuffer, JustContent, NodeBuffer
 from netext.rendering.segment_buffer import StripBuffer
-from rtree.index import Index
 
 # label_position: Point | None
 # start_tip_position: Point | None
@@ -30,8 +30,8 @@ def rasterize_edge(
     all_nodes: list[NodeBuffer],
     routed_edges: list[EdgeLayout],
     data: Any,
-    node_idx: Index | None = None,
-    edge_idx: Index | None = None,
+    node_idx: BufferIndex | None = None,
+    edge_idx: BufferIndex | None = None,
     lod: int = 1,
 ) -> tuple[EdgeBuffer, EdgeLayout, list[StripBuffer]] | None:
     show = data.get("$show", True)
@@ -85,22 +85,18 @@ def rasterize_edge(
 
     # First we route the edge with allowing the center magnet as start and end
     # This routing already tries to avoid other nodes.
-    non_start_end_node_indices = [
-        i
-        for i, node_buffer in enumerate(all_nodes)
+    non_start_end_nodes = [
+        node_buffer
+        for node_buffer in all_nodes
         if node_buffer is not u_buffer and node_buffer is not v_buffer
     ]
-
-    routed_edge_indices = list(range(len(routed_edges)))
 
     edge_segments = route_edge(
         start,
         end,
         routing_mode,
-        all_nodes,
+        non_start_end_nodes,
         routed_edges,
-        non_start_end_node_indices,
-        routed_edge_indices,
         node_idx,
         edge_idx,
     )
@@ -136,6 +132,9 @@ def rasterize_edge(
             case EdgeSegmentDrawingMode.BLOCK:
                 x_scaling = 2
                 y_scaling = 2
+            case _:
+                x_scaling = 1
+                y_scaling = 1
 
         bitmap_buffer = rasterize_edge_segments(
             edge_segments.segments, x_scaling=x_scaling, y_scaling=y_scaling
