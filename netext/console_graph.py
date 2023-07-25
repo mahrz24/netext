@@ -529,7 +529,7 @@ class ConsoleGraph(Generic[G]):
     ) -> None:
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
-        # Needs also a mode to keep the layout but rerender
+        # TODO Needs also a mode to keep the layout but rerender
         # For now we remove the edge and re-add it
         # TODO: This is not efficient
         old_data = self._nx_graph.edges[u, v]
