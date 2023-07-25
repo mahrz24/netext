@@ -356,8 +356,7 @@ class ConsoleGraph(Generic[G]):
         if result is not None:
             edge_buffer, edge_layout, label_nodes = result
 
-            # This works because insertion order is sort order for dicts
-            self.edge_idx_1_lod.insert(edge_buffer)
+            self.edge_idx_1_lod.insert(edge_buffer, edge_layout)
 
             self.edge_buffers[(u, v)] = edge_buffer
             self.edge_layouts[(u, v)] = edge_layout
@@ -372,32 +371,35 @@ class ConsoleGraph(Generic[G]):
         edge_layout = self.edge_layouts_per_lod[edge_lod].get((u, v))
         label_nodes = self.label_buffers_per_lod[edge_lod].get((u, v))
 
-        result = rasterize_edge(
-            self.console,
-            self.node_buffers_per_lod[u_lod][u],
-            self.node_buffers_per_lod[v_lod][v],
-            list(self.node_buffers_current_lod.values()),
-            list(self.edge_layouts_current_lod.values()),
-            data,
-            self.node_idx_current_lod,
-            self.edge_idx_current_lod,
-            edge_lod,
-        )
+        if edge_buffer is None or edge_layout is None or label_nodes is None:
+            result = rasterize_edge(
+                self.console,
+                self.node_buffers_per_lod[u_lod][u],
+                self.node_buffers_per_lod[v_lod][v],
+                list(self.node_buffers_current_lod.values()),
+                list(self.edge_layouts_current_lod.values()),
+                data,
+                self.node_idx_current_lod,
+                self.edge_idx_current_lod,
+                edge_lod,
+            )
 
-        if result is not None:
-            edge_buffer, edge_layout, label_nodes = result
-            self.edge_idx_current_lod.insert(edge_buffer, edge_layout)
-
-            self.edge_buffers_per_lod[edge_lod][(u, v)] = edge_buffer
-            self.edge_layouts_per_lod[edge_lod][(u, v)] = edge_layout
-            self.label_buffers_per_lod[edge_lod][(u, v)] = label_nodes
+            if result is not None:
+                edge_buffer, edge_layout, label_nodes = result
 
         if edge_buffer is not None:
+            self.edge_idx_current_lod.insert(edge_buffer, edge_layout)
+            self.edge_buffers_per_lod[edge_lod][(u, v)] = edge_buffer
             self.edge_buffers_current_lod[(u, v)] = edge_buffer
         if label_nodes is not None:
             self.label_buffers_current_lod[(u, v)] = label_nodes
+            self.label_buffers_per_lod[edge_lod][(u, v)] = label_nodes
         if edge_layout is not None:
+            self.edge_layouts_per_lod[edge_lod][(u, v)] = edge_layout
             self.edge_layouts_current_lod[(u, v)] = edge_layout
+
+        log(self.edge_buffers)
+        log(self.edge_buffers_current_lod)
 
     def remove_node(self, node: Hashable) -> None:
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
@@ -422,6 +424,9 @@ class ConsoleGraph(Generic[G]):
 
     def remove_edge(self, u: Hashable, v: Hashable) -> None:
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
+
+        log(f"Removing edge {u} {v}")
+        log(self.edge_buffers)
 
         self._nx_graph.remove_edge(u, v)
         edge_buffer_1_lod = self.edge_buffers.pop((u, v))
@@ -459,10 +464,15 @@ class ConsoleGraph(Generic[G]):
             old_position = self.node_buffers[node].center
             new_node = rasterize_node(self.console, node, new_data)
             old_node = self.node_buffers[node]
+            new_node.center = old_position
+            self.node_buffers[node] = new_node
+
             # If the data change, triggered a change of the shape, we need to rerender the edges
+            log(new_node.shape.polygon(new_node))
+            log(old_node.shape.polygon(old_node))
+            log(new_node.shape.polygon(new_node) != old_node.shape.polygon(old_node))
             if new_node.shape.polygon(new_node) != old_node.shape.polygon(old_node):
                 force_edge_rerender = True
-            self.node_buffers[node].center = old_position
 
         data = cast(dict[str, Any], self._nx_graph.nodes(data=True)[node])
 
@@ -470,6 +480,7 @@ class ConsoleGraph(Generic[G]):
             coords = self.node_positions[node]
             zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
         else:
+            force_edge_rerender = True
             # TODO same as in add_node
             pos_x, pos_y = position.as_tuple()
             # We add a new node and first need to transform the point from the buffer space to the not zoomed
@@ -509,8 +520,9 @@ class ConsoleGraph(Generic[G]):
         self.node_idx_1_lod.update(self.node_buffers[node])
         self.node_idx_current_lod.update(self.node_buffers_current_lod[node])
 
-        for u, v in affected_edges:
-            self.update_edge(u, v, self._nx_graph.edges[u, v], update_data=False)
+        if force_edge_rerender:
+            for u, v in affected_edges:
+                self.update_edge(u, v, self._nx_graph.edges[u, v], update_data=False)
 
     def update_edge(
         self, u: Hashable, v: Hashable, data: dict[str, Any], update_data: bool = True
@@ -643,7 +655,7 @@ class ConsoleGraph(Generic[G]):
         for node, node_buffer in self.node_buffers.items():
             node_buffer.center = Point(
                 x=round(self.node_positions[node][0]),
-                y=round(self.node_positions[node][0]),
+                y=round(self.node_positions[node][1]),
             )
 
         all_node_buffers = []
@@ -665,9 +677,7 @@ class ConsoleGraph(Generic[G]):
             )
             if result is not None:
                 edge_buffer, edge_layout, label_nodes = result
-                self.edge_idx_1_lod.insert(
-                    len(self.edge_buffers), edge_buffer.bounding_box
-                )
+                self.edge_idx_1_lod.insert(edge_buffer, edge_layout)
 
                 self.edge_buffers[(u, v)] = edge_buffer
                 self.edge_layouts[(u, v)] = edge_layout
@@ -710,21 +720,22 @@ class ConsoleGraph(Generic[G]):
         # Node moved, we need to re-render the edges
         if node_buffer.center != position or force_edge_rerender:
             node_buffer.center = position
-            for v in nx.all_neighbors(self._nx_graph, node):
-                if (node, v) in self.edge_buffers_per_lod[lod]:
-                    affected_edges.append((node, v))
-                if (v, node) in self.edge_buffers_per_lod[lod]:
-                    affected_edges.append((v, node))
+            if lod in self.edge_buffers_per_lod:
+                for v in nx.all_neighbors(self._nx_graph, node):
+                    if (node, v) in self.edge_buffers_per_lod[lod]:
+                        affected_edges.append((node, v))
+                    if (v, node) in self.edge_buffers_per_lod[lod]:
+                        affected_edges.append((v, node))
 
-                self.edge_buffers_per_lod[lod].pop((node, v), None)
-                self.edge_buffers_per_lod[lod].pop((v, node), None)
-                self.label_buffers_per_lod[lod].pop((node, v), None)
-                self.label_buffers_per_lod[lod].pop((v, node), None)
+                    self.edge_buffers_per_lod[lod].pop((node, v), None)
+                    self.edge_buffers_per_lod[lod].pop((v, node), None)
+                    self.label_buffers_per_lod[lod].pop((node, v), None)
+                    self.label_buffers_per_lod[lod].pop((v, node), None)
 
-                self.edge_buffers_current_lod.pop((node, v), None)
-                self.edge_buffers_current_lod.pop((v, node), None)
-                self.label_buffers_current_lod.pop((node, v), None)
-                self.label_buffers_current_lod.pop((v, node), None)
+                    self.edge_buffers_current_lod.pop((node, v), None)
+                    self.edge_buffers_current_lod.pop((v, node), None)
+                    self.label_buffers_current_lod.pop((node, v), None)
+                    self.label_buffers_current_lod.pop((v, node), None)
 
         self.node_buffers_current_lod[node] = node_buffer
 
@@ -755,6 +766,12 @@ class ConsoleGraph(Generic[G]):
             v_lod = determine_lod(self._nx_graph.nodes[v], self._zoom_factor)
 
             edge_lod = determine_lod(data, self._zoom_factor)
+
+            if edge_lod not in self.edge_buffers_per_lod:
+                self.edge_buffers_per_lod[edge_lod] = dict()
+                self.edge_layouts_per_lod[edge_lod] = dict()
+                self.label_buffers_per_lod[edge_lod] = dict()
+
             edge_buffer = self.edge_buffers_per_lod[edge_lod].get((u, v))
             edge_layout = self.edge_layouts_per_lod[edge_lod].get((u, v))
             label_nodes = self.label_buffers_per_lod[edge_lod].get((u, v))

@@ -77,19 +77,16 @@ class MainScreen(Screen):
     ) -> None:
         g = self.query_one(GraphView)
         if old_value is not None and old_value.type == "edge":
-            # TODO updating edges should also be possible partially and resetting as well
             g.update_edge(*old_value.ref, data={"$style": Style(color="white")})
 
         if new_value is not None and new_value.type == "edge":
-            # TODO updating edges should also be possible partially and resetting as well
             g.update_edge(*new_value.ref, data={"$style": Style(color="green")})
 
         if old_value is not None and old_value.type == "node":
-            # TODO updating edges should also be possible partially and resetting as well
             g.update_node(old_value.ref, data={"$style": None})
 
         if new_value is not None and new_value.type == "node":
-            # TODO updating edges should also be possible partially and resetting as well
+            self.log(f"Hover on node {new_value.ref}")
             g.update_node(new_value.ref, data={"$style": Style(color="green")})
 
     def on_click(self, event: events.Click) -> None:
@@ -127,7 +124,7 @@ class MainScreen(Screen):
         if self.current_editor is not None:
             self.end_node_editing(*self.current_editor)
 
-        title = g.graph[node]["title"]
+        title = g.graph.nodes(data=True)[node]["title"]
         input_widget = Input(placeholder=title)
         input_widget.focus()
         g.attach_widget_to_node(widget=input_widget, node=node)

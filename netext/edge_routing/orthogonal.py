@@ -11,8 +11,6 @@ def route_orthogonal_edge(
     end: Point,
     all_nodes: list[NodeBuffer] = [],
     routed_edges: list[EdgeLayout] = [],
-    node_view: list[int] = [],
-    edge_view: list[int] = [],
     node_idx: BufferIndex[NodeBuffer, None] | None = None,
     edge_idx: BufferIndex[EdgeBuffer, EdgeLayout] | None = None,
     recursion_depth: int = 0,
@@ -22,15 +20,16 @@ def route_orthogonal_edge(
     The edge will be routed in a way that minimizes the number of intersections with other nodes.
     """
     straight_connection = LineSegment(start=start, end=end)
-
     relevant_nodes = all_nodes
     if node_idx is not None:
-        relevant_nodes = node_idx.intersection(straight_connection.bounding_box)
+        relevant_nodes = node_idx.intersection(
+            straight_connection.bounding_box, restrict=relevant_nodes
+        )
 
     relevant_edges = routed_edges
     if edge_idx is not None:
         relevant_edges = edge_idx.annotations_for_intersection(
-            straight_connection.bounding_box
+            straight_connection.bounding_box, restrict=relevant_edges
         )
 
     # TODO: Add different midpoints as candidates.
@@ -56,10 +55,8 @@ def route_orthogonal_edge(
             route_orthogonal_edge(
                 start=start,
                 end=EdgeSegment(start=start, end=end).midpoint,
-                all_nodes=all_nodes,
-                routed_edges=routed_edges,
-                node_view=node_view,
-                edge_view=edge_view,
+                all_nodes=relevant_nodes,
+                routed_edges=relevant_edges,
                 node_idx=node_idx,
                 edge_idx=edge_idx,
                 recursion_depth=recursion_depth + 1,
@@ -67,10 +64,8 @@ def route_orthogonal_edge(
                 route_orthogonal_edge(
                     start=EdgeSegment(start=start, end=end).midpoint,
                     end=end,
-                    all_nodes=all_nodes,
-                    routed_edges=routed_edges,
-                    node_view=node_view,
-                    edge_view=edge_view,
+                    all_nodes=relevant_nodes,
+                    routed_edges=relevant_edges,
                     node_idx=node_idx,
                     edge_idx=edge_idx,
                     recursion_depth=recursion_depth + 1,
@@ -82,10 +77,8 @@ def route_orthogonal_edge(
             route_orthogonal_edge(
                 start=start,
                 end=Point(start.x, round((end.y + start.y) / 2)),
-                all_nodes=all_nodes,
-                routed_edges=routed_edges,
-                node_view=node_view,
-                edge_view=edge_view,
+                all_nodes=relevant_nodes,
+                routed_edges=relevant_edges,
                 node_idx=node_idx,
                 edge_idx=edge_idx,
                 recursion_depth=recursion_depth + 1,
@@ -93,10 +86,8 @@ def route_orthogonal_edge(
                 route_orthogonal_edge(
                     start=Point(start.x, round((end.y + start.y) / 2)),
                     end=end,
-                    all_nodes=all_nodes,
-                    routed_edges=routed_edges,
-                    node_view=node_view,
-                    edge_view=edge_view,
+                    all_nodes=relevant_nodes,
+                    routed_edges=relevant_edges,
                     node_idx=node_idx,
                     edge_idx=edge_idx,
                     recursion_depth=recursion_depth + 1,
@@ -108,10 +99,8 @@ def route_orthogonal_edge(
             route_orthogonal_edge(
                 start=start,
                 end=Point(round((end.x + start.x) / 2), start.y),
-                all_nodes=all_nodes,
-                routed_edges=routed_edges,
-                node_view=node_view,
-                edge_view=edge_view,
+                all_nodes=relevant_nodes,
+                routed_edges=relevant_edges,
                 node_idx=node_idx,
                 edge_idx=edge_idx,
                 recursion_depth=recursion_depth + 1,
@@ -119,10 +108,8 @@ def route_orthogonal_edge(
                 route_orthogonal_edge(
                     start=Point(round((end.x + start.x) / 2), start.y),
                     end=end,
-                    all_nodes=all_nodes,
-                    routed_edges=routed_edges,
-                    node_view=node_view,
-                    edge_view=edge_view,
+                    all_nodes=relevant_nodes,
+                    routed_edges=relevant_edges,
                     node_idx=node_idx,
                     edge_idx=edge_idx,
                     recursion_depth=recursion_depth + 1,

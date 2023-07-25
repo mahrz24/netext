@@ -30,8 +30,8 @@ def rasterize_edge(
     all_nodes: list[NodeBuffer],
     routed_edges: list[EdgeLayout],
     data: Any,
-    node_idx: BufferIndex | None = None,
-    edge_idx: BufferIndex | None = None,
+    node_idx: BufferIndex[NodeBuffer, None] | None = None,
+    edge_idx: BufferIndex[EdgeBuffer, EdgeLayout] | None = None,
     lod: int = 1,
 ) -> tuple[EdgeBuffer, EdgeLayout, list[StripBuffer]] | None:
     show = data.get("$show", True)

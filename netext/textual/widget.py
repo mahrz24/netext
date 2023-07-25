@@ -155,7 +155,6 @@ class GraphView(ScrollView, Generic[G]):
                 )
             else:
                 node_position = position
-            self.log(f"Adding node {node} at {node_position}")
             self._console_graph.add_node(node, node_position, data)
             self._graph = self._console_graph._nx_graph.copy()
             self._graph_was_updated()
@@ -197,7 +196,6 @@ class GraphView(ScrollView, Generic[G]):
                 )
             else:
                 node_position = position
-            self.log(f"Adding node {node} at {node_position}")
             self._console_graph.update_node(
                 node, node_position, data, update_data=update_data
             )
