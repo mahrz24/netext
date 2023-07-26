@@ -402,7 +402,8 @@ class ConsoleGraph(Generic[G]):
         if node_buffer_current_lod is not None:
             self.node_idx_current_lod.delete(node_buffer_current_lod)
 
-        for u, v in self._nx_graph.edges():
+        edges = list(self._nx_graph.edges())
+        for u, v in edges:
             if u == node or v == node:
                 self.remove_edge(u, v)
 
@@ -837,13 +838,12 @@ class ConsoleGraph(Generic[G]):
                 )
                 if result is not None:
                     edge_buffer, edge_layout, label_nodes = result
-                    self.edge_idx_current_lod.insert(edge_buffer, edge_layout)
-
                     self.edge_buffers_per_lod[edge_lod][(u, v)] = edge_buffer
                     self.edge_layouts_per_lod[edge_lod][(u, v)] = edge_layout
                     self.label_buffers_per_lod[edge_lod][(u, v)] = label_nodes
 
             if edge_buffer is not None:
+                self.edge_idx_current_lod.insert(edge_buffer, edge_layout)
                 self.edge_buffers_current_lod[(u, v)] = edge_buffer
             if label_nodes is not None:
                 self.label_buffers_current_lod[(u, v)] = label_nodes
