@@ -8,7 +8,7 @@ from netext.edge_rendering.box import orthogonal_segments_to_strips_with_box_cha
 from netext.edge_rendering.bresenham import rasterize_edge_segments
 from netext.edge_rendering.buffer import EdgeBuffer
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
-from netext.edge_routing.edge import EdgeLayout
+from netext.edge_routing.edge import EdgeLayout, RoutedEdgeSegments
 from netext.edge_routing.edge import EdgeInput
 from netext.edge_routing.route import route_edge
 from netext.edge_routing.modes import EdgeRoutingMode
@@ -33,6 +33,7 @@ def rasterize_edge(
     node_idx: BufferIndex[NodeBuffer, None] | None = None,
     edge_idx: BufferIndex[EdgeBuffer, EdgeLayout] | None = None,
     lod: int = 1,
+    edge_layout: EdgeLayout | None = None,
 ) -> tuple[EdgeBuffer, EdgeLayout, list[StripBuffer]] | None:
     show = data.get("$show", True)
 
@@ -78,34 +79,38 @@ def rasterize_edge(
         label=label,
         routing_mode=routing_mode,
         edge_segment_drawing_mode=edge_segment_drawing_mode,
-        routing_hints=[],
+        routing_hints=[],  # TODO: If doing relayout, the edge input should contain the existing segments
     )
 
-    # We perform a two pass routing here.
+    if edge_layout is None:
+        # We perform a two pass routing here.
+        # First we route the edge with allowing the center magnet as start and end
+        # This routing already tries to avoid other nodes.
+        non_start_end_nodes = [
+            node_buffer
+            for node_buffer in all_nodes
+            if node_buffer is not u_buffer and node_buffer is not v_buffer
+        ]
 
-    # First we route the edge with allowing the center magnet as start and end
-    # This routing already tries to avoid other nodes.
-    non_start_end_nodes = [
-        node_buffer
-        for node_buffer in all_nodes
-        if node_buffer is not u_buffer and node_buffer is not v_buffer
-    ]
+        edge_segments = route_edge(
+            start,
+            end,
+            routing_mode,
+            non_start_end_nodes,
+            routed_edges,
+            node_idx,
+            edge_idx,
+        )
 
-    edge_segments = route_edge(
-        start,
-        end,
-        routing_mode,
-        non_start_end_nodes,
-        routed_edges,
-        node_idx,
-        edge_idx,
-    )
+        # Then we cut the edge with the node boundaries.
+        edge_segments = edge_segments.cut_with_nodes([u_buffer, v_buffer])
 
-    # Then we cut the edge with the node boundaries.
-    edge_segments = edge_segments.cut_with_nodes([u_buffer, v_buffer])
-
-    if not edge_segments.segments:
-        return None
+        if not edge_segments.segments:
+            return None
+    else:
+        edge_segments = RoutedEdgeSegments(
+            segments=edge_layout.segments, intersections=0
+        )
 
     if edge_segment_drawing_mode in [
         EdgeSegmentDrawingMode.BOX,
@@ -147,7 +152,7 @@ def rasterize_edge(
 
     z_index = len(all_nodes) ** 2
     if routed_edges:
-        z_index = min([layout.z_index for layout in routed_edges]) - 1
+        z_index += len(routed_edges)
     edge_layout = EdgeLayout(
         input=edge_input, segments=edge_segments.segments, z_index=z_index
     )

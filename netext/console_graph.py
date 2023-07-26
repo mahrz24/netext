@@ -24,8 +24,6 @@ from netext.layout_engines.engine import LayoutEngine, G
 from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
 from netext.node_rasterizer import NodeBuffer, rasterize_node
 
-from textual import log
-
 
 class RenderState(Enum):
     INITIAL = "initial"
@@ -195,9 +193,7 @@ class ConsoleGraph(Generic[G]):
             el = transition_graph.edges[u, v]
             transition = el["transition"]
             transition_func = getattr(self, f"_transition_{transition}")
-            log(f"Transitioning from {u} to {v} using {transition}")
             transition_func()
-            log(f"Transitioned to {transition}")
             self._render_state = v
 
     def _reset_render_state(self, new_state: RenderState) -> None:
@@ -292,10 +288,6 @@ class ConsoleGraph(Generic[G]):
                 zoom_factor = min([zoom_x, zoom_y])
 
             if zoom_factor != self._zoom_factor:
-                log(
-                    "RESETTING RENDER STATE AS ZOOM FACTOR CHANGED FROM"
-                    f" {self._zoom_factor} to {zoom_factor}"
-                )
                 self._zoom_factor = zoom_factor
                 self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
             else:
@@ -315,13 +307,10 @@ class ConsoleGraph(Generic[G]):
     ) -> None:
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
-        # TODO a lot of code duplication with the edge rendering
+        # TODO A lot of code duplication with the edge rendering
         edge_buffer: EdgeBuffer | None = None
         edge_layout: EdgeLayout | None = None
         label_nodes: list[StripBuffer] | None = None
-
-        log("Adding edge", u, v, data)
-        log(self.edge_buffers.keys())
 
         if self._zoom_factor is None:
             raise RuntimeError(
@@ -398,9 +387,6 @@ class ConsoleGraph(Generic[G]):
             self.edge_layouts_per_lod[edge_lod][(u, v)] = edge_layout
             self.edge_layouts_current_lod[(u, v)] = edge_layout
 
-        log(self.edge_buffers)
-        log(self.edge_buffers_current_lod)
-
     def remove_node(self, node: Hashable) -> None:
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
@@ -424,9 +410,6 @@ class ConsoleGraph(Generic[G]):
 
     def remove_edge(self, u: Hashable, v: Hashable) -> None:
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
-
-        log(f"Removing edge {u} {v}")
-        log(self.edge_buffers)
 
         self._nx_graph.remove_edge(u, v)
         edge_buffer_1_lod = self.edge_buffers.pop((u, v))
@@ -468,9 +451,6 @@ class ConsoleGraph(Generic[G]):
             self.node_buffers[node] = new_node
 
             # If the data change, triggered a change of the shape, we need to rerender the edges
-            log(new_node.shape.polygon(new_node))
-            log(old_node.shape.polygon(old_node))
-            log(new_node.shape.polygon(new_node) != old_node.shape.polygon(old_node))
             if new_node.shape.polygon(new_node) != old_node.shape.polygon(old_node):
                 force_edge_rerender = True
 
@@ -501,10 +481,6 @@ class ConsoleGraph(Generic[G]):
                 zoom_factor = min([zoom_x, zoom_y])
 
             if zoom_factor != self._zoom_factor:
-                log(
-                    "RESETTING RENDER STATE AS ZOOM FACTOR CHANGED FROM"
-                    f" {self._zoom_factor} to {zoom_factor}"
-                )
                 self._zoom_factor = zoom_factor
                 self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
                 return
@@ -525,17 +501,88 @@ class ConsoleGraph(Generic[G]):
                 self.update_edge(u, v, self._nx_graph.edges[u, v], update_data=False)
 
     def update_edge(
-        self, u: Hashable, v: Hashable, data: dict[str, Any], update_data: bool = True
+        self,
+        u: Hashable,
+        v: Hashable,
+        data: dict[str, Any],
+        update_data: bool = True,
+        update_layout: bool = True,
     ) -> None:
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
-        # TODO Needs also a mode to keep the layout but rerender
-        # For now we remove the edge and re-add it
-        # TODO: This is not efficient
+        if self._zoom_factor is None:
+            raise RuntimeError(
+                "You can only update edges once the zoom factor has been computed"
+            )
+
         old_data = self._nx_graph.edges[u, v]
-        self.remove_edge(u, v)
         data = dict(old_data, **data) if update_data else data
-        self.add_edge(u, v, data)
+        self._nx_graph.edges[u, v].update(data)
+
+        edge_buffer: EdgeBuffer | None = None
+        edge_layout: EdgeLayout | None = None
+        label_nodes: list[StripBuffer] | None = None
+
+        old_edge_layout = None
+        if not update_layout:
+            old_edge_layout = self.edge_layouts.get((u, v))
+
+        result = rasterize_edge(
+            self.console,
+            self.node_buffers[u],
+            self.node_buffers[v],
+            list(self.node_buffers.values()),
+            list(self.edge_layouts.values()),
+            data,
+            self.node_idx_1_lod,
+            self.edge_idx_1_lod,
+            lod=1,
+            edge_layout=old_edge_layout,
+        )
+
+        if result is not None:
+            edge_buffer, edge_layout, label_nodes = result
+
+            self.edge_idx_1_lod.insert(edge_buffer, edge_layout)
+
+            self.edge_buffers[(u, v)] = edge_buffer
+            self.edge_layouts[(u, v)] = edge_layout
+            self.label_buffers[(u, v)] = label_nodes
+
+        u_lod = determine_lod(self._nx_graph.nodes[u], self._zoom_factor)
+        v_lod = determine_lod(self._nx_graph.nodes[v], self._zoom_factor)
+
+        edge_lod = determine_lod(data, self._zoom_factor)
+
+        old_edge_layout = None
+        if not update_layout:
+            old_edge_layout = self.edge_layouts_current_lod.get((u, v))
+
+        result = rasterize_edge(
+            self.console,
+            self.node_buffers_per_lod[u_lod][u],
+            self.node_buffers_per_lod[v_lod][v],
+            list(self.node_buffers_current_lod.values()),
+            list(self.edge_layouts_current_lod.values()),
+            data,
+            self.node_idx_current_lod,
+            self.edge_idx_current_lod,
+            edge_lod,
+            edge_layout=old_edge_layout,
+        )
+
+        if result is not None:
+            edge_buffer, edge_layout, label_nodes = result
+        if edge_buffer is not None:
+            self.edge_idx_current_lod.update(edge_buffer, edge_layout)
+            self.edge_buffers_per_lod[edge_lod][(u, v)] = edge_buffer
+            self.edge_buffers_current_lod[(u, v)] = edge_buffer
+        if label_nodes is not None:
+            self.label_buffers_current_lod[(u, v)] = label_nodes
+            self.label_buffers_per_lod[edge_lod][(u, v)] = label_nodes
+        if edge_layout is not None:
+            self.edge_layouts_per_lod[edge_lod][(u, v)] = edge_layout
+            self.edge_layouts_current_lod[(u, v)] = edge_layout
 
     def layout(self) -> None:
         self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_1_LOD)

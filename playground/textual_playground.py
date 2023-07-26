@@ -77,16 +77,23 @@ class MainScreen(Screen):
     ) -> None:
         g = self.query_one(GraphView)
         if old_value is not None and old_value.type == "edge":
-            g.update_edge(*old_value.ref, data={"$style": Style(color="white")})
+            g.update_edge(
+                *old_value.ref,
+                data={"$style": Style(color="white")},
+                update_layout=False,
+            )
 
         if new_value is not None and new_value.type == "edge":
-            g.update_edge(*new_value.ref, data={"$style": Style(color="green")})
+            g.update_edge(
+                *new_value.ref,
+                data={"$style": Style(color="green")},
+                update_layout=False,
+            )
 
         if old_value is not None and old_value.type == "node":
             g.update_node(old_value.ref, data={"$style": None})
 
         if new_value is not None and new_value.type == "node":
-            self.log(f"Hover on node {new_value.ref}")
             g.update_node(new_value.ref, data={"$style": Style(color="green")})
 
     def on_click(self, event: events.Click) -> None:
@@ -161,7 +168,6 @@ class MainScreen(Screen):
                 self.edge_first_click = None
 
     def on_graph_view_element_move(self, event: GraphView.ElementMove) -> None:
-        # self.log(event, event.element_reference)
         pass
 
     def on_graph_view_element_mouse_down(

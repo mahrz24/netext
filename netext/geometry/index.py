@@ -33,6 +33,9 @@ class BufferIndex(Generic[T, AnnotationT]):
             raise ValueError("Cannot insert buffer without reference")
         buffer_key = hash((buffer.reference.type, buffer.reference.ref))
         self._index.delete(id=buffer_key, coordinates=self._coordinate_map[buffer_key])
+        del self._buffer_map[buffer_key]
+        del self._coordinate_map[buffer_key]
+        del self._annotations[buffer_key]
 
     def intersection(
         self, bounding_box: tuple[float, float, float, float], restrict: list[T]
@@ -60,9 +63,9 @@ class BufferIndex(Generic[T, AnnotationT]):
             ],
         )
 
-    def update(self, buffer: T) -> None:
+    def update(self, buffer: T, annotation: AnnotationT | None = None) -> None:
         self.delete(buffer)
-        self.insert(buffer)
+        self.insert(buffer, annotation)
 
     def reset(self) -> None:
         self._index = RTreeIndex()

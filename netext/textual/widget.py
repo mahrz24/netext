@@ -108,7 +108,6 @@ class GraphView(ScrollView, Generic[G]):
         self._graph_was_updated()
 
     def on_resize(self, message: Resize):
-        self.log("Graph was resized.")
         self._resized()
 
     def attach_widget_to_node(
@@ -206,9 +205,18 @@ class GraphView(ScrollView, Generic[G]):
             self._graph = self._console_graph._nx_graph.copy()
             self._graph_was_updated()
 
-    def update_edge(self, u: Hashable, v: Hashable, data: dict[str, Any]) -> None:
+    def update_edge(
+        self,
+        u: Hashable,
+        v: Hashable,
+        data: dict[str, Any],
+        update_data: bool = True,
+        update_layout: bool = True,
+    ) -> None:
         if self._console_graph is not None:
-            self._console_graph.update_edge(u, v, data)
+            self._console_graph.update_edge(
+                u, v, data, update_data=update_data, update_layout=update_layout
+            )
             self._graph = self._console_graph._nx_graph.copy()
             self._graph_was_updated()
 
