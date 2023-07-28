@@ -227,6 +227,14 @@ class GraphView(ScrollView, Generic[G]):
             self._strip_segments = self.pre_render_strips()
             self.refresh()
 
+    def watch_zoom(
+        self,
+        new_zoom: float | tuple[float, float] | ZoomSpec | AutoZoom,
+    ) -> None:
+        if _setup_console_graph(self):
+            self._console_graph.zoom = new_zoom
+            self._graph_was_updated()
+
     def _to_graph_coordinates(self, x: int, y: int) -> tuple[int, int]:
         if self._console_graph is not None:
             full_viewport = self._console_graph.full_viewport
@@ -240,14 +248,6 @@ class GraphView(ScrollView, Generic[G]):
             scroll_x, scroll_y = self.scroll_offset
             return x - full_viewport.x - scroll_x, y - full_viewport.y - scroll_y
         return x, y
-
-    def watch_zoom(
-        self,
-        new_zoom: float | tuple[float, float] | ZoomSpec | AutoZoom,
-    ) -> None:
-        if _setup_console_graph(self):
-            self._console_graph.zoom = new_zoom
-            self._graph_was_updated()
 
     def watch_viewport(
         self,

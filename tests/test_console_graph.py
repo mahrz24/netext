@@ -33,14 +33,20 @@ def test_render_graph_with_two_nodes(console):
 
     with console.capture() as capture:
         console.print(terminal_graph)
-    orgiginal = capture.get()
+    original = capture.get()
+    point = Point(*terminal_graph.to_graph_coordinates(1, 1))
+
+    print(terminal_graph.node_positions)
+
     terminal_graph.remove_node(1)
     # TODO This is in the viewport space while the layout engine works in the graph space
-    terminal_graph.add_node(1, position=Point(-4, 0))
+    terminal_graph.add_node(1, position=point)
     terminal_graph.add_edge(1, 2)
 
     with console.capture() as capture:
         console.print(terminal_graph)
     mutated = capture.get()
-
-    assert orgiginal == mutated
+    print("")
+    print(original)
+    print(mutated)
+    assert original == mutated
