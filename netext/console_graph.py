@@ -257,7 +257,7 @@ class ConsoleGraph(Generic[G]):
     def add_node(
         self,
         node: Hashable,
-        position: Point | None = None,
+        position: tuple[float, float] | None = None,
         data: dict[str, Any] | None = None,
     ) -> None:
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
@@ -269,7 +269,7 @@ class ConsoleGraph(Generic[G]):
         self.node_buffers[node] = rasterize_node(self.console, node, data)
 
         if position is not None:
-            pos_x, pos_y = position.as_tuple()
+            pos_x, pos_y = position
             # We add a new node and first need to transform the point from the buffer space to the not zoomed
             # coordinate space of the nodes
             # TODO these should probably be points
@@ -292,9 +292,6 @@ class ConsoleGraph(Generic[G]):
                 self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
             else:
                 lod = determine_lod(data, zoom_factor)
-                position = Point(
-                    x=round(coords[0] * self.zoom_x), y=round(coords[1] * self.zoom_y)
-                )
                 self._render_node_buffer_current_lod(node, data, lod, coords)
 
                 self.node_idx_1_lod.insert(self.node_buffers[node])
@@ -487,9 +484,6 @@ class ConsoleGraph(Generic[G]):
                 return
 
         lod = determine_lod(data, zoom_factor)
-        position = Point(
-            x=round(coords[0] * self.zoom_x), y=round(coords[1] * self.zoom_y)
-        )
         affected_edges = self._render_node_buffer_current_lod(
             node, data, lod, coords, force_edge_rerender
         )
@@ -501,11 +495,11 @@ class ConsoleGraph(Generic[G]):
             for u, v in affected_edges:
                 self.update_edge(u, v, self._nx_graph.edges[u, v], update_data=False)
 
-    def to_viewport_coordinates(self, x: int, y: int) -> tuple[int, int]:
+    def to_graph_coordinates(self, x: int, y: int) -> tuple[int, int]:
         full_viewport = self.full_viewport
         return full_viewport.x + x, full_viewport.y + y
 
-    def to_graph_coordinates(self, x: int, y: int) -> tuple[int, int]:
+    def to_viewport_coordinates(self, x: int, y: int) -> tuple[int, int]:
         full_viewport = self.full_viewport
         return x - full_viewport.x, y - full_viewport.y
 

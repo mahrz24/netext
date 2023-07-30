@@ -4,7 +4,6 @@ from networkx import DiGraph
 from rich.console import Console
 
 from netext import ConsoleGraph
-from netext.geometry.point import Point
 from netext.layout_engines.static import StaticLayout
 
 
@@ -14,7 +13,8 @@ def console():
 
 
 def test_render_binomial_tree(console):
-    """Test rendering a binomial tree. Simple smoke test that no exceptions are raised."""
+    """Test rendering a binomial tree. Simple smoke test that no exceptions are raised.
+    """
     graph = binomial_tree(4)
     terminal_graph = ConsoleGraph(graph)
 
@@ -23,7 +23,8 @@ def test_render_binomial_tree(console):
 
 
 def test_render_graph_with_two_nodes(console):
-    """Test rendering a graph with two nodes. Simple smoke test that no exceptions are raised."""
+    """Test rendering a graph with two nodes. Simple smoke test that no exceptions are raised.
+    """
     graph = DiGraph()
     graph.add_node(1, **{"$x": 1, "$y": 1})
     graph.add_node(2, **{"$x": 10, "$y": 1})
@@ -34,14 +35,23 @@ def test_render_graph_with_two_nodes(console):
     with console.capture() as capture:
         console.print(terminal_graph)
     original = capture.get()
-    point = Point(*terminal_graph.to_graph_coordinates(1, 1))
 
+    point = terminal_graph.to_graph_coordinates(1, 1)
+
+    print(terminal_graph.full_viewport)
     print(terminal_graph.node_positions)
 
     terminal_graph.remove_node(1)
     # TODO This is in the viewport space while the layout engine works in the graph space
+    print(point)
+    print(terminal_graph.node_positions)
+
     terminal_graph.add_node(1, position=point)
+    print(terminal_graph.node_positions)
+
     terminal_graph.add_edge(1, 2)
+
+    print(terminal_graph.node_positions)
 
     with console.capture() as capture:
         console.print(terminal_graph)
