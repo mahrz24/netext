@@ -154,7 +154,7 @@ class GraphView(ScrollView, Generic[G]):
                 )
             else:
                 node_position = position
-            self._console_graph.add_node(node, node_position, data)
+            self._console_graph.add_node(node, (node_position.x, node_position.y), data)
             self._graph = self._console_graph._nx_graph.copy()
             self._graph_was_updated()
 
@@ -235,6 +235,7 @@ class GraphView(ScrollView, Generic[G]):
             self._console_graph.zoom = new_zoom
             self._graph_was_updated()
 
+    # Check if this would work with scrolling via viewport
     def _to_graph_coordinates(self, x: int, y: int) -> tuple[int, int]:
         if self._console_graph is not None:
             full_viewport = self._console_graph.full_viewport
