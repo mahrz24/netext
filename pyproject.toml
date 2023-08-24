@@ -19,6 +19,7 @@ shapely = "^2.0.1"
 rtree = "^1.0.1"
 cachetools = "^5.3.0"
 textual = { version = "^0", optional = true }
+plum-dispatch = "^2.1.1"
 
 [tool.poetry.extras]
 textual = ["textual"]

@@ -4,6 +4,7 @@ from networkx import DiGraph
 from rich.console import Console
 
 from netext import ConsoleGraph
+from netext.geometry.point import FloatPoint
 from netext.layout_engines.static import StaticLayout
 
 
@@ -22,9 +23,7 @@ def test_render_binomial_tree(console):
         console.print(terminal_graph)
 
 
-def test_render_graph_with_two_nodes(console):
-    """Test rendering a graph with two nodes. Simple smoke test that no exceptions are raised.
-    """
+def test_render_graph_with_mutations_remove_and_add(console):
     graph = DiGraph()
     graph.add_node(1, **{"$x": 1, "$y": 1})
     graph.add_node(2, **{"$x": 10, "$y": 1})
@@ -36,27 +35,53 @@ def test_render_graph_with_two_nodes(console):
         console.print(terminal_graph)
     original = capture.get()
 
-    point = terminal_graph.to_graph_coordinates(1, 1)
-
-    print(terminal_graph.full_viewport)
-    print(terminal_graph.node_positions)
-
     terminal_graph.remove_node(1)
-    # TODO This is in the viewport space while the layout engine works in the graph space
-    print(point)
-    print(terminal_graph.node_positions)
 
-    terminal_graph.add_node(1, position=point)
-    print(terminal_graph.node_positions)
-
+    terminal_graph.add_node(1, position=FloatPoint(1, 1))
     terminal_graph.add_edge(1, 2)
-
-    print(terminal_graph.node_positions)
 
     with console.capture() as capture:
         console.print(terminal_graph)
     mutated = capture.get()
-    print("")
+
+    assert original == mutated
+
+
+def test_render_graph_with_mutations_update_positions(console):
+    graph = DiGraph()
+    graph.add_node(1, **{"$x": 1, "$y": 1})
+    graph.add_node(2, **{"$x": 10, "$y": 1})
+    graph.add_edge(1, 2)
+
+    terminal_graph = ConsoleGraph[DiGraph](graph, layout_engine=StaticLayout())
+
+    with console.capture() as capture:
+        console.print(terminal_graph)
+    original = capture.get()
+
+    terminal_graph.update_node(1, position=FloatPoint(1, 2))
+
+    with console.capture() as capture:
+        console.print(terminal_graph)
+    mutated = capture.get()
+
+    graph = DiGraph()
+    graph.add_node(1, **{"$x": 1, "$y": 2})
+    graph.add_node(2, **{"$x": 10, "$y": 1})
+    graph.add_edge(1, 2)
+
+    expected_terminal_graph = ConsoleGraph[DiGraph](graph, layout_engine=StaticLayout())
+
+    with console.capture() as capture:
+        console.print(expected_terminal_graph)
+    expected = capture.get()
+
     print(original)
     print(mutated)
-    assert original == mutated
+    print(terminal_graph.node_positions)
+
+    print(expected)
+    print(expected_terminal_graph.node_positions)
+
+    assert original != mutated
+    assert expected == mutated

@@ -15,6 +15,7 @@ from netext.geometry import Point, Region
 from netext.edge_rendering.buffer import EdgeBuffer
 from netext.edge_routing.edge import EdgeLayout
 from netext.geometry.index import BufferIndex
+from netext.geometry.point import FloatPoint
 
 from netext.rendering.segment_buffer import StripBuffer
 
@@ -257,7 +258,7 @@ class ConsoleGraph(Generic[G]):
     def add_node(
         self,
         node: Hashable,
-        position: tuple[float, float] | None = None,
+        position: FloatPoint | None = None,
         data: dict[str, Any] | None = None,
     ) -> None:
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
@@ -269,11 +270,11 @@ class ConsoleGraph(Generic[G]):
         self.node_buffers[node] = rasterize_node(self.console, node, data)
 
         if position is not None:
-            pos_x, pos_y = position
             # We add a new node and first need to transform the point from the buffer space to the not zoomed
             # coordinate space of the nodes
             # TODO these should probably be points
-            coords = (pos_x / self.zoom_x, pos_y / self.zoom_y)
+            position += self.offset
+            coords = (position.x / self.zoom_x, position.y / self.zoom_y)
             self.node_positions[node] = coords
             self.node_buffers[node].center = Point(round(coords[0]), round(coords[1]))
 
@@ -424,7 +425,7 @@ class ConsoleGraph(Generic[G]):
     def update_node(
         self,
         node: Hashable,
-        position: Point | None = None,
+        position: FloatPoint | None = None,
         data: dict[str, Any] | None = None,
         update_data: bool = True,
     ) -> None:
@@ -460,11 +461,8 @@ class ConsoleGraph(Generic[G]):
         else:
             force_edge_rerender = True
             # TODO same as in add_node
-            pos_x, pos_y = position.as_tuple()
-            # We add a new node and first need to transform the point from the buffer space to the not zoomed
-            # coordinate space of the nodes
-            # TODO these should probably be points
-            coords = (pos_x / self.zoom_x, pos_y / self.zoom_y)
+            position += self.offset
+            coords = (position.x / self.zoom_x, position.y / self.zoom_y)
             self.node_positions[node] = coords
             self.node_buffers[node].center = Point(round(coords[0]), round(coords[1]))
 
@@ -606,6 +604,7 @@ class ConsoleGraph(Generic[G]):
 
         # Position the nodes and store these original positions
         self.node_positions = self.layout_engine(self._nx_graph)
+        self.offset = FloatPoint(0, 0)
 
         if self.node_positions:
             x_positions = [x for _, (x, _) in self.node_positions.items()]
@@ -616,8 +615,15 @@ class ConsoleGraph(Generic[G]):
             min_y = min(y_positions)
             max_y = max(y_positions)
 
+            # We add 0.25 to the offset to make sure we do not get rounding errors
+            # Otherwise nodes that have different coordinates originally end up in
+            # the same position after rounding.
+            self.offset = FloatPoint(
+                -min_x - (max_x - min_x) / 2 + 0.25, -min_y - (max_y - min_y) / 2 + 0.25
+            )
+
             self.node_positions = {
-                node: (x - min_x - (max_x - min_x) / 2, y - min_y - (max_y - min_y) / 2)
+                node: (x + self.offset.x, y + self.offset.y)
                 for node, (x, y) in self.node_positions.items()
             }
 

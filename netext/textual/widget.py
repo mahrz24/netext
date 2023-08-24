@@ -13,7 +13,7 @@ from netext.buffer_renderer import render_buffers
 from netext.console_graph import G, AutoZoom, ZoomSpec
 from rich.segment import Segment
 from netext.geometry.region import Region as NetextRegion
-from netext.geometry.point import Point
+from netext.geometry.point import FloatPoint, Point
 from textual.message import Message
 
 from netext.rendering.segment_buffer import Reference
@@ -144,17 +144,11 @@ class GraphView(ScrollView, Generic[G]):
     def add_node(
         self,
         node: Hashable,
-        position: Offset | None = None,
+        position: FloatPoint | None = None,
         data: dict[str, Any] | None = None,
     ) -> None:
         if self._console_graph is not None:
-            if position is not None:
-                node_position: Point | None = Point(
-                    *self._to_graph_coordinates(position.x, position.y)
-                )
-            else:
-                node_position = position
-            self._console_graph.add_node(node, (node_position.x, node_position.y), data)
+            self._console_graph.add_node(node, position, data)
             self._graph = self._console_graph._nx_graph.copy()
             self._graph_was_updated()
 
