@@ -274,9 +274,10 @@ class ConsoleGraph(Generic[G]):
             # coordinate space of the nodes
             # TODO these should probably be points
             position += self.offset
-            coords = (position.x / self.zoom_x, position.y / self.zoom_y)
-            self.node_positions[node] = coords
-            self.node_buffers[node].center = Point(round(coords[0]), round(coords[1]))
+            self.node_positions[node] = position.as_tuple()
+            self.node_buffers[node].center = Point(
+                round(position.x * self.zoom_x), round(position.y / self.zoom_y)
+            )
 
             # Then we recompute zoom (in case we have a zoom to fit)
             zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
@@ -293,7 +294,9 @@ class ConsoleGraph(Generic[G]):
                 self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
             else:
                 lod = determine_lod(data, zoom_factor)
-                self._render_node_buffer_current_lod(node, data, lod, coords)
+                self._render_node_buffer_current_lod(
+                    node, data, lod, position.as_tuple()
+                )
 
                 self.node_idx_1_lod.insert(self.node_buffers[node])
                 self.node_idx_current_lod.insert(self.node_buffers_current_lod[node])
@@ -429,6 +432,7 @@ class ConsoleGraph(Generic[G]):
         data: dict[str, Any] | None = None,
         update_data: bool = True,
     ) -> None:
+        print(self.node_positions)
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
         force_edge_rerender = False
 
@@ -462,9 +466,11 @@ class ConsoleGraph(Generic[G]):
             force_edge_rerender = True
             # TODO same as in add_node
             position += self.offset
-            coords = (position.x / self.zoom_x, position.y / self.zoom_y)
-            self.node_positions[node] = coords
-            self.node_buffers[node].center = Point(round(coords[0]), round(coords[1]))
+            self.node_positions[node] = position.as_tuple()
+            coords = position.as_tuple()
+            self.node_buffers[node].center = Point(
+                round(position.x * self.zoom_x), round(position.y / self.zoom_y)
+            )
 
             # Then we recompute zoom (in case we have a zoom to fit)
             zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
@@ -477,8 +483,10 @@ class ConsoleGraph(Generic[G]):
                 zoom_factor = min([zoom_x, zoom_y])
 
             if zoom_factor != self._zoom_factor:
+                print("RERENDER EVERYTHING")
                 self._zoom_factor = zoom_factor
                 self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
+                print(self.node_positions)
                 return
 
         lod = determine_lod(data, zoom_factor)

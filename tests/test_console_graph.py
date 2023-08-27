@@ -4,6 +4,7 @@ from networkx import DiGraph
 from rich.console import Console
 
 from netext import ConsoleGraph
+from netext.console_graph import AutoZoom
 from netext.geometry.point import FloatPoint
 from netext.layout_engines.static import StaticLayout
 
@@ -76,12 +77,29 @@ def test_render_graph_with_mutations_update_positions(console):
         console.print(expected_terminal_graph)
     expected = capture.get()
 
-    print(original)
-    print(mutated)
-    print(terminal_graph.node_positions)
-
-    print(expected)
-    print(expected_terminal_graph.node_positions)
-
     assert original != mutated
     assert expected == mutated
+
+
+def test_render_graph_with_mutations_update_positions_and_zoom_fit(console):
+    graph = DiGraph()
+    graph.add_node(1, **{"$x": 1, "$y": 1})
+    graph.add_node(2, **{"$x": 10, "$y": 1})
+    graph.add_edge(1, 2)
+
+    terminal_graph = ConsoleGraph[DiGraph](
+        graph, layout_engine=StaticLayout(), zoom=AutoZoom.FIT
+    )
+
+    with console.capture() as capture:
+        console.print(terminal_graph)
+    original = capture.get()
+
+    terminal_graph.update_node(1, position=FloatPoint(1, 5))
+    terminal_graph.update_node(1, position=FloatPoint(1, 1))
+
+    with console.capture() as capture:
+        console.print(terminal_graph)
+    mutated = capture.get()
+
+    assert original == mutated
