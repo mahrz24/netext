@@ -622,11 +622,11 @@ class ConsoleGraph(Generic[G]):
 
         # Position the nodes and store these original positions
         self.node_positions = self.layout_engine(self._nx_graph)
-        self.offset = FloatPoint(0, 0)
+        self.offset: FloatPoint = FloatPoint(0, 0)
 
         if self.node_positions:
-            x_positions = [x for _, (x, _) in self.node_positions.items()]
-            y_positions = [y for _, (_, y) in self.node_positions.items()]
+            x_positions = [pos.x for _, pos in self.node_positions.items()]
+            y_positions = [pos.y for _, pos in self.node_positions.items()]
             # Center node positions around the midpoint of all nodes
             min_x = min(x_positions)
             max_x = max(x_positions)
@@ -641,13 +641,13 @@ class ConsoleGraph(Generic[G]):
             )
 
             self.node_positions = {
-                node: (x + self.offset.x, y + self.offset.y)
-                for node, (x, y) in self.node_positions.items()
+                node: pos + self.offset
+                for node, pos in self.node_positions.items()
             }
 
         for node, position in self.node_positions.items():
             self.node_buffers[node].center = Point(
-                x=round(position[0]), y=round(position[1])
+                x=round(position.x), y=round(position.y)
             )
 
     def _transition_compute_zoomed_positions(self) -> None:
@@ -728,8 +728,8 @@ class ConsoleGraph(Generic[G]):
         # Make sure we use the lod 1 positions:
         for node, node_buffer in self.node_buffers.items():
             node_buffer.center = Point(
-                x=round(self.node_positions[node][0]),
-                y=round(self.node_positions[node][1]),
+                x=round(self.node_positions[node].x),
+                y=round(self.node_positions[node].y),
             )
 
         all_node_buffers = []
