@@ -152,7 +152,7 @@ class ConsoleGraph(Generic[G]):
         )
         self.node_buffers_current_lod: dict[Hashable, NodeBuffer] = dict()
 
-        self.node_positions: dict[Hashable, tuple[float, float]] = dict()
+        self.node_positions: dict[Hashable, FloatPoint] = dict()
 
         self.edge_buffers: dict[tuple[Hashable, Hashable], EdgeBuffer] = dict()
         self.edge_buffers_per_lod: dict[
@@ -272,11 +272,11 @@ class ConsoleGraph(Generic[G]):
         if position is not None:
             # We add a new node and first need to transform the point from the buffer space to the not zoomed
             # coordinate space of the nodes
-            # TODO these should probably be points
-            position += self.offset
-            self.node_positions[node] = position.as_tuple()
+            node_position = cast(FloatPoint, position)
+            node_position += self.offset
+            self.node_positions[node] = node_position
             self.node_buffers[node].center = Point(
-                round(position.x * self.zoom_x), round(position.y / self.zoom_y)
+                round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y)
             )
 
             # Then we recompute zoom (in case we have a zoom to fit)
@@ -293,9 +293,13 @@ class ConsoleGraph(Generic[G]):
                 self._zoom_factor = zoom_factor
                 self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
             else:
+                position_view_space = Point(
+                   round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y)
+                )
+
                 lod = determine_lod(data, zoom_factor)
                 self._render_node_buffer_current_lod(
-                    node, data, lod, position.as_tuple()
+                    node, data, lod, position_view_space
                 )
 
                 self.node_idx_1_lod.insert(self.node_buffers[node])
@@ -460,16 +464,16 @@ class ConsoleGraph(Generic[G]):
         data = cast(dict[str, Any], self._nx_graph.nodes(data=True)[node])
 
         if position is None:
-            coords = self.node_positions[node]
+            node_position = self.node_positions[node]
             zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
         else:
             force_edge_rerender = True
             # TODO same as in add_node
+            node_position = cast(FloatPoint, position)
             position += self.offset
-            self.node_positions[node] = position.as_tuple()
-            coords = position.as_tuple()
+            self.node_positions[node] = node_position
             self.node_buffers[node].center = Point(
-                round(position.x * self.zoom_x), round(position.y / self.zoom_y)
+                round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y)
             )
 
             # Then we recompute zoom (in case we have a zoom to fit)
@@ -489,9 +493,15 @@ class ConsoleGraph(Generic[G]):
                 print(self.node_positions)
                 return
 
+        position_view_space = Point(
+            round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y)
+        )
+
+        self.node_buffers[node].center = position_view_space
+
         lod = determine_lod(data, zoom_factor)
         affected_edges = self._render_node_buffer_current_lod(
-            node, data, lod, coords, force_edge_rerender
+            node, data, lod, position_view_space, force_edge_rerender
         )
 
         self.node_idx_1_lod.update(self.node_buffers[node])
@@ -761,21 +771,24 @@ class ConsoleGraph(Generic[G]):
         for node, data in self._nx_graph.nodes(data=True):
             lod = determine_lod(data, self._zoom_factor)
             # Get the zoomed position of the node
-            coords = self.node_positions[node]
-            self._render_node_buffer_current_lod(node, data, lod, coords)
+
+            # TODO: We might want to precompute this as well
+            position = self.node_positions[node]
+            position_view_space = Point(
+                round(position.x * self.zoom_x), round(position.y * self.zoom_y)
+            )
+
+            self._render_node_buffer_current_lod(node, data, lod, position_view_space)
 
     def _render_node_buffer_current_lod(
         self,
         node: Hashable,
         data: dict[str, Any],
         lod: int,
-        coords: tuple[float, float],
+        position: Point,
         force_edge_rerender: bool = False,
     ) -> list[tuple[Hashable, Hashable]]:
         affected_edges: list[tuple[Hashable, Hashable]] = []
-        position = Point(
-            x=round(coords[0] * self.zoom_x), y=round(coords[1] * self.zoom_y)
-        )
         node_buffer = self.node_buffers_per_lod.get(lod, dict()).get(node)
         if node_buffer is None:
             node_buffer = rasterize_node(self.console, node, data, lod=lod)

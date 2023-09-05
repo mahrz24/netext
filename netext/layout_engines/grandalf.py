@@ -2,7 +2,9 @@ from collections.abc import Hashable
 from typing import Any
 
 from grandalf.graphs import Edge, Vertex, Graph  # type: ignore
-from grandalf.layouts import SugiyamaLayout  # type: ignore
+from grandalf.layouts import SugiyamaLayout
+
+from netext.geometry.point import FloatPoint  # type: ignore
 
 from .engine import G, LayoutEngine
 
@@ -18,7 +20,6 @@ def _create_vertex(node: Hashable, data: dict[str, Any]) -> Vertex:
 
     # The API is a bit weird that it assumes to just add some members externally.
     v.view = GrandalfView()
-    # TODO: A width of 1 does not work well and makes to much space, so we scale up by some arbitrary constant
     v.view.w = data["_netext_node_buffer"].layout_width * 5
     v.view.h = data["_netext_node_buffer"].layout_height * 5
     return v
@@ -30,7 +31,7 @@ class GrandalfSugiyamaLayout(LayoutEngine[G]):
     Multiple components will be placed next to each other.
     """
 
-    def __call__(self, g: G) -> dict[Hashable, tuple[float, float]]:
+    def __call__(self, g: G) -> dict[Hashable, FloatPoint]:
         vertices = {
             node: _create_vertex(node, data) for node, data in g.nodes(data=True)
         }
@@ -48,7 +49,7 @@ class GrandalfSugiyamaLayout(LayoutEngine[G]):
         x_offset = 0
         for c in graph.components():
             component = {
-                v.data: (v.view.xy[0] / 4 + x_offset, v.view.xy[1] / 6) for v in c.sV
+                v.data: FloatPoint(x=v.view.xy[0] / 4 + x_offset, y=v.view.xy[1] / 6) for v in c.sV
             }
             x_offset = max([v.view.xy[0] / 4 + x_offset + v.view.w + 2 for v in c.sV])
             result.update(component)
