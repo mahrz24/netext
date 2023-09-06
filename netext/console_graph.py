@@ -131,7 +131,7 @@ class ConsoleGraph(Generic[G]):
         self._viewport = viewport
         self._render_state = RenderState.INITIAL
 
-        if isinstance(zoom, float):
+        if isinstance(zoom, float) or isinstance(zoom, int):
             zoom = ZoomSpec(zoom, zoom)
         elif isinstance(zoom, tuple):
             zoom = ZoomSpec(zoom[0], zoom[1])
@@ -202,13 +202,13 @@ class ConsoleGraph(Generic[G]):
             self._render_state = new_state
 
     @property
-    def zoom(self) -> float | tuple[float, float] | ZoomSpec | AutoZoom:
+    def zoom(self) -> ZoomSpec | AutoZoom:
         return self._zoom
 
     @zoom.setter
     def zoom(self, value: float | tuple[float, float] | ZoomSpec | AutoZoom) -> None:
-        if isinstance(value, float):
-            value = ZoomSpec(value, value)
+        if isinstance(value, float) or isinstance(value, int):
+            value = ZoomSpec(float(value), float(value))
         elif isinstance(value, tuple):
             value = ZoomSpec(value[0], value[1])
         if self._zoom != value:
@@ -255,23 +255,17 @@ class ConsoleGraph(Generic[G]):
     def reset_viewport(self) -> None:
         self._viewport = None
 
-    def add_node(
+    def _position_and_render_node(
         self,
         node: Hashable,
-        position: FloatPoint | None = None,
-        data: dict[str, Any] | None = None,
-    ) -> None:
-        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
-
-        if data is None:
-            data = dict()
-
-        self._nx_graph.add_node(node, **data)
-        self.node_buffers[node] = rasterize_node(self.console, node, data)
-
-        if position is not None:
-            # We add a new node and first need to transform the point from the buffer space to the not zoomed
-            # coordinate space of the nodes
+        position: FloatPoint | None,
+        data: dict[str, Any],
+        force_edge_rerender: bool = False,
+    ) -> list[tuple[Hashable, Hashable]] | None:
+        if position is None:
+            node_position = self.node_positions[node]
+            zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
+        else:
             node_position = cast(FloatPoint, position)
             node_position += self.offset
             self.node_positions[node] = node_position
@@ -292,18 +286,46 @@ class ConsoleGraph(Generic[G]):
             if zoom_factor != self._zoom_factor:
                 self._zoom_factor = zoom_factor
                 self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
-            else:
-                position_view_space = Point(
-                   round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y)
-                )
+                return None
 
-                lod = determine_lod(data, zoom_factor)
-                self._render_node_buffer_current_lod(
-                    node, data, lod, position_view_space
-                )
+        position_view_space = Point(
+            round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y)
+        )
+        self.node_buffers[node].center = position_view_space
 
-                self.node_idx_1_lod.insert(self.node_buffers[node])
-                self.node_idx_current_lod.insert(self.node_buffers_current_lod[node])
+        lod = determine_lod(data, zoom_factor)
+        return self._render_node_buffer_current_lod(
+            node, data, lod, position_view_space, force_edge_rerender
+        )
+
+    def add_node(
+        self,
+        node: Hashable,
+        position: FloatPoint | None = None,
+        data: dict[str, Any] | None = None,
+    ) -> None:
+        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
+
+        if data is None:
+            data = dict()
+
+        self._nx_graph.add_node(node, **data)
+        self.node_buffers[node] = rasterize_node(self.console, node, data)
+
+        if position is not None:
+            # We add a new node and first need to transform the point from the buffer space to the not zoomed
+            # coordinate space of the nodes
+            do_continue = self._position_and_render_node(
+                node=node,
+                position=position,
+                data=data,
+                force_edge_rerender=False,
+            )
+            if do_continue is None:
+                return
+
+            self.node_idx_1_lod.insert(self.node_buffers[node])
+            self.node_idx_current_lod.insert(self.node_buffers_current_lod[node])
         else:
             self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_1_LOD)
 
@@ -436,7 +458,6 @@ class ConsoleGraph(Generic[G]):
         data: dict[str, Any] | None = None,
         update_data: bool = True,
     ) -> None:
-        print(self.node_positions)
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
         force_edge_rerender = False
 
@@ -463,52 +484,23 @@ class ConsoleGraph(Generic[G]):
 
         data = cast(dict[str, Any], self._nx_graph.nodes(data=True)[node])
 
-        if position is None:
-            node_position = self.node_positions[node]
-            zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
-        else:
-            force_edge_rerender = True
-            # TODO same as in add_node
-            node_position = cast(FloatPoint, position)
-            position += self.offset
-            self.node_positions[node] = node_position
-            self.node_buffers[node].center = Point(
-                round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y)
-            )
+        force_edge_rerender = force_edge_rerender or (position is not None)
 
-            # Then we recompute zoom (in case we have a zoom to fit)
-            zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
-            if (
-                self._zoom is AutoZoom.FIT
-                or self._zoom is AutoZoom.FIT_PROPORTIONAL
-                or self._zoom_factor is None
-            ):
-                zoom_x, zoom_y = self._compute_current_zoom()
-                zoom_factor = min([zoom_x, zoom_y])
-
-            if zoom_factor != self._zoom_factor:
-                print("RERENDER EVERYTHING")
-                self._zoom_factor = zoom_factor
-                self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
-                print(self.node_positions)
-                return
-
-        position_view_space = Point(
-            round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y)
+        affected_edges_or_break = self._position_and_render_node(
+            node=node,
+            position=position,
+            data=data,
+            force_edge_rerender=force_edge_rerender,
         )
 
-        self.node_buffers[node].center = position_view_space
-
-        lod = determine_lod(data, zoom_factor)
-        affected_edges = self._render_node_buffer_current_lod(
-            node, data, lod, position_view_space, force_edge_rerender
-        )
+        if affected_edges_or_break is None:
+            return
 
         self.node_idx_1_lod.update(self.node_buffers[node])
         self.node_idx_current_lod.update(self.node_buffers_current_lod[node])
 
         if force_edge_rerender:
-            for u, v in affected_edges:
+            for u, v in affected_edges_or_break:
                 self.update_edge(u, v, self._nx_graph.edges[u, v], update_data=False)
 
     def to_graph_coordinates(self, x: int, y: int) -> tuple[int, int]:
@@ -641,8 +633,7 @@ class ConsoleGraph(Generic[G]):
             )
 
             self.node_positions = {
-                node: pos + self.offset
-                for node, pos in self.node_positions.items()
+                node: pos + self.offset for node, pos in self.node_positions.items()
             }
 
         for node, position in self.node_positions.items():
@@ -658,10 +649,10 @@ class ConsoleGraph(Generic[G]):
 
     def _compute_current_zoom(self):
         if self.node_positions:
-            max_node_x = max([x for x, _ in self.node_positions.values()])
-            max_node_y = max([y for _, y in self.node_positions.values()])
-            min_node_x = min([x for x, _ in self.node_positions.values()])
-            min_node_y = min([y for _, y in self.node_positions.values()])
+            max_node_x = max([pos.x for pos in self.node_positions.values()])
+            max_node_y = max([pos.y for pos in self.node_positions.values()])
+            min_node_x = min([pos.x for pos in self.node_positions.values()])
+            min_node_y = min([pos.y for pos in self.node_positions.values()])
 
             # Compute the zoom value for both axes
             max_buffer_width = max(
@@ -696,7 +687,7 @@ class ConsoleGraph(Generic[G]):
                     zoom_x = x
                     zoom_y = y
                 case _:
-                    raise ValueError("Invalid zoom value")
+                    raise ValueError(f"Invalid zoom value {self._zoom}")
         else:
             zoom_x = 1
             zoom_y = 1
