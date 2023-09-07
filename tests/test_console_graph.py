@@ -7,6 +7,7 @@ from rich import print
 from netext import ConsoleGraph
 from netext.console_graph import AutoZoom
 from netext.geometry.point import FloatPoint
+from netext.geometry.region import Region
 from netext.layout_engines.static import StaticLayout
 
 
@@ -31,6 +32,37 @@ def test_zoom(console, zoom: AutoZoom | float | tuple[float, float]):
     expected_terminal_graph = ConsoleGraph(graph, zoom=zoom)
     terminal_graph = ConsoleGraph(graph)
     terminal_graph.zoom = zoom
+
+    with console.capture() as capture:
+        console.print(terminal_graph)
+    original = capture.get()
+
+    with console.capture() as capture:
+        console.print(expected_terminal_graph)
+    expected = capture.get()
+
+    assert original == expected
+
+
+def test_get_viewport_when_set_previously():
+    # Set up
+    graph = binomial_tree(4)
+    terminal_graph = ConsoleGraph(graph)
+    terminal_graph._viewport = Region(x=0, y=0, width=100, height=100)
+
+    # Exercise
+    result = terminal_graph.viewport
+
+    # Verify
+    assert result == Region(x=0, y=0, width=100, height=100)
+
+
+@pytest.mark.parametrize("viewport", [Region(x=0, y=0, width=100, height=100)])
+def test_viewport_renders_the_same_when_set_or_initialized(console, viewport: Region):
+    graph = binomial_tree(4)
+    expected_terminal_graph = ConsoleGraph(graph, viewport=viewport)
+    terminal_graph = ConsoleGraph(graph)
+    terminal_graph.viewport = viewport
 
     with console.capture() as capture:
         console.print(terminal_graph)

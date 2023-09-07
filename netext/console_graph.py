@@ -270,7 +270,8 @@ class ConsoleGraph(Generic[G]):
             node_position += self.offset
             self.node_positions[node] = node_position
             self.node_buffers[node].center = Point(
-                round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y)
+                round(node_position.x * self.zoom_x),
+                round(node_position.y * self.zoom_y),
             )
 
             # Then we recompute zoom (in case we have a zoom to fit)
