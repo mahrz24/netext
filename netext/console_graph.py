@@ -504,13 +504,16 @@ class ConsoleGraph(Generic[G]):
             for u, v in affected_edges_or_break:
                 self.update_edge(u, v, self._nx_graph.edges[u, v], update_data=False)
 
-    def to_graph_coordinates(self, x: int, y: int) -> tuple[int, int]:
-        full_viewport = self.full_viewport
-        return full_viewport.x + x, full_viewport.y + y
+    def to_graph_coordinates(self, p: Point) -> FloatPoint:
+        return FloatPoint(
+            p.x / self.zoom_x - self.offset.x, p.y / self.zoom_y - self.offset.y
+        )
 
-    def to_viewport_coordinates(self, x: int, y: int) -> tuple[int, int]:
-        full_viewport = self.full_viewport
-        return x - full_viewport.x, y - full_viewport.y
+    def to_view_coordinates(self, p: FloatPoint) -> Point:
+        return Point(
+            round((self.offset.x + p.x) * self.zoom_x),
+            round((self.offset.y + p.y) * self.zoom_y),
+        )
 
     def update_edge(
         self,

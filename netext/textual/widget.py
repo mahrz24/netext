@@ -131,8 +131,8 @@ class GraphView(ScrollView, Generic[G]):
                 widget.styles.height = size.height
 
             widget.styles.dock = "left"
-            widget.styles.offset = self._to_view_coordinates(
-                node_buffer.left_x, node_buffer.top_y
+            widget.styles.offset = self._to_widget_coordinates(
+                Point(node_buffer.left_x, node_buffer.top_y)
             )
 
     def detach_widget_from_node(self, node: Hashable) -> None:
@@ -184,11 +184,9 @@ class GraphView(ScrollView, Generic[G]):
     ) -> None:
         if self._console_graph is not None:
             if position is not None:
-                node_position: Point | None = Point(
-                    *self._to_graph_coordinates(position.x, position.y)
-                )
+                node_position: FloatPoint | None = self._to_graph_coordinates(position)
             else:
-                node_position = position
+                node_position = None
             self._console_graph.update_node(
                 node, node_position, data, update_data=update_data
             )
@@ -226,23 +224,33 @@ class GraphView(ScrollView, Generic[G]):
         new_zoom: float | tuple[float, float] | ZoomSpec | AutoZoom,
     ) -> None:
         if _setup_console_graph(self):
-            self._console_graph.zoom = new_zoom
+            # TODO check why mypy gets the setter wrong
+            self._console_graph.zoom = new_zoom  # type: ignore
             self._graph_was_updated()
 
     # Check if this would work with scrolling via viewport
-    def _to_graph_coordinates(self, x: int, y: int) -> tuple[int, int]:
+    def _to_view_coordinates(self, offset: Offset) -> Point:
+        p = Point(offset.x, offset.y)
         if self._console_graph is not None:
             full_viewport = self._console_graph.full_viewport
             scroll_x, scroll_y = self.scroll_offset
-            return full_viewport.x + x + scroll_x, full_viewport.y + y + scroll_y
-        return x, y
+            return full_viewport.top_left + p + Point(scroll_x, scroll_y)
+        return p
 
-    def _to_view_coordinates(self, x: int, y: int) -> tuple[int, int]:
+    def _to_graph_coordinates(self, p: Point | Offset) -> FloatPoint:
+        if isinstance(p, Offset):
+            p = self._to_view_coordinates(p)
+        if self._console_graph is not None:
+            return self._console_graph.to_graph_coordinates(p)
+        return FloatPoint(p.x, p.y)
+
+    def _to_widget_coordinates(self, p: Point) -> Offset:
         if self._console_graph is not None:
             full_viewport = self._console_graph.full_viewport
             scroll_x, scroll_y = self.scroll_offset
-            return x - full_viewport.x - scroll_x, y - full_viewport.y - scroll_y
-        return x, y
+            coords = full_viewport.top_left - p - Point(scroll_x, scroll_y)
+            return Offset(coords.x, coords.y)
+        return Offset(p.x, p.y)
 
     def watch_viewport(
         self,
@@ -291,8 +299,9 @@ class GraphView(ScrollView, Generic[G]):
                 if resize:
                     widget.styles.width = node_buffer.width
                     widget.styles.height = node_buffer.height
-                widget.styles.offset = self._to_view_coordinates(
-                    node_buffer.left_x, node_buffer.top_y
+                # TODO node buffer top left should be point
+                widget.styles.offset = self._to_widget_coordinates(
+                    Point(node_buffer.left_x, node_buffer.top_y)
                 )
         return super().refresh(*regions, repaint=repaint, layout=layout)
 
@@ -348,7 +357,7 @@ class GraphView(ScrollView, Generic[G]):
     def on_mouse_move(self, event: events.MouseMove) -> None:
         if self._console_graph is not None:
             ref = self._reverse_click_map.get(
-                self._to_graph_coordinates(event.x, event.y)
+                self._to_view_coordinates(Offset(event.x, event.y)).as_tuple()
             )
 
             if ref != self._last_hover and self._last_hover is not None:
@@ -365,7 +374,7 @@ class GraphView(ScrollView, Generic[G]):
     def on_click(self, event: events.Click) -> None:
         if self._console_graph is not None:
             ref = self._reverse_click_map.get(
-                self._to_graph_coordinates(event.x, event.y)
+                self._to_view_coordinates(Offset(event.x, event.y)).as_tuple()
             )
 
             if ref is not None:
@@ -374,7 +383,7 @@ class GraphView(ScrollView, Generic[G]):
     def on_mouse_down(self, event: events.MouseDown) -> None:
         if self._console_graph is not None:
             ref = self._reverse_click_map.get(
-                self._to_graph_coordinates(event.x, event.y)
+                self._to_view_coordinates(Offset(event.x, event.y)).as_tuple()
             )
 
             if ref is not None:
@@ -383,7 +392,7 @@ class GraphView(ScrollView, Generic[G]):
     def on_mouse_up(self, event: events.MouseDown) -> None:
         if self._console_graph is not None:
             ref = self._reverse_click_map.get(
-                self._to_graph_coordinates(event.x, event.y)
+                self._to_view_coordinates(Offset(event.x, event.y)).as_tuple()
             )
 
             if ref is not None:
