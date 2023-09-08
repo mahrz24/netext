@@ -184,7 +184,7 @@ class GraphView(ScrollView, Generic[G]):
     ) -> None:
         if self._console_graph is not None:
             if position is not None:
-                node_position: FloatPoint | None = self._to_graph_coordinates(position)
+                node_position: FloatPoint | None = self.to_graph_coordinates(position)
             else:
                 node_position = None
             self._console_graph.update_node(
@@ -237,7 +237,7 @@ class GraphView(ScrollView, Generic[G]):
             return full_viewport.top_left + p + Point(scroll_x, scroll_y)
         return p
 
-    def _to_graph_coordinates(self, p: Point | Offset) -> FloatPoint:
+    def to_graph_coordinates(self, p: Point | Offset) -> FloatPoint:
         if isinstance(p, Offset):
             p = self._to_view_coordinates(p)
         if self._console_graph is not None:

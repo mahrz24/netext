@@ -42,6 +42,7 @@ mypy = "^1.3"
 textual = { extras = ["dev"], version = "^0.29" }
 textual-dev = { extras = ["dev"], version = "^0" }
 pyinstrument = "^4.4.0"
+pytest-asyncio = "^0.21.1"
 
 [tool.black]
 preview = true

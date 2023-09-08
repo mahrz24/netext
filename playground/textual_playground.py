@@ -108,7 +108,7 @@ class MainScreen(Screen):
 
         g.add_node(
             node_uuid,
-            g._to_graph_coordinates(Offset(x, y)),
+            g.to_graph_coordinates(Offset(x, y)),
             data={"title": "Untitled New Node", "$content-renderer": _render},
         )
         self.edit_node_label(node_uuid)
