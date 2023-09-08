@@ -234,7 +234,7 @@ class GraphView(ScrollView, Generic[G]):
         if self._console_graph is not None:
             full_viewport = self._console_graph.full_viewport
             scroll_x, scroll_y = self.scroll_offset
-            return full_viewport.top_left + p + Point(scroll_x, scroll_y)
+            return full_viewport.top_left - p - Point(scroll_x, scroll_y)
         return p
 
     def to_graph_coordinates(self, p: Point | Offset) -> FloatPoint:
@@ -248,7 +248,7 @@ class GraphView(ScrollView, Generic[G]):
         if self._console_graph is not None:
             full_viewport = self._console_graph.full_viewport
             scroll_x, scroll_y = self.scroll_offset
-            coords = full_viewport.top_left - p - Point(scroll_x, scroll_y)
+            coords = p - full_viewport.top_left + Point(scroll_x, scroll_y)
             return Offset(coords.x, coords.y)
         return Offset(p.x, p.y)
 
