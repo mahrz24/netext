@@ -131,7 +131,7 @@ class GraphView(ScrollView, Generic[G]):
                 widget.styles.height = size.height
 
             widget.styles.dock = "left"
-            widget.styles.offset = self._to_widget_coordinates(
+            widget.styles.offset = self.view_to_widget_coordinates(
                 Point(node_buffer.left_x, node_buffer.top_y)
             )
 
@@ -229,22 +229,29 @@ class GraphView(ScrollView, Generic[G]):
             self._graph_was_updated()
 
     # Check if this would work with scrolling via viewport
-    def _to_view_coordinates(self, offset: Offset) -> Point:
+    def widget_to_view_coordinates(self, offset: Offset) -> Point:
         p = Point(offset.x, offset.y)
         if self._console_graph is not None:
             full_viewport = self._console_graph.full_viewport
             scroll_x, scroll_y = self.scroll_offset
-            return full_viewport.top_left - p - Point(scroll_x, scroll_y)
+            return full_viewport.top_left + p - Point(scroll_x, scroll_y)
         return p
 
     def to_graph_coordinates(self, p: Point | Offset) -> FloatPoint:
         if isinstance(p, Offset):
-            p = self._to_view_coordinates(p)
+            p = self.widget_to_view_coordinates(p)
         if self._console_graph is not None:
             return self._console_graph.to_graph_coordinates(p)
         return FloatPoint(p.x, p.y)
 
-    def _to_widget_coordinates(self, p: Point) -> Offset:
+    def graph_to_widget_coordinates(self, p: FloatPoint) -> Offset:
+        if self._console_graph is not None:
+            return self.view_to_widget_coordinates(
+                self._console_graph.to_view_coordinates(p)
+            )
+        return Offset(0, 0)
+
+    def view_to_widget_coordinates(self, p: Point) -> Offset:
         if self._console_graph is not None:
             full_viewport = self._console_graph.full_viewport
             scroll_x, scroll_y = self.scroll_offset
@@ -300,7 +307,7 @@ class GraphView(ScrollView, Generic[G]):
                     widget.styles.width = node_buffer.width
                     widget.styles.height = node_buffer.height
                 # TODO node buffer top left should be point
-                widget.styles.offset = self._to_widget_coordinates(
+                widget.styles.offset = self.view_to_widget_coordinates(
                     Point(node_buffer.left_x, node_buffer.top_y)
                 )
         return super().refresh(*regions, repaint=repaint, layout=layout)
@@ -357,7 +364,7 @@ class GraphView(ScrollView, Generic[G]):
     def on_mouse_move(self, event: events.MouseMove) -> None:
         if self._console_graph is not None:
             ref = self._reverse_click_map.get(
-                self._to_view_coordinates(Offset(event.x, event.y)).as_tuple()
+                self.widget_to_view_coordinates(Offset(event.x, event.y)).as_tuple()
             )
 
             if ref != self._last_hover and self._last_hover is not None:
@@ -374,7 +381,7 @@ class GraphView(ScrollView, Generic[G]):
     def on_click(self, event: events.Click) -> None:
         if self._console_graph is not None:
             ref = self._reverse_click_map.get(
-                self._to_view_coordinates(Offset(event.x, event.y)).as_tuple()
+                self.widget_to_view_coordinates(Offset(event.x, event.y)).as_tuple()
             )
 
             if ref is not None:
@@ -383,7 +390,7 @@ class GraphView(ScrollView, Generic[G]):
     def on_mouse_down(self, event: events.MouseDown) -> None:
         if self._console_graph is not None:
             ref = self._reverse_click_map.get(
-                self._to_view_coordinates(Offset(event.x, event.y)).as_tuple()
+                self.widget_to_view_coordinates(Offset(event.x, event.y)).as_tuple()
             )
 
             if ref is not None:
@@ -392,7 +399,7 @@ class GraphView(ScrollView, Generic[G]):
     def on_mouse_up(self, event: events.MouseDown) -> None:
         if self._console_graph is not None:
             ref = self._reverse_click_map.get(
-                self._to_view_coordinates(Offset(event.x, event.y)).as_tuple()
+                self.widget_to_view_coordinates(Offset(event.x, event.y)).as_tuple()
             )
 
             if ref is not None:
