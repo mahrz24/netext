@@ -10,7 +10,8 @@ nav:
     - reference/edges.md
     - reference/nodes.md
   - 'API':
-    - api/terminal-graph.md
+    - api/console-graph.md
+    - api/textual-widget.md
     - api/styling.md
     - api/layout-engines.md
 

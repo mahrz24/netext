@@ -1,6 +1,6 @@
-# Terminal Graph
+# Console Graph
 
-::: netext.terminal_graph.G
+::: netext.console_graph.G
     handler: python
     options:
       show_source: false
@@ -22,4 +22,4 @@
     handler: python
     options:
       show_source: false
-      members: ["__init__", "full_viewport"]
+      members: ["__init__", "full_viewport", "zoom", "viewport", "reset_viewport", "add_node", "update_node", "remove_node", "add_edge", "update_edge", "remove_edge", "to_graph_coordinates", "to_view_coordinates"]

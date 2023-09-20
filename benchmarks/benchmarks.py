@@ -31,12 +31,12 @@ class TimeSuite:
             "$edge-segment-drawing-mode",
         )
 
-        self.terminal_graph = ConsoleGraph(self.graph)
+        self.console_graph = ConsoleGraph(self.graph)
         self.console = Console()
 
     def time_render_binomial_tree(self, n):
         with self.console.capture():
-            self.console.print(self.terminal_graph)
+            self.console.print(self.console_graph)
 
     def time_layout_and_rasterize_binomial_tree(self, n):
         ConsoleGraph(self.graph)
