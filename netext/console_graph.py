@@ -203,6 +203,16 @@ class ConsoleGraph(Generic[G]):
 
     @property
     def zoom(self) -> ZoomSpec | AutoZoom:
+        """The zoom level of the graph.
+
+        Can be set either to a float, a tuple of zoom in x and y direction or a
+        zoom spec / auto zoom mode. Defaults to 1.0, always returns a
+        ZoomSpec or AutoZoom, so a float or tuple is converted to a ZoomSpec.
+
+        Returns
+        -------
+        The zoom level, either a ZoomSpec or AutoZoom.
+        """
         return self._zoom
 
     @zoom.setter
