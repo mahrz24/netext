@@ -208,10 +208,6 @@ class ConsoleGraph(Generic[G]):
         Can be set either to a float, a tuple of zoom in x and y direction or a
         zoom spec / auto zoom mode. Defaults to 1.0, always returns a
         ZoomSpec or AutoZoom, so a float or tuple is converted to a ZoomSpec.
-
-        Returns
-        -------
-        The zoom level, either a ZoomSpec or AutoZoom.
         """
         return self._zoom
 
@@ -227,6 +223,8 @@ class ConsoleGraph(Generic[G]):
 
     @property
     def max_width(self) -> int | None:
+        """The maximum width of the graph in characters or None if no maximum width is set.
+        """
         return self._max_width
 
     @max_width.setter
@@ -238,6 +236,8 @@ class ConsoleGraph(Generic[G]):
 
     @property
     def max_height(self) -> int | None:
+        """The maximum height of the graph in characters as integer or None if no maximum height is set.
+        """
         return self._max_height
 
     @max_height.setter
@@ -249,10 +249,13 @@ class ConsoleGraph(Generic[G]):
 
     @property
     def full_viewport(self) -> Region:
+        """The full viewport of the graph that is spanned by the whole graph."""
         return self._unconstrained_viewport()
 
     @property
     def viewport(self) -> Region:
+        """The viewport that is set by the user (or the full viewport if none is set).
+        """
         if self._viewport is not None:
             return self._viewport
         return self._unconstrained_viewport()
