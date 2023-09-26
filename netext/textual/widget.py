@@ -63,10 +63,10 @@ class GraphView(ScrollView, Generic[G]):
         """Element mouse leave message."""
 
     class ElementMouseDown(ElementEvent):
-        """Element moused down message."""
+        """Element mouse down message."""
 
     class ElementMouseUp(ElementEvent):
-        """Element moused up message."""
+        """Element mouse up message."""
 
     def __init__(
         self,
@@ -80,6 +80,24 @@ class GraphView(ScrollView, Generic[G]):
         scroll_via_viewport: bool = False,
         **console_graph_kwargs,
     ):
+        """Initializes a new instance of the Widget class.
+
+        Args:
+            graph: A graph object to be displayed in the widget.
+            name: A string representing the name of the widget (optional).
+            id: A string representing the ID of the widget (optional).
+            classes: A string representing the CSS classes of the widget (optional).
+            disabled: A boolean indicating whether the widget is disabled (optional).
+            zoom: A float or tuple of floats representing the zoom level of the widget (optional).
+            viewport: A Region object representing the viewport of the widget (optional).
+            scroll_via_viewport: A boolean indicating whether the widget should scroll via the viewport (optional).
+            **console_graph_kwargs: Additional keyword arguments to be passed to the ConsoleGraph constructor.
+
+        Raises:
+            ValueError: If both viewport and scroll_via_viewport are specified.
+
+        """
+
         self._reverse_click_map: dict[tuple[int, int], Reference] = dict()
         self._last_hover: Reference | None = None
         self._console_graph_kwargs = console_graph_kwargs
@@ -99,6 +117,11 @@ class GraphView(ScrollView, Generic[G]):
 
     @property
     def graph(self) -> G:
+        """Returns and sets the graph object associated with this widget.
+
+        Returns:
+            G: The graph object associated with this widget.
+        """
         return self._graph
 
     @graph.setter
@@ -113,6 +136,14 @@ class GraphView(ScrollView, Generic[G]):
     def attach_widget_to_node(
         self, widget: Widget, node: Hashable, size: Size | None = None
     ) -> None:
+        """
+        Attaches a widget to a node in the console graph.
+
+        Args:
+            widget (Widget): The textual widget to attach.
+            node (Hashable): The node to attach the widget to.
+            size (Size | None): The size of the widget, by default uses the node size (optional).
+        """
         if self._console_graph is not None:
             if node in self._attached_widgets:
                 self.detach_widget_from_node(node)
@@ -136,6 +167,14 @@ class GraphView(ScrollView, Generic[G]):
             )
 
     def detach_widget_from_node(self, node: Hashable) -> None:
+        """Detach a widget from a node.
+
+        Args:
+            node (Hashable): The node to detach the widget from.
+
+        Returns:
+            None
+        """
         widget, _ = self._attached_widgets[node]
         del self._attached_widgets[node]
         del self._attached_widgets_lookup[widget]
@@ -147,6 +186,21 @@ class GraphView(ScrollView, Generic[G]):
         position: FloatPoint | None = None,
         data: dict[str, Any] | None = None,
     ) -> None:
+        """
+        Adds a node to the graph widget.
+
+        Args:
+            node: The node to add to the graph.
+            position: The position of the node in the graph (optional). If set add the node at the specific
+                position in graph space coordinates. If not set the node will be added and the layout will be
+                recomputed.
+            data: Optional dictionary of node attributes, see
+                [ConsoleGraph.add_node][netext.console_graph.ConsoleGraph.add_node] (optional).
+
+        Returns:
+            None
+        """
+
         if self._console_graph is not None:
             self._console_graph.add_node(node, position, data)
             self._graph = self._console_graph._nx_graph.copy()
@@ -158,22 +212,52 @@ class GraphView(ScrollView, Generic[G]):
         v: Hashable,
         data: dict[str, Any] | None = None,
     ) -> None:
+        """
+        Adds an edge to the graph widget.
+
+        Args:
+            u: The source node of the edge.
+            v: The destination node of the edge.
+            data: Optional dictionary of edge attributes, see
+                [ConsoleGraph.add_edge][netext.console_graph.ConsoleGraph.add_edge] (optional).
+
+        Returns:
+            None
+        """
         if self._console_graph is not None:
             self._console_graph.add_edge(u, v, data)
             self._graph = self._console_graph._nx_graph.copy()
             self._graph_was_updated()
 
     def remove_node(self, node: Hashable) -> None:
+        """Remove a node from the graph  and updates the console graph and the internal graph.
+
+        Args:
+            node (Hashable): The node to remove from the graph.
+
+        Returns:
+            None
+        """
         if self._console_graph is not None:
             self._console_graph.remove_node(node)
             self._graph = self._console_graph._nx_graph.copy()
             self._graph_was_updated()
 
     def remove_edge(self, u: Hashable, v: Hashable) -> None:
+        """
+        Removes an edge from the graph and updates the console graph and the internal graph.
+
+        Args:
+            u (Hashable): The source node of the edge.
+            v (Hashable): The destination node of the edge.
+
+        Returns:
+            None
+        """
         if self._console_graph is not None:
             self._console_graph.remove_edge(u, v)
             self._graph = self._console_graph._nx_graph.copy()
-            self._graph_was_updated()
+        self._graph_was_updated()
 
     def update_node(
         self,
@@ -182,6 +266,18 @@ class GraphView(ScrollView, Generic[G]):
         data: dict[str, Any] | None = None,
         update_data: bool = True,
     ) -> None:
+        """
+        Updates a node in the graph and reflects the changes in the console graph.
+
+        See [ConsoleGraph.update_node][netext.console_graph.ConsoleGraph.update_node] for comparison.
+
+        Args:
+            node (Hashable): The node to update.
+            position (Offset | None, optional): The new position of the node. Defaults to None.
+            data (dict[str, Any] | None, optional): The new data to associate with the node. Defaults to None.
+            update_data (bool, optional): Whether to merge the data associated with the node. Defaults to True.
+        """
+
         if self._console_graph is not None:
             if position is not None:
                 node_position: FloatPoint | None = self.to_graph_coordinates(position)
@@ -205,6 +301,22 @@ class GraphView(ScrollView, Generic[G]):
         update_data: bool = True,
         update_layout: bool = True,
     ) -> None:
+        """
+        Updates the edge between nodes `u` and `v` with the given `data`.
+
+        See [ConsoleGraph.update_edge][netext.console_graph.ConsoleGraph.update_edge] for comparison.
+
+        Args:
+            u (Hashable): The source node of the edge.
+            v (Hashable): The destination node of the edge.
+            data (dict[str, Any]): The data to update the edge with.
+            update_data (bool, optional): Whether to merge the data of the edge. Defaults to True.
+            update_layout (bool, optional): Whether to update the layout of the graph. Defaults to True.
+
+        Returns:
+            None
+        """
+
         if self._console_graph is not None:
             self._console_graph.update_edge(
                 u, v, data, update_data=update_data, update_layout=update_layout
@@ -230,6 +342,14 @@ class GraphView(ScrollView, Generic[G]):
 
     # Check if this would work with scrolling via viewport
     def widget_to_view_coordinates(self, offset: Offset) -> Point:
+        """Converts widget coordinates to view coordinates.
+
+        Args:
+            offset (Offset): The offset to convert.
+
+        Returns:
+            Point: The converted point.
+        """
         p = Point(offset.x, offset.y)
         if self._console_graph is not None:
             full_viewport = self._console_graph.full_viewport
@@ -238,6 +358,15 @@ class GraphView(ScrollView, Generic[G]):
         return p
 
     def to_graph_coordinates(self, p: Point | Offset) -> FloatPoint:
+        """
+        Converts a point or offset to graph coordinates.
+
+        Args:
+            p (Point | Offset): The point or offset to convert.
+
+        Returns:
+            FloatPoint: The converted point in graph coordinates.
+        """
         if isinstance(p, Offset):
             p = self.widget_to_view_coordinates(p)
         if self._console_graph is not None:
@@ -245,6 +374,14 @@ class GraphView(ScrollView, Generic[G]):
         return FloatPoint(p.x, p.y)
 
     def graph_to_widget_coordinates(self, p: FloatPoint) -> Offset:
+        """Converts a point in graph coordinates to widget coordinates.
+
+        Args:
+            p (FloatPoint): The point in graph coordinates.
+
+        Returns:
+            Offset: The point in widget coordinates.
+        """
         if self._console_graph is not None:
             return self.view_to_widget_coordinates(
                 self._console_graph.to_view_coordinates(p)
@@ -252,6 +389,15 @@ class GraphView(ScrollView, Generic[G]):
         return Offset(0, 0)
 
     def view_to_widget_coordinates(self, p: Point) -> Offset:
+        """
+        Converts a point in the view's coordinate system to a point in the widget's coordinate system.
+
+        Args:
+            p (Point): The point to convert.
+
+        Returns:
+            Offset: The converted point in the widget's coordinate system.
+        """
         if self._console_graph is not None:
             full_viewport = self._console_graph.full_viewport
             scroll_x, scroll_y = self.scroll_offset

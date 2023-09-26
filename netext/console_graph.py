@@ -318,6 +318,14 @@ class ConsoleGraph(Generic[G]):
         position: FloatPoint | None = None,
         data: dict[str, Any] | None = None,
     ) -> None:
+        """Add a node to the console graph.
+
+        Args:
+            node (Hashable): The node to add.
+            position (FloatPoint | None): If set add the node at the specific position in graph
+                space coordinates.
+            data (dict[str, Any] | None): The data and attributes of the node.
+        """
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
         if data is None:
@@ -346,9 +354,19 @@ class ConsoleGraph(Generic[G]):
     def add_edge(
         self, u: Hashable, v: Hashable, data: dict[str, Any] | None = None
     ) -> None:
+        """Add an edge between existing nodes in the graph.
+
+        Args:
+            u (Hashable): The source node.
+            v (Hashable): The target node.
+            data (dict[str, Any] | None, optional): The data and attributes of the edge.
+
+        Raises:
+            ValueError: Raised if one of the edges does not exist in the graph.
+        """
+
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
-        # TODO A lot of code duplication with the edge rendering
         edge_buffer: EdgeBuffer | None = None
         edge_layout: EdgeLayout | None = None
         label_nodes: list[StripBuffer] | None = None
@@ -429,6 +447,15 @@ class ConsoleGraph(Generic[G]):
             self.edge_layouts_current_lod[(u, v)] = edge_layout
 
     def remove_node(self, node: Hashable) -> None:
+        """Removes the specified node from the graph, along with any edges that are connected to it.
+
+        Args:
+            node (Hashable): The node to remove.
+
+        Returns:
+            None
+        """
+
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
         self.node_positions.pop(node)
@@ -451,6 +478,15 @@ class ConsoleGraph(Generic[G]):
         self._nx_graph.remove_node(node)
 
     def remove_edge(self, u: Hashable, v: Hashable) -> None:
+        """Removes an edge from the graph.
+
+        Args:
+            u (Hashable): The source node of the edge.
+            v (Hashable): The target node of the edge.
+
+        Returns:
+            None
+        """
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
         self._nx_graph.remove_edge(u, v)
@@ -472,6 +508,17 @@ class ConsoleGraph(Generic[G]):
         data: dict[str, Any] | None = None,
         update_data: bool = True,
     ) -> None:
+        """Update a node position or attributes (data).
+
+        Args:
+            node (Hashable): The node to update.
+            position (FloatPoint | None, optional): A new position if the node should be moved, by default None.
+            data (dict[str, Any] | None, optional): A new or updated data dictionary, by default None.
+            update_data (bool, optional): Whether to replace or update the data dictionary, by default True.
+
+        Returns:
+            None
+        """
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
         force_edge_rerender = False
 
@@ -518,11 +565,31 @@ class ConsoleGraph(Generic[G]):
                 self.update_edge(u, v, self._nx_graph.edges[u, v], update_data=False)
 
     def to_graph_coordinates(self, p: Point) -> FloatPoint:
+        """Converts a point from view coordinates to graph coordinates.
+
+        This means applying the inverse zoom and offset to the point.
+
+        Args:
+            p (Point): The point to convert.
+
+        Returns:
+            FloatPoint: The converted point in graph coordinates.
+        """
         return FloatPoint(
             p.x / self.zoom_x - self.offset.x, p.y / self.zoom_y - self.offset.y
         )
 
     def to_view_coordinates(self, p: FloatPoint) -> Point:
+        """Converts a point from graph coordinates to view coordinates.
+
+        This means applying the zoom and offset to the point.
+
+        Args:
+            p (FloatPoint): The point to convert.
+
+        Returns:
+            Point: The converted point in view coordinates.
+        """
         return Point(
             round((self.offset.x + p.x) * self.zoom_x),
             round((self.offset.y + p.y) * self.zoom_y),
@@ -536,8 +603,25 @@ class ConsoleGraph(Generic[G]):
         update_data: bool = True,
         update_layout: bool = True,
     ) -> None:
+        """Update edge attributes (data).
+
+        Args:
+            u (Hashable): The source node of the edge.
+            v (Hashable): The target node of the edge.
+            data (dict[str, Any]): The new or updated data dictionary.
+            update_data (bool, optional): Whether to replace or update the data dictionary, by default True.
+            update_layout (bool, optional): Whether to update the layout of the edge, by default True.
+
+        Raises:
+            RuntimeError: If the zoom factor has not been computed yet.
+
+        Returns:
+            None
+
+        """
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
+        # This should not happen as we require the render state to have zoomed positions computed.
         if self._zoom_factor is None:
             raise RuntimeError(
                 "You can only update edges once the zoom factor has been computed"
