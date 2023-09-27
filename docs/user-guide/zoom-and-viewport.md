@@ -35,3 +35,11 @@ nx.set_node_attributes(g, JustContent(), "$shape-0")
 # For lod 0, replace the content by a circle.
 nx.set_node_attributes(g, lambda _, __, ___: "⏺", "$content-renderer-0")
 ```
+
+## Coordinate Systems
+
+There are two relevant coordinate systems (more if you use netext in a textual widget). The first one is the graph coordinate system, which uses a floating point representation and are the coordinates that are used to layout the graph. The second is the view coordinate system, which is linked to the the graph coordinate system by a transpose, scale and round transformation. The view coordinate system is thus using integer coordinates and represent individual characters on the console.
+
+The size of the nodes is specified in the view coordinate system and mapped without transformation into the graph coordinate system. Hence, if you zoom out nodes will move closer together, but stay the same size, unless you implement a level of detail mapping.
+
+The viewport then determines the part of the graph in view coordinates that will be rendered to the console.
