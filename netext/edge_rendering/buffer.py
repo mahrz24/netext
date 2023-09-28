@@ -1,14 +1,20 @@
+from typing import Hashable
 from netext.geometry import Point
-from netext.rendering.segment_buffer import StripBuffer
+from netext.rendering.segment_buffer import Reference, StripBuffer
 
 
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EdgeBuffer(StripBuffer):
+    edge: tuple[Hashable, Hashable]
     boundary_1: Point
     boundary_2: Point
+
+    @property
+    def reference(self) -> Reference | None:
+        return Reference(type="edge", ref=self.edge)
 
     @property
     def left_x(self) -> int:

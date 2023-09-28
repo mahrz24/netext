@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Tuple
+from typing import Any, Hashable, Tuple
 
 from rich.segment import Segment
 from netext.geometry import Region
@@ -25,9 +25,19 @@ class Strip:
 
 
 @dataclass
+class Reference:
+    type: str
+    ref: Hashable
+
+
+@dataclass(kw_only=True)
 class StripBuffer:
     strips: list[Strip]
     z_index: float
+
+    @property
+    def reference(self) -> Reference | None:
+        return None
 
     @property
     def left_x(self) -> int:

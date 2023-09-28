@@ -12,7 +12,7 @@ from rich.text import Text
 from netext.geometry import Magnet, Point
 from shapely import LineString, Polygon
 
-from netext.rendering.segment_buffer import Strip, StripBuffer, Spacer
+from netext.rendering.segment_buffer import Reference, Strip, StripBuffer, Spacer
 
 
 class Shape(Protocol):
@@ -29,7 +29,7 @@ class Shape(Protocol):
         console: Console,
         content_renderable: RenderableType,
         style: Style,
-        data: dict[Hashable, Any],
+        data: dict[str, Any],
     ) -> list[Strip]:
         return NotImplemented
 
@@ -109,7 +109,7 @@ class JustContent(RectangularShapeMixin):
         console: Console,
         content_renderable: RenderableType,
         style: Style,
-        data: dict[Hashable, Any],
+        data: dict[str, Any],
     ) -> list[Strip]:
         return self._renderable_type_to_strips(console, content_renderable)
 
@@ -120,7 +120,7 @@ class Box(RectangularShapeMixin):
         console: Console,
         content_renderable: RenderableType,
         style: Style,
-        data: dict[Hashable, Any],
+        data: dict[str, Any],
     ) -> list[Strip]:
         box_type = data.get("$box-type", box.ROUNDED)
         return self._renderable_type_to_strips(
@@ -128,8 +128,9 @@ class Box(RectangularShapeMixin):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NodeBuffer(StripBuffer):
+    node: Hashable
     center: Point
     node_width: int
     node_height: int
@@ -138,10 +139,15 @@ class NodeBuffer(StripBuffer):
 
     shape: Shape = JustContent()
 
+    @property
+    def reference(self) -> Reference | None:
+        return Reference(type="node", ref=self.node)
+
     @classmethod
     def from_strips(
         cls,
         strips: list[Strip],
+        node: Hashable,
         center: Point,
         shape: Shape,
         z_index: int = 0,
@@ -153,6 +159,7 @@ class NodeBuffer(StripBuffer):
         )
 
         return cls(
+            node=node,
             shape=shape,
             center=center,
             z_index=z_index,
@@ -202,14 +209,21 @@ class NodeBuffer(StripBuffer):
 
 
 def _default_content_renderer(
-    node_str: str, data: dict[Hashable, Any], content_style: Style
+    node_str: str, data: dict[str, Any], content_style: Style
 ) -> RenderableType:
     return Text(node_str, style=content_style)
 
 
 def rasterize_node(
-    console: Console, node: Hashable, data: dict[Hashable, Any], lod: int = 1
+    console: Console, node: Hashable, data: dict[str, Any], lod: int = 1
 ) -> NodeBuffer:
+    # TODO make helper function to get node from data
+    to_be_ignored = []
+    for key, val in data.items():
+        if val is None:
+            to_be_ignored.append(key)
+    for key in to_be_ignored:
+        del data[key]
     shape: Shape = data.get("$shape", Box())
     style: Style = data.get("$style", Style())
     content_style = data.get("$content-style", Style())
@@ -228,5 +242,48 @@ def rasterize_node(
     strips = shape.render_shape(console, content_renderable, style=style, data=data)
 
     return NodeBuffer.from_strips(
-        strips, center=Point(x=0, y=0), z_index=-1, shape=shape, margin=margin, lod=lod
+        strips,
+        node=node,
+        center=Point(x=0, y=0),
+        z_index=-1,
+        shape=shape,
+        margin=margin,
+        lod=lod,
     )
+
+
+@dataclass(kw_only=True)
+class EdgeLabelBuffer(NodeBuffer):
+    edge: tuple[Hashable, Hashable]
+
+    @property
+    def reference(self) -> Reference | None:
+        return Reference(type="edge_label", ref=self.edge)
+
+    @classmethod
+    def from_strips_and_edge(
+        cls,
+        strips: list[Strip],
+        edge: tuple[Hashable, Hashable],
+        center: Point,
+        shape: Shape,
+        z_index: int = 0,
+        margin: int = 0,
+        lod: int = 1,
+    ) -> "EdgeLabelBuffer":
+        width = max(
+            sum(segment.cell_length for segment in strip.segments) for strip in strips
+        )
+
+        return cls(
+            node=edge[0],
+            edge=edge,
+            shape=shape,
+            center=center,
+            z_index=z_index,
+            node_width=width,
+            node_height=len(strips),
+            strips=strips,
+            margin=margin,
+            lod=lod,
+        )

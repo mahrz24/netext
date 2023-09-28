@@ -8,7 +8,7 @@ Type: bool.
 
 ## Level of Detail
 
-The `lod-map` attribute can be set to a function mapping zoom levels to discrete level of detail values. The function takes a single float parameter and returns an integer value. See [Zoom and Viewport](./user-guide/zoom-and-viewport.md) for details on how to use the level of detail to change the appearance of edges on different zoom levels.
+The `lod-map` attribute can be set to a function mapping zoom levels to discrete level of detail values. The function takes a single float parameter and returns an integer value. See [Zoom and Viewport](../user-guide/zoom-and-viewport.md) for details on how to use the level of detail to change the appearance of edges on different zoom levels.
 
 Type: Callable | None
 
@@ -28,7 +28,7 @@ Possible values are:
 ### Examples
 
 ```{.rich title='ArrowTip.ARROW' }
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
@@ -65,7 +65,7 @@ g.add_edge("G", "H", **{"$end-arrow-tip": ArrowTip.ARROW,
                         "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL}
 )
 
-output = TerminalGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(g, layout_engine=StaticLayout())
 ```
 
 ## Label
@@ -77,7 +77,7 @@ Type: str | None.
 ### Example
 
 ```{.rich title='Label' }
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.layout_engines.static import StaticLayout
 from rich import print
 
@@ -89,7 +89,7 @@ g.add_node("B", **{"$x": 5, "$y": 9})
 g.add_edge("A", "B", **{"$label": "Label"})
 
 
-output = TerminalGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(g, layout_engine=StaticLayout())
 ```
 
 ## Style
@@ -101,7 +101,7 @@ Type: [Style][rich.style.Style] | None.
 ### Examples
 
 ```{.rich title='Style' }
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.layout_engines.static import StaticLayout
 from rich import print
 from rich.style import Style
@@ -129,7 +129,7 @@ g.add_edge("G", "H"
 
 )
 
-output = TerminalGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(g, layout_engine=StaticLayout())
 ```
 
 ## Edge Routing Mode
@@ -150,7 +150,7 @@ Possible values are:
 ### Example
 
 ```{.rich title='Edge Routing Mode' }
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
@@ -169,7 +169,7 @@ g.add_node("D", **{"$x": 29, "$y": 9})
 g.add_edge("C", "D", **{"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL}
 )
 
-output = TerminalGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(g, layout_engine=StaticLayout())
 ```
 
 ## Edge Segment Drawing Mode
@@ -192,7 +192,7 @@ Possible values are:
 ### Examples
 
 ```{.rich title='Style' }
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.layout_engines.static import StaticLayout
@@ -240,5 +240,5 @@ g.add_node("P", **{"$x": 75, "$y": 22})
 g.add_edge("O", "P", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BLOCK,"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
 
 
-output = TerminalGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(g, layout_engine=StaticLayout())
 ```

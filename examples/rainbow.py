@@ -1,7 +1,7 @@
 # Minimum Spanning Tree Example
 import itertools
 import networkx as nx
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from rich.style import Style
 from rich import print
 
@@ -24,4 +24,4 @@ colors = [
 for edge, color in zip(G.edges, itertools.cycle(colors)):
     G.edges[edge]["$style"] = color
 
-print(TerminalGraph(G))
+print(ConsoleGraph(G))

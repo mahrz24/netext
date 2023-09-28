@@ -1,4 +1,4 @@
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.layout_engines.static import StaticLayout
@@ -22,4 +22,4 @@ g.add_edge(
     }
 )
 
-print(TerminalGraph(g, layout_engine=StaticLayout()))
+print(ConsoleGraph(g, layout_engine=StaticLayout()))

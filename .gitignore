@@ -138,3 +138,9 @@ typings
 # asv published results
 .asv/html
 .DS_Store
+
+# pycharm
+.idea
+
+# snapshot test report
+tests/snapshot_tests/output/

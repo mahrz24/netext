@@ -1,6 +1,6 @@
 {
     "benchmarks.TimeSuite.time_layout_and_rasterize_binomial_tree": {
-        "code": "class TimeSuite:\n    def time_layout_and_rasterize_binomial_tree(self, n):\n        TerminalGraph(self.graph)\n\n    def setup(self, n):\n        self.graph = binomial_tree(n)\n        self.graph_ortho_box = binomial_tree(n)\n    \n        nx.set_edge_attributes(\n            self.graph_ortho_box, EdgeRoutingMode.ORTHOGONAL, \"$edge-routing-mode\"\n        )\n        nx.set_edge_attributes(\n            self.graph_ortho_box,\n            EdgeSegmentDrawingMode.BOX,\n            \"$edge-segment-drawing-mode\",\n        )\n    \n        self.terminal_graph = TerminalGraph(self.graph)\n        self.console = Console()",
+        "code": "class TimeSuite:\n    def time_layout_and_rasterize_binomial_tree(self, n):\n        ConsoleGraph(self.graph)\n\n    def setup(self, n):\n        self.graph = binomial_tree(n)\n        self.graph_ortho_box = binomial_tree(n)\n    \n        nx.set_edge_attributes(\n            self.graph_ortho_box, EdgeRoutingMode.ORTHOGONAL, \"$edge-routing-mode\"\n        )\n        nx.set_edge_attributes(\n            self.graph_ortho_box,\n            EdgeSegmentDrawingMode.BOX,\n            \"$edge-segment-drawing-mode\",\n        )\n    \n        self.console_graph = ConsoleGraph(self.graph)\n        self.console = Console()",
         "min_run_count": 2,
         "name": "benchmarks.TimeSuite.time_layout_and_rasterize_binomial_tree",
         "number": 0,
@@ -26,7 +26,7 @@
         "warmup_time": -1
     },
     "benchmarks.TimeSuite.time_layout_and_rasterize_binomial_tree_orthogonal_box": {
-        "code": "class TimeSuite:\n    def time_layout_and_rasterize_binomial_tree_orthogonal_box(self, n):\n        TerminalGraph(self.graph_ortho_box)\n\n    def setup(self, n):\n        self.graph = binomial_tree(n)\n        self.graph_ortho_box = binomial_tree(n)\n    \n        nx.set_edge_attributes(\n            self.graph_ortho_box, EdgeRoutingMode.ORTHOGONAL, \"$edge-routing-mode\"\n        )\n        nx.set_edge_attributes(\n            self.graph_ortho_box,\n            EdgeSegmentDrawingMode.BOX,\n            \"$edge-segment-drawing-mode\",\n        )\n    \n        self.terminal_graph = TerminalGraph(self.graph)\n        self.console = Console()",
+        "code": "class TimeSuite:\n    def time_layout_and_rasterize_binomial_tree_orthogonal_box(self, n):\n        ConsoleGraph(self.graph_ortho_box)\n\n    def setup(self, n):\n        self.graph = binomial_tree(n)\n        self.graph_ortho_box = binomial_tree(n)\n    \n        nx.set_edge_attributes(\n            self.graph_ortho_box, EdgeRoutingMode.ORTHOGONAL, \"$edge-routing-mode\"\n        )\n        nx.set_edge_attributes(\n            self.graph_ortho_box,\n            EdgeSegmentDrawingMode.BOX,\n            \"$edge-segment-drawing-mode\",\n        )\n    \n        self.console_graph = ConsoleGraph(self.graph)\n        self.console = Console()",
         "min_run_count": 2,
         "name": "benchmarks.TimeSuite.time_layout_and_rasterize_binomial_tree_orthogonal_box",
         "number": 0,
@@ -52,7 +52,7 @@
         "warmup_time": -1
     },
     "benchmarks.TimeSuite.time_render_binomial_tree": {
-        "code": "class TimeSuite:\n    def time_render_binomial_tree(self, n):\n        with self.console.capture():\n            self.console.print(self.terminal_graph)\n\n    def setup(self, n):\n        self.graph = binomial_tree(n)\n        self.graph_ortho_box = binomial_tree(n)\n    \n        nx.set_edge_attributes(\n            self.graph_ortho_box, EdgeRoutingMode.ORTHOGONAL, \"$edge-routing-mode\"\n        )\n        nx.set_edge_attributes(\n            self.graph_ortho_box,\n            EdgeSegmentDrawingMode.BOX,\n            \"$edge-segment-drawing-mode\",\n        )\n    \n        self.terminal_graph = TerminalGraph(self.graph)\n        self.console = Console()",
+        "code": "class TimeSuite:\n    def time_render_binomial_tree(self, n):\n        with self.console.capture():\n            self.console.print(self.console_graph)\n\n    def setup(self, n):\n        self.graph = binomial_tree(n)\n        self.graph_ortho_box = binomial_tree(n)\n    \n        nx.set_edge_attributes(\n            self.graph_ortho_box, EdgeRoutingMode.ORTHOGONAL, \"$edge-routing-mode\"\n        )\n        nx.set_edge_attributes(\n            self.graph_ortho_box,\n            EdgeSegmentDrawingMode.BOX,\n            \"$edge-segment-drawing-mode\",\n        )\n    \n        self.console_graph = ConsoleGraph(self.graph)\n        self.console = Console()",
         "min_run_count": 2,
         "name": "benchmarks.TimeSuite.time_render_binomial_tree",
         "number": 0,

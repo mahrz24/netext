@@ -15,7 +15,7 @@ from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
 from netext.layout_engines.static import StaticLayout
 from pyinstrument.processors import aggregate_repeated_calls
 
-from netext.terminal_graph import GraphProfiler, TerminalGraph
+from netext.console_graph import GraphProfiler, ConsoleGraph
 
 import networkx as nx
 from rich import box
@@ -32,7 +32,7 @@ class Graph(Widget):
     """Display a graph."""
 
     graph: Reactive[nx.DiGraph | nx.Graph | None] = reactive(None)
-    terminal_graph: TerminalGraph | None = None
+    console_graph: ConsoleGraph | None = None
 
     class Profiled(Message):
         """Color selected message."""
@@ -73,7 +73,7 @@ class Graph(Widget):
         if nx.get_node_attributes(graph, "$x") and nx.get_node_attributes(graph, "$y"):
             engine = StaticLayout()
 
-        self.terminal_graph = TerminalGraph(
+        self.console_graph = ConsoleGraph(
             graph,
             layout_engine=engine,
             layout_profiler=cast(GraphProfiler, layout_profiler),
@@ -82,9 +82,9 @@ class Graph(Widget):
             buffer_render_profiler=cast(GraphProfiler, buffer_render_profiler),
         )
 
-        self.terminal_graph._profile_render()
+        self.console_graph._profile_render()
 
-        for node, pos in self.terminal_graph.node_layout.items():
+        for node, pos in self.console_graph.node_layout.items():
             graph.nodes[node]["$x"] = pos[0]
             graph.nodes[node]["$y"] = pos[1]
 
@@ -99,18 +99,18 @@ class Graph(Widget):
         self.refresh(layout=False)
 
     def render(self) -> RenderResult:
-        if self.terminal_graph:
-            return self.terminal_graph
+        if self.console_graph:
+            return self.console_graph
         else:
             return "Empty graph."
 
     def get_content_width(self, container: Size, viewport: Size) -> int:
         """Force content width size."""
-        return self.terminal_graph.width
+        return self.console_graph.width
 
     def get_content_height(self, container: Size, viewport: Size, width: int) -> int:
         """Force content width size."""
-        return self.terminal_graph.height
+        return self.console_graph.height
 
 
 def create_graph() -> nx.DiGraph:

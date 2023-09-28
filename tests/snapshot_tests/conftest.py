@@ -27,15 +27,15 @@ from rich.console import Console
 from syrupy import SnapshotAssertion
 
 
-from netext import TerminalGraph
+from netext import ConsoleGraph
 
 NETEXT_SNAPSHOT_SVG_KEY = pytest.StashKey[str]()
 NETEXT_ACTUAL_SVG_KEY = pytest.StashKey[str]()
 NETEXT_SNAPSHOT_PASS = pytest.StashKey[bool]()
-NETEXT_GRAPH_KEY = pytest.StashKey[TerminalGraph]()
+NETEXT_GRAPH_KEY = pytest.StashKey[ConsoleGraph]()
 
 
-def import_graph(path: str) -> TerminalGraph:
+def import_graph(path: str) -> ConsoleGraph:
     """Import a graph from a path.
 
     This function does some magic to import a graph from a path, and then
@@ -142,7 +142,7 @@ class SvgSnapshotDiff:
     file_similarity: float
     path: PathLike
     line_number: int
-    graph: TerminalGraph
+    graph: ConsoleGraph
     environment: dict
 
 

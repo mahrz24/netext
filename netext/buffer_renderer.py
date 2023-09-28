@@ -1,18 +1,32 @@
 from collections import defaultdict
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 from heapq import merge
+from typing import Any
 
 from rich.segment import Segment
 from netext.geometry import Region
 
-from netext.rendering.segment_buffer import StripBuffer, Spacer
+from netext.rendering.segment_buffer import Reference, StripBuffer, Spacer
+
+
+def flatten_strips(strips: list[list[Segment]], *reverse_map: Any) -> list[Segment]:
+    """Returns a flattened list of segments with interspersed newlines."""
+
+    result = []
+    for strip in strips:
+        result.extend(strip)
+        result.append(Segment("\n"))
+
+    return result
 
 
 def render_buffers(
     buffers: Iterable[StripBuffer], viewport: Region
-) -> Iterator[Segment]:
+) -> tuple[list[list[Segment]], dict[tuple[int, int], Reference]]:
     full_width = viewport.x + viewport.width
     full_height = viewport.y + viewport.height
+
+    reverse_buffer_map: dict[tuple[int, int], Reference] = {}
 
     buffers_by_row: dict[int, list[StripBuffer]] = defaultdict(list)
     for buffer in buffers:
@@ -21,8 +35,14 @@ def render_buffers(
                 buffers_by_row[buffer.top_y] + [buffer]
             )
 
+    result_strips = []
+
+    if not buffers_by_row:
+        return ([], dict())
+
     active_buffers: list[tuple[int, list[Segment | Spacer], int, StripBuffer]] = []
     for row in range(min(buffers_by_row.keys()), full_height):
+        current_strip: list[Segment] = []
         # This contains information where the segments for the currently
         # active buffers start (active buffer == intersects with current line)
         active_buffers = sorted(
@@ -59,8 +79,11 @@ def render_buffers(
         if row < viewport.y:
             continue
 
+        result_strips.append(current_strip)
+
         if not active_buffers:
-            yield Segment(" " * full_width + "\n")
+            segment_content = " " * full_width
+            current_strip.append(Segment(segment_content))
             continue
 
         current_x = viewport.x
@@ -95,7 +118,8 @@ def render_buffers(
                 elif current_x < segment_left_x:
                     next_x = min(full_width, segment_left_x)
                     # Pad to the left boundary of the segment
-                    yield Segment(" " * (next_x - current_x))
+                    segment_content = " " * (next_x - current_x)
+                    current_strip.append(Segment(segment_content))
                     current_x = next_x
 
                 # Perform a look ahead, and if the left boundary of any of the next active buffers
@@ -165,12 +189,18 @@ def render_buffers(
                 # will be yielded.
                 if segment.cell_length > 0:
                     if isinstance(segment, Spacer):
-                        yield Segment(" " * segment.cell_length)
+                        out_segment = Segment(" " * segment.cell_length)
+                        current_strip.append(out_segment)
                     else:
-                        yield segment
+                        for x in range(current_x, current_x + segment.cell_length):
+                            if buffer.reference is not None:
+                                reverse_buffer_map[x, row] = buffer.reference
+                        current_strip.append(segment)
                     current_x += segment.cell_length
                 segment_left_x += full_segment_cell_length
 
         if current_x < full_width:
-            yield Segment(" " * (full_width - current_x))
-        yield Segment("\n")
+            segment = Segment(" " * (full_width - current_x))
+            current_strip.append(segment)
+
+    return result_strips, reverse_buffer_map

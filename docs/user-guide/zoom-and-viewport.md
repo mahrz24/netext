@@ -1,6 +1,6 @@
 # Zoom and Viewport
 
-When creating a [TerminalGraph][netext.TerminalGraph] it is possible to specify a zoom level and a viewport. The zoom level determines how close or far apart nodes are placed, but can also change the way and size of nodes. The viewport allows to select only a certain part of the graph to be rendered. By default the zoom level is one and the viewport is spanning all rendered parts of the graph.
+When creating a [ConsoleGraph][netext.ConsoleGraph] it is possible to specify a zoom level and a viewport. The zoom level determines how close or far apart nodes are placed, but can also change the way and size of nodes. The viewport allows to select only a certain part of the graph to be rendered. By default the zoom level is one and the viewport is spanning all rendered parts of the graph.
 
 # Viewport
 
@@ -9,14 +9,14 @@ The viewport, if explicitly specified, is passed as a region, e.g.:
 ```python
 from netext.geometry import Region
 ...
-TerminalGraph(g, viewport=Region(-20, -25, 40, 15))
+ConsoleGraph(g, viewport=Region(-20, -25, 40, 15))
 ```
 
 that determines the upper left point, i.e. `(-20, -25)` and the size of the region, i.e. `(40, 15)`.
 
 !!! info
 
-    Graphs are centered around the `(0,0)` coordinate, so negative coordinates are common for specifying viewports. You can use [TerminalGraph.full_viewport][netext.TerminalGraph.full_viewport] to find the maximum extent of your viewport.
+    Graphs are centered around the `(0,0)` coordinate, so negative coordinates are common for specifying viewports. You can use [ConsoleGraph.full_viewport][netext.ConsoleGraph.full_viewport] to find the maximum extent of your viewport.
 
 # Zoom
 
@@ -35,3 +35,11 @@ nx.set_node_attributes(g, JustContent(), "$shape-0")
 # For lod 0, replace the content by a circle.
 nx.set_node_attributes(g, lambda _, __, ___: "⏺", "$content-renderer-0")
 ```
+
+## Coordinate Systems
+
+There are two relevant coordinate systems (more if you use netext in a textual widget). The first one is the graph coordinate system, which uses a floating point representation and are the coordinates that are used to layout the graph. The second is the view coordinate system, which is linked to the the graph coordinate system by a transpose, scale and round transformation. The view coordinate system is thus using integer coordinates and represent individual characters on the console.
+
+The size of the nodes is specified in the view coordinate system and mapped without transformation into the graph coordinate system. Hence, if you zoom out nodes will move closer together, but stay the same size, unless you implement a level of detail mapping.
+
+The viewport then determines the part of the graph in view coordinates that will be rendered to the console.

@@ -6,11 +6,13 @@ nav:
   - 'User Guide':
     - user-guide/styling-graphs.md
     - user-guide/zoom-and-viewport.md
+    - user-guide/textual-widget.md
   - 'Reference':
     - reference/edges.md
     - reference/nodes.md
   - 'API':
-    - api/terminal-graph.md
+    - api/console-graph.md
+    - api/textual-widget.md
     - api/styling.md
     - api/layout-engines.md
 
@@ -51,6 +53,9 @@ markdown_extensions:
   - pymdownx.snippets
   - pymdownx.superfences:
       custom_fences:
+        - name: textual
+          class: textual
+          format: !!python/name:textual._doc.format_svg
         - name: rich
           class: rich
           format: !!python/name:textual._doc.rich

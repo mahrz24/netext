@@ -8,7 +8,7 @@ Type: bool.
 
 ## Level of Detail
 
-The `lod-map` attribute can be set to a function mapping zoom levels to discrete level of detail values. The function takes a single float parameter and returns an integer value. See [Zoom and Viewport](./user-guide/zoom-and-viewport.md) for details on how to use the level of detail to change the appearance of nodes on different zoom levels.
+The `lod-map` attribute can be set to a function mapping zoom levels to discrete level of detail values. The function takes a single float parameter and returns an integer value. See [Zoom and Viewport](../user-guide/zoom-and-viewport.md) for details on how to use the level of detail to change the appearance of nodes on different zoom levels.
 
 Type: Callable | None
 
@@ -29,7 +29,7 @@ Possible values are:
 
 ```{.rich title='Shapes' }
 from netext.node_rasterizer import JustContent
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.layout_engines.static import StaticLayout
 from rich import print
 
@@ -41,7 +41,7 @@ g.add_node("B", **{"$x": 15, "$y": 0})
 g.add_edge("A", "B")
 
 
-output = TerminalGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(g, layout_engine=StaticLayout())
 ```
 
 ### Box
@@ -58,7 +58,7 @@ Type: [Box](https://rich.readthedocs.io/en/stable/appendix/box.html#appendix-box
 
 ```{.rich title='Box Types' }
 from netext.node_rasterizer import JustContent
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.layout_engines.static import StaticLayout
 from rich import box
 from rich import print
@@ -71,7 +71,7 @@ g.add_node("B", **{"$x": 15, "$y": 0})
 g.add_edge("A", "B")
 
 
-output = TerminalGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(g, layout_engine=StaticLayout())
 ```
 
 ### Generic styling for all shapes
@@ -87,7 +87,7 @@ Type: [Style][rich.style.Style] | None
 
 ```{.rich title='Style' }
 from netext.node_rasterizer import JustContent
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.layout_engines.static import StaticLayout
 from rich import print
 from rich.style import Style
@@ -99,7 +99,7 @@ g.add_node("A", **{"$x": 5, "$y": 0}, **{"$style": Style(color="red")})
 g.add_node("B", **{"$x": 15, "$y": 0},  **{"$style": Style(bold=True, bgcolor="blue")})
 g.add_edge("A", "B")
 
-output = TerminalGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(g, layout_engine=StaticLayout())
 ```
 
 #### Content Style
@@ -112,7 +112,7 @@ Type: [Style][rich.style.Style] | None
 
 ```{.rich title='Content Style' }
 from netext.node_rasterizer import JustContent
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.layout_engines.static import StaticLayout
 from rich import print
 from rich.style import Style
@@ -124,7 +124,7 @@ g.add_node("A", **{"$x": 5, "$y": 0}, **{"$content-style": Style(color="red")})
 g.add_node("B", **{"$x": 15, "$y": 0},  **{"$content-style": Style(bold=True, bgcolor="blue")})
 g.add_edge("A", "B")
 
-output = TerminalGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(g, layout_engine=StaticLayout())
 ```
 
 #### Content Renderer

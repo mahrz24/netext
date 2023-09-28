@@ -1,6 +1,6 @@
 # Minimum Spanning Tree Example
 import networkx as nx
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from rich.style import Style
@@ -16,4 +16,4 @@ nx.set_edge_attributes(
     G, EdgeSegmentDrawingMode.BOX_ROUNDED, "$edge-segment-drawing-mode"
 )
 
-print(TerminalGraph(G))
+print(ConsoleGraph(G))

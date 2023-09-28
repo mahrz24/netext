@@ -3,24 +3,25 @@
 ## First Steps
 
 To render a graph, you first need to create a [networkx](https://networkx.org/) graph. Once it's there,
-the netext API is very simple. Just wrap it in a [netext.TerminalGraph][] object
+the netext API is very simple. Just wrap it in a [netext.ConsoleGraph][] object
 and render it
 
 ```python
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from rich import print
 
 import networkx as nx
+
 g = nx.Graph()
 g.add_node("Hello")
 g.add_node("World")
 g.add_edge("Hello", "World")
 
-print(TerminalGraph(g))
+print(ConsoleGraph(g))
 ```
 
 ```{.rich title='Hello World' }
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from rich import print
 
 import networkx as nx
@@ -29,7 +30,7 @@ g.add_node("Hello")
 g.add_node("World")
 g.add_edge("Hello", "World")
 
-output = TerminalGraph(g)
+output = ConsoleGraph(g)
 ```
 
 ## A Styled Graph
@@ -41,7 +42,8 @@ import networkx as nx
 from rich.style import Style
 from rich import box, print
 
-from netext import TerminalGraph
+from netext import ConsoleGraph
+from netext.edge_rasterizer import EdgeRoutingMode
 
 g = nx.binomial_tree(3)
 
@@ -51,7 +53,7 @@ nx.set_node_attributes(g, box.SQUARE, "$box-type")
 
 nx.set_edge_attributes(g, Style(color="green"), "$style")
 
-print(TerminalGraph(g))
+print(ConsoleGraph(g))
 ```
 
 
@@ -60,7 +62,8 @@ import networkx as nx
 from rich.style import Style
 from rich import box
 
-from netext import TerminalGraph
+from netext import ConsoleGraph
+from netext.edge_rasterizer import EdgeRoutingMode
 
 g = nx.binomial_tree(3)
 
@@ -70,5 +73,5 @@ nx.set_node_attributes(g, box.SQUARE, "$box-type")
 
 nx.set_edge_attributes(g, Style(color="green"), "$style")
 
-output = TerminalGraph(g)
+output = ConsoleGraph(g)
 ```

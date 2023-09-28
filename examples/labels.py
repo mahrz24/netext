@@ -1,4 +1,4 @@
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
@@ -16,4 +16,4 @@ nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
 nx.set_edge_attributes(g, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
 nx.set_edge_attributes(g, EdgeSegmentDrawingMode.BOX, "$edge-segment-drawing-mode")
 
-print(TerminalGraph(g))
+print(ConsoleGraph(g))

@@ -5,7 +5,7 @@ import pytest
 from rich.console import Console
 from rich.segment import Segment, Segments
 
-from netext.buffer_renderer import render_buffers
+from netext.buffer_renderer import flatten_strips, render_buffers
 from netext.geometry import Point
 from netext.geometry.region import Region
 from netext.node_rasterizer import NodeBuffer
@@ -56,7 +56,11 @@ def test_render_trivial(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 10, 1))))
+        console.print(
+            Segments(
+                flatten_strips(*render_buffers([test_buffer], Region(0, 0, 10, 1)))
+            )
+        )
 
     assert capture.get() == "XXXXXXXXXX\n"
 
@@ -70,7 +74,11 @@ def test_render_spacer_trivial(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 10, 1))))
+        console.print(
+            Segments(
+                flatten_strips(*render_buffers([test_buffer], Region(0, 0, 10, 1)))
+            )
+        )
 
     assert capture.get() == "          \n"
 
@@ -84,7 +92,11 @@ def test_render_trivial_multiple_segments(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 10, 1))))
+        console.print(
+            Segments(
+                flatten_strips(*render_buffers([test_buffer], Region(0, 0, 10, 1)))
+            )
+        )
 
     assert capture.get() == "XXXXXXXXXX\n"
 
@@ -103,7 +115,11 @@ def test_render_trivial_multiple_segments_spacers(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 10, 1))))
+        console.print(
+            Segments(
+                flatten_strips(*render_buffers([test_buffer], Region(0, 0, 10, 1)))
+            )
+        )
 
     assert capture.get() == "XXXXX     \n"
 
@@ -136,7 +152,9 @@ def test_render_multiple_segments_spacers_layered(console):
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == "   XXXYY  \n"
 
@@ -150,7 +168,11 @@ def test_render_segment_with_offset(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 10, 1))))
+        console.print(
+            Segments(
+                flatten_strips(*render_buffers([test_buffer], Region(0, 0, 10, 1)))
+            )
+        )
 
     assert capture.get() == " XXXXXXXXX\n"
 
@@ -164,7 +186,11 @@ def test_render_buffer_with_offset(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 10, 1))))
+        console.print(
+            Segments(
+                flatten_strips(*render_buffers([test_buffer], Region(0, 0, 10, 1)))
+            )
+        )
 
     assert capture.get() == " XXXXXXXXX\n"
 
@@ -178,7 +204,11 @@ def test_render_segment_with_offset_cropped(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 10, 1))))
+        console.print(
+            Segments(
+                flatten_strips(*render_buffers([test_buffer], Region(0, 0, 10, 1)))
+            )
+        )
 
     assert capture.get() == " XXXXXXXXX\n"
 
@@ -192,7 +222,11 @@ def test_render_segment_with_offset_cropped_multiple_segments(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 10, 1))))
+        console.print(
+            Segments(
+                flatten_strips(*render_buffers([test_buffer], Region(0, 0, 10, 1)))
+            )
+        )
 
     assert capture.get() == " XXXXXXXXX\n"
 
@@ -206,7 +240,11 @@ def test_render_buffer_with_offset_cropped(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 10, 1))))
+        console.print(
+            Segments(
+                flatten_strips(*render_buffers([test_buffer], Region(0, 0, 10, 1)))
+            )
+        )
 
     assert capture.get() == " XXXXXXXXX\n"
 
@@ -220,7 +258,11 @@ def test_render_fill_remaining_buffer(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 10, 1))))
+        console.print(
+            Segments(
+                flatten_strips(*render_buffers([test_buffer], Region(0, 0, 10, 1)))
+            )
+        )
 
     assert capture.get() == "   X      \n"
 
@@ -234,7 +276,11 @@ def test_render_buffer_with_offset_and_fill_right(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 10, 1))))
+        console.print(
+            Segments(
+                flatten_strips(*render_buffers([test_buffer], Region(0, 0, 10, 1)))
+            )
+        )
 
     assert capture.get() == "   X      \n"
 
@@ -248,7 +294,11 @@ def test_render_segment_empty(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 10, 1))))
+        console.print(
+            Segments(
+                flatten_strips(*render_buffers([test_buffer], Region(0, 0, 10, 1)))
+            )
+        )
 
     assert capture.get() == "          \n"
 
@@ -262,7 +312,11 @@ def test_render_segment_empty_with_multiple_segments(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 10, 1))))
+        console.print(
+            Segments(
+                flatten_strips(*render_buffers([test_buffer], Region(0, 0, 10, 1)))
+            )
+        )
 
     assert capture.get() == "XY        \n"
 
@@ -288,7 +342,9 @@ def test_render_mutliple_buffers(console):
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == " XX  YY   \n"
 
@@ -314,7 +370,9 @@ def test_render_multiple_buffers_with_overlap(console):
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == " XXXXYYXX \n"
 
@@ -342,7 +400,9 @@ def test_render_multiple_buffers_with_overlap_and_spacer(console):
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == " XXXXYXXY \n"
 
@@ -368,7 +428,9 @@ def test_render_multiple_buffers_with_overlap_and_multiple_segments(console):
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == " XXXXYYZZ \n"
 
@@ -394,7 +456,9 @@ def test_render_multiple_buffers_with_overlap_and_multiple_segments_in_overlap(c
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == " XXXXYYZZ \n"
 
@@ -420,7 +484,9 @@ def test_render_multiple_buffers_with_overlap_hidden(console):
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == " XXXXXXXX \n"
 
@@ -446,7 +512,9 @@ def test_render_multiple_buffers_with_overlap_hidden_multiple_segments(console):
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == " XXXXXXXX \n"
 
@@ -480,7 +548,9 @@ def test_render_multiple_buffers_with_nested_overlap(console):
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == " AX12WFGH \n"
 
@@ -514,7 +584,9 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments(console):
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == " AX12WFGH \n"
 
@@ -550,7 +622,9 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_different
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == " AB12EFGH \n"
 
@@ -588,7 +662,9 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_and_space
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == " AX1Z2FGH \n"
 
@@ -622,7 +698,9 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden(console):
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == " AXYZWFGH \n"
 
@@ -656,7 +734,9 @@ def test_render_multiple_buffers_with_multiple_overlaps(console):
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == "AXYZ1234  \n"
 
@@ -696,7 +776,9 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden_multiple_spacers
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == " AX12WFGH \n"
 
@@ -730,7 +812,9 @@ def test_render_multiple_buffers_with_multiple_overlaps_middle_in_front(console)
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == "AXYZW234  \n"
 
@@ -764,13 +848,16 @@ def test_render_multiple_buffers_with_empty_segment(console):
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 10, 1))))
+        )
 
     assert capture.get() == " ABCDEFGH \n"
 
 
 def test_render_node_buffer(console):
     test_buffer = NodeBuffer(
+        node=0,
         z_index=0,
         center=Point(x=1, y=1),
         node_width=3,
@@ -783,13 +870,16 @@ def test_render_node_buffer(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 3, 3))))
+        console.print(
+            Segments(flatten_strips(*render_buffers([test_buffer], Region(0, 0, 3, 3))))
+        )
 
     assert capture.get() == " X \nX X\n X \n"
 
 
 def test_render_node_buffer_with_spacers(console):
     test_buffer = NodeBuffer(
+        node=0,
         z_index=0,
         center=Point(x=1, y=1),
         node_width=3,
@@ -806,7 +896,9 @@ def test_render_node_buffer_with_spacers(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 3, 3))))
+        console.print(
+            Segments(flatten_strips(*render_buffers([test_buffer], Region(0, 0, 3, 3))))
+        )
 
     assert capture.get() == "X  \n X \n  X\n"
 
@@ -814,6 +906,7 @@ def test_render_node_buffer_with_spacers(console):
 def test_render_node_buffers_with_spacers(console):
     test_buffers = [
         NodeBuffer(
+            node=0,
             z_index=0,
             center=Point(x=1, y=1),
             node_width=3,
@@ -831,6 +924,7 @@ def test_render_node_buffers_with_spacers(console):
             ],
         ),
         NodeBuffer(
+            node=0,
             z_index=1,
             center=Point(x=1, y=1),
             node_width=3,
@@ -850,13 +944,16 @@ def test_render_node_buffers_with_spacers(console):
     ]
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers(test_buffers, Region(0, 0, 3, 3))))
+        console.print(
+            Segments(flatten_strips(*render_buffers(test_buffers, Region(0, 0, 3, 3))))
+        )
 
     assert capture.get() == "XY \n XY\n YX\n"
 
 
 def test_render_node_buffer_with_empty_line(console):
     test_buffer = NodeBuffer(
+        node=0,
         z_index=0,
         center=Point(x=1, y=1),
         node_width=3,
@@ -869,13 +966,16 @@ def test_render_node_buffer_with_empty_line(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 3, 3))))
+        console.print(
+            Segments(flatten_strips(*render_buffers([test_buffer], Region(0, 0, 3, 3))))
+        )
 
     assert capture.get() == " X \n   \n X \n"
 
 
 def test_render_node_buffer_with_empty_line_and_no_buffer(console):
     test_buffer = NodeBuffer(
+        node=0,
         z_index=0,
         center=Point(x=1, y=1),
         node_width=3,
@@ -888,7 +988,9 @@ def test_render_node_buffer_with_empty_line_and_no_buffer(console):
     )
 
     with console.capture() as capture:
-        console.print(Segments(render_buffers([test_buffer], Region(0, 0, 3, 4))))
+        console.print(
+            Segments(flatten_strips(*render_buffers([test_buffer], Region(0, 0, 3, 4))))
+        )
 
     assert capture.get() == " X \n   \n X \n   \n"
 
@@ -906,4 +1008,4 @@ def test_render_buffer_with_overflow_segment_fails(console):
     ]
 
     with pytest.raises(AssertionError, match="Segment overflow"):
-        list(render_buffers(test_buffers, Region(0, 0, 3, 1)))
+        list(render_buffers(test_buffers, Region(0, 0, 3, 1))[0])

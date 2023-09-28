@@ -108,7 +108,7 @@ class EdgeSegment(LineSegment):
             ]
 
 
-@dataclass
+@dataclass(frozen=True)
 class EdgeInput:
     start: Point
     end: Point
@@ -122,12 +122,32 @@ class EdgeInput:
     # external layout engines where to route along.
     routing_hints: list[Point] = field(default_factory=list)
 
+    def __hash__(self) -> int:
+        return hash(
+            (
+                self.start,
+                self.end,
+                self.routing_mode,
+                self.edge_segment_drawing_mode,
+                frozenset(self.routing_hints),
+            )
+        )
 
-@dataclass
+
+@dataclass(frozen=True)
 class EdgeLayout:
     input: EdgeInput
     segments: list[EdgeSegment]
     z_index: int
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                self.input,
+                self.z_index,
+                frozenset(self.segments),
+            )
+        )
 
 
 @dataclass

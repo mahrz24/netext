@@ -7,13 +7,13 @@ from rich.panel import Panel
 from rich.style import Style
 from rich.layout import Layout
 
-from netext import TerminalGraph
+from netext import ConsoleGraph
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.geometry import Region
 from netext.node_rasterizer import JustContent
-from netext.terminal_graph import AutoZoom
+from netext.console_graph import AutoZoom
 
 g = cast(nx.Graph, nx.binomial_tree(5))
 nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
@@ -49,10 +49,10 @@ layout.split_column(
 
 layout["top"].split_row(
     Layout(
-        Panel(TerminalGraph(g), style=Style(color="blue")), name="top_left", size=120
+        Panel(ConsoleGraph(g), style=Style(color="blue")), name="top_left", size=120
     ),
     Layout(
-        Panel(TerminalGraph(g, zoom=(AutoZoom.FIT)), style=Style(color="blue")),
+        Panel(ConsoleGraph(g, zoom=(AutoZoom.FIT)), style=Style(color="blue")),
         name="top_right",
         size=40,
     ),
@@ -61,7 +61,7 @@ layout["top"].split_row(
 layout["bottom"].split_row(
     Layout(
         Panel(
-            TerminalGraph(g, viewport=Region(-10, -10, 40, 15)),
+            ConsoleGraph(g, viewport=Region(-10, -10, 40, 15)),
             style=Style(color="blue"),
         ),
         name="bottom_1",
@@ -69,7 +69,7 @@ layout["bottom"].split_row(
     ),
     Layout(
         Panel(
-            TerminalGraph(g, viewport=Region(-20, -20, 40, 15)),
+            ConsoleGraph(g, viewport=Region(-20, -20, 40, 15)),
             style=Style(color="blue"),
         ),
         name="bottom_1",
@@ -77,14 +77,14 @@ layout["bottom"].split_row(
     ),
     Layout(
         Panel(
-            TerminalGraph(g, viewport=Region(0, 0, 40, 15)), style=Style(color="blue")
+            ConsoleGraph(g, viewport=Region(0, 0, 40, 15)), style=Style(color="blue")
         ),
         name="bottom_1",
         size=40,
     ),
     Layout(
         Panel(
-            TerminalGraph(g, viewport=Region(5, -10, 40, 15)), style=Style(color="blue")
+            ConsoleGraph(g, viewport=Region(5, -10, 40, 15)), style=Style(color="blue")
         ),
         name="bottom_1",
         size=40,
