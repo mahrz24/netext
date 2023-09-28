@@ -66,11 +66,11 @@ def rasterize_edge(
         style = data.get(f"$style-{lod}", style)
 
     start = u_buffer.get_magnet_position(
-        v_buffer.center, data.get("$magnet", Magnet.CENTER)
+        v_buffer.center, data.get("$start-magnet", Magnet.CENTER)
     )
 
     end = v_buffer.get_magnet_position(
-        u_buffer.center, data.get("$magnet", Magnet.CENTER)
+        u_buffer.center, data.get("$end-magnet", Magnet.CENTER)
     )
 
     edge_input = EdgeInput(
@@ -83,26 +83,18 @@ def rasterize_edge(
     )
 
     if edge_layout is None:
-        # We perform a two pass routing here.
-        # First we route the edge with allowing the center magnet as start and end
-        # This routing already tries to avoid other nodes.
-        non_start_end_nodes = [
-            node_buffer
-            for node_buffer in all_nodes
-            if node_buffer is not u_buffer and node_buffer is not v_buffer
-        ]
-
         edge_segments = route_edge(
             start,
             end,
             routing_mode,
-            non_start_end_nodes,
+            all_nodes,  # non_start_end_nodes,
             routed_edges,
             node_idx,
             edge_idx,
         )
 
-        # Then we cut the edge with the node boundaries.
+        # We cut the edge segments with the nodes to get rid of the
+        # parts hidden behind the nodes to draw correct arrow tips
         edge_segments = edge_segments.cut_with_nodes([u_buffer, v_buffer])
 
         if not edge_segments.segments:

@@ -32,15 +32,40 @@ def route_orthogonal_edge(
             straight_connection.bounding_box, restrict=relevant_edges
         )
 
-    # TODO: Add different midpoints as candidates.
+    # If the start or endpoint are inside a node and recursion depth is 0
+    # we route around it.
+
+    helper_segments_start = []
+
+    if recursion_depth == 0:
+        print("recursion depth 0")
+        print([node.shape.polygon(node) for node in relevant_nodes])
+        print(start.shapely)
+        node_containing_start = next(
+            (
+                node
+                for node in relevant_nodes
+                if node.shape.polygon(node).covers(start.shapely)
+            ),
+            None,
+        )
+        print(node_containing_start)
+        if node_containing_start is not None:
+            dir = Point.from_shapely(
+                start.shapely - node_containing_start.center.shapely
+            )
+            helper_point = start + dir * 0.5
+            helper_segments_start = [EdgeSegment(start=start, end=helper_point)]
+            start = helper_point
+
     candidates = [
         RoutedEdgeSegments.from_segments_compute_intersections(
-            EdgeSegment(start=start, end=end).ortho_split_x(),
+            helper_segments_start + EdgeSegment(start=start, end=end).ortho_split_x(),
             node_buffers=relevant_nodes,
             edges=relevant_edges,
         ),
         RoutedEdgeSegments.from_segments_compute_intersections(
-            EdgeSegment(start=start, end=end).ortho_split_y(),
+            helper_segments_start + EdgeSegment(start=start, end=end).ortho_split_y(),
             node_buffers=relevant_nodes,
             edges=relevant_edges,
         ),

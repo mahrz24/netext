@@ -50,7 +50,7 @@ class EdgeSegment(LineSegment):
             if remaining.is_empty:
                 return []
             if remaining.geom_type == "MultiLineString":
-                for line in remaining:
+                for line in remaining.geoms:
                     result.append(
                         EdgeSegment(
                             start=Point.from_shapely(
