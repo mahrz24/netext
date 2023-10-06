@@ -51,7 +51,7 @@ def route_orthogonal_edge(
 
         if node_containing_start is not None:
             dir = start - node_containing_start.center
-            helper_point = start + dir
+            helper_point = start + dir * 2
             helper_segments_start = [EdgeSegment(start=start, end=helper_point)]
 
             def _intersects_to_end(point: Point):
@@ -66,7 +66,7 @@ def route_orthogonal_edge(
                 last_helper_segment = helper_segments_start[-1].shapely
                 helper_point = Point.from_shapely(
                     last_helper_segment.offset_curve(
-                        distance=last_helper_segment.length
+                        distance=last_helper_segment.length / 1.5
                     ).boundary.geoms[1]
                 )
 
@@ -75,7 +75,7 @@ def route_orthogonal_edge(
                 if _intersects_to_end(helper_point):
                     helper_point = Point.from_shapely(
                         last_helper_segment.offset_curve(
-                            distance=-last_helper_segment.length
+                            distance=-last_helper_segment.length / 1.5
                         ).boundary.geoms[1]
                     )
 
@@ -104,7 +104,7 @@ def route_orthogonal_edge(
 
         if node_containing_end is not None:
             dir = end - node_containing_end.center
-            helper_point = end + dir
+            helper_point = end + dir * 2
             helper_segments_end = [EdgeSegment(start=helper_point, end=end)]
 
             def _intersects_to_end(point: Point):
