@@ -91,7 +91,7 @@ def orthogonal_segments_to_strips_with_box_characters(
             end=Point(
                 edge_segment.end.x - min_point.x, edge_segment.end.y - min_point.y
             ),
-            # We keep the parent segments in the original coordinate sp
+            # We keep the parent segments in the original coordinate space
             _parent=edge_segment._parent
             if edge_segment._parent is not None
             else edge_segment,
@@ -99,6 +99,7 @@ def orthogonal_segments_to_strips_with_box_characters(
         for edge_segment in edge_segments
     ]
     last_segment: EdgeSegment | None = None
+
     for edge_segment in offset_edge_segments:
         start = edge_segment.start
         first_character = True
@@ -114,7 +115,7 @@ def orthogonal_segments_to_strips_with_box_characters(
                             char_buffer[y][start.x] = edge_characters[drawing_mode][
                                 EdgeCharacters.CORNER_UPPER_RIGHT
                             ]
-                        elif edge_segment.parent.end.y > last_segment.parent.end.y:
+                        elif edge_segment.parent.end.y < last_segment.parent.end.y:
                             char_buffer[y][start.x] = edge_characters[drawing_mode][
                                 EdgeCharacters.CORNER_LOWER_RIGHT
                             ]
