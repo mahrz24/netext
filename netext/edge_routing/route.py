@@ -12,6 +12,8 @@ def route_edge(
     routing_mode: EdgeRoutingMode,
     all_nodes: list[NodeBuffer] = [],
     routed_edges: list[EdgeLayout] = [],
+    start_helper: Point | None = None,
+    end_helper: Point | None = None,
     node_idx: BufferIndex | None = None,
     edge_idx: BufferIndex | None = None,
 ) -> RoutedEdgeSegments:
@@ -29,6 +31,8 @@ def route_edge(
                 routed_edges=routed_edges,
                 node_idx=node_idx,
                 edge_idx=edge_idx,
+                start_helper=start_helper,
+                end_helper=end_helper,
             )
         case _:
             raise NotImplementedError(

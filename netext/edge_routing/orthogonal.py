@@ -15,6 +15,8 @@ def route_orthogonal_edge(
     node_idx: BufferIndex[NodeBuffer, None] | None = None,
     edge_idx: BufferIndex[EdgeBuffer, EdgeLayout] | None = None,
     recursion_depth: int = 0,
+    start_helper: Point | None = None,
+    end_helper: Point | None = None,
 ) -> RoutedEdgeSegments:
     """
     Route an edge from start to end using orthogonal segments.
@@ -49,9 +51,8 @@ def route_orthogonal_edge(
             None,
         )
 
-        if node_containing_start is not None:
-            dir = start - node_containing_start.center
-            helper_point = start + dir * 2
+        if node_containing_start is not None and start_helper is not None:
+            helper_point = start_helper
             helper_segments_start = [EdgeSegment(start=start, end=helper_point)]
 
             def _intersects_to_end(point: Point):
@@ -102,9 +103,8 @@ def route_orthogonal_edge(
             None,
         )
 
-        if node_containing_end is not None:
-            dir = end - node_containing_end.center
-            helper_point = end + dir * 2
+        if node_containing_end is not None and end_helper is not None:
+            helper_point = end_helper
             helper_segments_end = [EdgeSegment(start=helper_point, end=end)]
 
             def _intersects_to_end(point: Point):

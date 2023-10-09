@@ -17,8 +17,13 @@ from netext.rendering.segment_buffer import Reference, Strip, StripBuffer, Space
 
 class Shape(Protocol):
     def get_magnet_position(
-        self, node_buffer: "NodeBuffer", target_point: Point, magnet: Magnet
-    ) -> Point:
+        self,
+        node_buffer: "NodeBuffer",
+        target_point: Point,
+        magnet: Magnet,
+        offset: int = 0,
+        extrusion_offset: int = 2,
+    ) -> tuple[Point, Point | None]:
         return NotImplemented
 
     def polygon(self, node_buffer: "NodeBuffer", margin: float = 0) -> Polygon:
@@ -55,19 +60,53 @@ class RectangularShapeMixin:
         )
 
     def get_magnet_position(
-        self, node_buffer: "NodeBuffer", target_point: Point, magnet: Magnet
-    ) -> Point:
+        self,
+        node_buffer: "NodeBuffer",
+        target_point: Point,
+        magnet: Magnet,
+        offset: int = 0,
+        extrusion_offset: int = 2,
+    ) -> tuple[Point, Point | None]:
+        extruded_point: Point | None = None
         match magnet:
             case Magnet.TOP:
-                return Point(x=node_buffer.center.x, y=node_buffer.top_y)
+                extruded_point = Point(
+                    x=node_buffer.center.x + offset,
+                    y=node_buffer.top_y - extrusion_offset,
+                )
+                return (
+                    Point(x=node_buffer.center.x + offset, y=node_buffer.top_y),
+                    extruded_point,
+                )
             case Magnet.LEFT:
-                return Point(x=node_buffer.left_x, y=node_buffer.center.y)
+                extruded_point = Point(
+                    x=node_buffer.left_x + extrusion_offset,
+                    y=node_buffer.center.y + offset,
+                )
+                return (
+                    Point(x=node_buffer.left_x, y=node_buffer.center.y + offset),
+                    extruded_point,
+                )
             case Magnet.BOTTOM:
-                return Point(x=node_buffer.center.x, y=node_buffer.bottom_y)
+                extruded_point = Point(
+                    x=node_buffer.center.x - offset,
+                    y=node_buffer.bottom_y + extrusion_offset,
+                )
+                return (
+                    Point(x=node_buffer.center.x - offset, y=node_buffer.bottom_y),
+                    extruded_point,
+                )
             case Magnet.RIGHT:
-                return Point(x=node_buffer.right_x, y=node_buffer.center.y)
+                extruded_point = Point(
+                    x=node_buffer.right_x - extrusion_offset,
+                    y=node_buffer.center.y - offset,
+                )
+                return (
+                    Point(x=node_buffer.right_x, y=node_buffer.center.y - offset),
+                    extruded_point,
+                )
             case Magnet.CENTER:
-                return node_buffer.center
+                return node_buffer.center - Point(x=offset, y=0), None
             case Magnet.CLOSEST:
                 direct_line = LineString(
                     [node_buffer.center.shapely, target_point.shapely]
@@ -78,28 +117,33 @@ class RectangularShapeMixin:
                     1.0, normalized=True
                 )
                 if intersection_point.is_empty:
-                    return node_buffer.center
+                    return node_buffer.center, None
 
                 closest_magnet = Magnet.TOP
-                closest_point = self.get_magnet_position(
+                closest_point, closest_extruded_point = self.get_magnet_position(
                     node_buffer=node_buffer,
                     target_point=target_point,
                     magnet=closest_magnet,
+                    offset=offset,
+                    extrusion_offset=extrusion_offset,
                 )
                 closest_distance = intersection_point.distance(closest_point.shapely)
 
                 for magnet in [Magnet.LEFT, Magnet.RIGHT, Magnet.BOTTOM]:
-                    point = self.get_magnet_position(
+                    point, extruded_point = self.get_magnet_position(
                         node_buffer=node_buffer,
                         target_point=target_point,
                         magnet=magnet,
+                        offset=offset,
+                        extrusion_offset=extrusion_offset,
                     )
                     distance = intersection_point.distance(point.shapely)
                     if distance < closest_distance:
                         closest_point = point
+                        closest_extruded_point = extruded_point
                         closest_distance = distance
 
-                return closest_point
+                return closest_point, closest_extruded_point
         raise RuntimeError(magnet)
 
 
@@ -134,6 +178,7 @@ class NodeBuffer(StripBuffer):
     center: Point
     node_width: int
     node_height: int
+    data: dict[str, Any]
     margin: int = 0
     lod: int = 1
 
@@ -150,6 +195,7 @@ class NodeBuffer(StripBuffer):
         node: Hashable,
         center: Point,
         shape: Shape,
+        data: dict[str, Any],
         z_index: int = 0,
         margin: int = 0,
         lod: int = 1,
@@ -160,6 +206,7 @@ class NodeBuffer(StripBuffer):
 
         return cls(
             node=node,
+            data=data,
             shape=shape,
             center=center,
             z_index=z_index,
@@ -170,9 +217,19 @@ class NodeBuffer(StripBuffer):
             lod=lod,
         )
 
-    def get_magnet_position(self, target_point: Point, magnet: Magnet) -> Point:
+    def get_magnet_position(
+        self,
+        target_point: Point,
+        magnet: Magnet,
+        offset: int = 0,
+        extrusion_offset: int = 2,
+    ) -> tuple[Point, Point | None]:
         return self.shape.get_magnet_position(
-            self, target_point=target_point, magnet=magnet
+            self,
+            target_point=target_point,
+            magnet=magnet,
+            offset=offset,
+            extrusion_offset=extrusion_offset,
         )
 
     @property
@@ -243,6 +300,7 @@ def rasterize_node(
 
     return NodeBuffer.from_strips(
         strips,
+        data=data,
         node=node,
         center=Point(x=0, y=0),
         z_index=-1,
@@ -265,6 +323,7 @@ class EdgeLabelBuffer(NodeBuffer):
         cls,
         strips: list[Strip],
         edge: tuple[Hashable, Hashable],
+        data: dict[str, Any],
         center: Point,
         shape: Shape,
         z_index: int = 0,
@@ -285,5 +344,6 @@ class EdgeLabelBuffer(NodeBuffer):
             node_height=len(strips),
             strips=strips,
             margin=margin,
+            data=data,
             lod=lod,
         )

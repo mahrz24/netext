@@ -65,11 +65,20 @@ def rasterize_edge(
         label = data.get(f"$label-{lod}", label)
         style = data.get(f"$style-{lod}", style)
 
-    start = u_buffer.get_magnet_position(
-        v_buffer.center, data.get("$start-magnet", Magnet.CENTER)
-    )
+    if "$start-port" in data:
+        port_label = data["$start-port"]
+        port = u_buffer.data.get("$ports", {}).get(port_label, {})
+        start, start_helper = u_buffer.get_magnet_position(
+            target_point=v_buffer.center,
+            magnet=port.get("magnet", Magnet.CENTER),
+            offset=port.get("offset", 0),
+        )
+    else:
+        start, start_helper = u_buffer.get_magnet_position(
+            v_buffer.center, data.get("$start-magnet", Magnet.CENTER)
+        )
 
-    end = v_buffer.get_magnet_position(
+    end, end_helper = v_buffer.get_magnet_position(
         u_buffer.center, data.get("$end-magnet", Magnet.CENTER)
     )
 
@@ -84,13 +93,15 @@ def rasterize_edge(
 
     if edge_layout is None:
         edge_segments = route_edge(
-            start,
-            end,
-            routing_mode,
-            all_nodes,  # non_start_end_nodes,
-            routed_edges,
-            node_idx,
-            edge_idx,
+            start=start,
+            end=end,
+            start_helper=start_helper,
+            end_helper=end_helper,
+            routing_mode=routing_mode,
+            all_nodes=all_nodes,  # non_start_end_nodes,
+            routed_edges=routed_edges,
+            node_idx=node_idx,
+            edge_idx=edge_idx,
         )
 
         # We cut the edge segments with the nodes to get rid of the
