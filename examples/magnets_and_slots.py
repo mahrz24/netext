@@ -21,7 +21,7 @@ for routing, drawing in [
             "$ports": {
                 "a": {
                     "magnet": Magnet.TOP,
-                    "offset": -1,
+                    "offset": 4,
                     "symbol": "o",
                     "symbol-connected": "x",
                     "label": "A",

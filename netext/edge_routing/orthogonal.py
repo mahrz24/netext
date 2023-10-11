@@ -1,3 +1,4 @@
+from heapq import heappush
 from netext.edge_rendering.buffer import EdgeBuffer
 from netext.edge_routing.edge import EdgeLayout, EdgeSegment, RoutedEdgeSegments
 from netext.geometry import Point
@@ -61,28 +62,26 @@ def route_orthogonal_edge(
                     node_containing_start
                 ).intersects(direct_line_to_end)
 
-            if _intersects_to_end(helper_point):
+            distance_factor = 1 / 1.5
+            helper_start = None
+            while _intersects_to_end(helper_point):
                 # We need to route around the node as our extrusion would still intersect it.
                 helper_start = helper_point
                 last_helper_segment = helper_segments_start[-1].shapely
                 helper_point = Point.from_shapely(
                     last_helper_segment.offset_curve(
-                        distance=last_helper_segment.length / 1.5
+                        distance=last_helper_segment.length * distance_factor
                     ).boundary.geoms[1]
                 )
 
-                # Our choice of direction might have been wrong, so we check again.
-                # And if it is still wrong, we flip the direction.
-                if _intersects_to_end(helper_point):
-                    helper_point = Point.from_shapely(
-                        last_helper_segment.offset_curve(
-                            distance=-last_helper_segment.length / 1.5
-                        ).boundary.geoms[1]
-                    )
+                distance_factor *= 1.5
+                distance_factor = -distance_factor
 
+            if helper_start is not None:
                 helper_segments_start.append(
                     EdgeSegment(start=helper_start, end=helper_point)
                 )
+
             start = helper_point
 
             node_containing_start = next(
@@ -107,35 +106,69 @@ def route_orthogonal_edge(
             helper_point = end_helper
             helper_segments_end = [EdgeSegment(start=helper_point, end=end)]
 
-            def _intersects_to_end(point: Point):
+            def _intersects_to_start(point: Point):
                 direct_line_to_end = LineString([start.shapely, point.shapely])
                 return node_containing_end.shape.polygon(
                     node_containing_end
                 ).intersects(direct_line_to_end)
 
-            if _intersects_to_end(helper_point):
+            distance_factor = 1 / 1.5
+            new_helper_point = None
+            helper_end = None
+            # TODO: Return a list of candidate segments and then pick the best one
+            # later on with the full routing in place.
+            while new_helper_point is None or _intersects_to_start(new_helper_point):
                 # We need to route around the node as our extrusion would still intersect it.
                 helper_end = helper_point
                 last_helper_segment = helper_segments_end[-1].shapely
-                helper_point = Point.from_shapely(
+
+                helper_point_candidates: list[tuple[bool, int, int, Point]] = []
+
+                candidate = Point.from_shapely(
                     last_helper_segment.offset_curve(
-                        distance=-last_helper_segment.length
+                        distance=last_helper_segment.length * distance_factor
                     ).boundary.geoms[0]
                 )
-
-                # Our choice of direction might have been wrong, so we check again.
-                # And if it is still wrong, we flip the direction.
-                if _intersects_to_end(helper_point):
-                    helper_point = Point.from_shapely(
-                        last_helper_segment.offset_curve(
-                            distance=last_helper_segment.length
-                        ).boundary.geoms[0]
-                    )
-
-                helper_segments_end.insert(
-                    0, EdgeSegment(start=helper_point, end=helper_end)
+                heappush(
+                    helper_point_candidates,
+                    (
+                        _intersects_to_start(candidate),
+                        (candidate.distance_to(start)),
+                        0,
+                        candidate,
+                    ),
                 )
-            end = helper_point
+
+                candidate = Point.from_shapely(
+                    last_helper_segment.offset_curve(
+                        distance=-last_helper_segment.length * distance_factor
+                    ).boundary.geoms[0]
+                )
+                heappush(
+                    helper_point_candidates,
+                    (
+                        _intersects_to_start(candidate),
+                        (candidate.distance_to(start)),
+                        1,
+                        candidate,
+                    ),
+                )
+
+                intersects, _, _, best_candidate = helper_point_candidates[0]
+
+                if not intersects:
+                    new_helper_point = best_candidate
+
+                distance_factor *= 1.5
+
+            if new_helper_point is not None:
+                new_helper_point
+                helper_segments_end.insert(
+                    0, EdgeSegment(start=new_helper_point, end=helper_end)
+                )
+                end = new_helper_point
+            else:
+                end = helper_point
 
     candidates = [
         RoutedEdgeSegments.from_segments_compute_intersections(
