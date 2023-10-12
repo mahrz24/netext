@@ -20,8 +20,8 @@ for routing, drawing in [
             "$y": 1,
             "$ports": {
                 "a": {
-                    "magnet": Magnet.TOP,
-                    "offset": 4,
+                    "magnet": Magnet.BOTTOM,
+                    "offset": -2,
                     "symbol": "o",
                     "symbol-connected": "x",
                     "label": "A",
@@ -37,6 +37,20 @@ for routing, drawing in [
     g.add_edge(
         "FOOOOOO",
         2,
+        **{
+            "$edge-routing-mode": routing,
+            "$start-port": "a",
+            "$edge-segment-drawing-mode": drawing,
+            "$end-arrow-tip": ArrowTip.ARROW,
+            "$start-magnet": Magnet.LEFT,
+            "$end-magnet": Magnet.TOP,
+            "$style": Style(color="green"),
+        }
+    )
+
+    g.add_edge(
+        "FOOOOOO",
+        3,
         **{
             "$edge-routing-mode": routing,
             "$start-port": "a",

@@ -1,6 +1,6 @@
 import math
 from collections.abc import Hashable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Protocol, cast
 
 from rich import box
@@ -173,16 +173,48 @@ class Box(RectangularShapeMixin):
 
 
 @dataclass(kw_only=True)
-class NodeBuffer(StripBuffer):
-    node: Hashable
+class ShapeBuffer(StripBuffer):
     center: Point
-    node_width: int
-    node_height: int
+    shape: Shape = JustContent()
+
+    shape_width: int
+    shape_height: int
+
+    @property
+    def left_x(self) -> int:
+        return self.center.x - math.ceil((self.width - 1) / 2.0)
+
+    @property
+    def right_x(self) -> int:
+        return self.center.x + math.floor((self.width - 1) / 2.0)
+
+    @property
+    def top_y(self) -> int:
+        return self.center.y - math.ceil((self.height - 1) / 2.0)
+
+    @property
+    def bottom_y(self) -> int:
+        return self.center.y + math.floor((self.height - 1) / 2.0)
+
+    @property
+    def width(self) -> int:
+        return self.shape_width
+
+    @property
+    def height(self) -> int:
+        return self.shape_height
+
+
+@dataclass(kw_only=True)
+class NodeBuffer(ShapeBuffer):
+    node: Hashable
+
     data: dict[str, Any]
     margin: int = 0
     lod: int = 1
 
-    shape: Shape = JustContent()
+    port_positions: dict[str, tuple[Point, Point | None]] = field(default_factory=dict)
+    connected_ports: list[str] = field(default_factory=list)
 
     @property
     def reference(self) -> Reference | None:
@@ -210,8 +242,8 @@ class NodeBuffer(StripBuffer):
             shape=shape,
             center=center,
             z_index=z_index,
-            node_width=width,
-            node_height=len(strips),
+            shape_width=width,
+            shape_height=len(strips),
             strips=strips,
             margin=margin,
             lod=lod,
@@ -233,36 +265,38 @@ class NodeBuffer(StripBuffer):
         )
 
     @property
-    def left_x(self) -> int:
-        return self.center.x - math.ceil((self.width - 1) / 2.0)
-
-    @property
-    def right_x(self) -> int:
-        return self.center.x + math.floor((self.width - 1) / 2.0)
-
-    @property
-    def top_y(self) -> int:
-        return self.center.y - math.ceil((self.height - 1) / 2.0)
-
-    @property
-    def bottom_y(self) -> int:
-        return self.center.y + math.floor((self.height - 1) / 2.0)
-
-    @property
-    def width(self) -> int:
-        return self.node_width
-
-    @property
-    def height(self) -> int:
-        return self.node_height
-
-    @property
     def layout_width(self) -> int:
         return self.node_width + self.margin * 2
 
     @property
     def layout_height(self) -> int:
         return self.node_height + self.margin * 2
+
+    def get_port_position(
+        self, port_name: str, target_point: Point
+    ) -> tuple[Point, Point | None]:
+        # TODO should we raise on wrong port?
+        # TODO more tests for non happy path
+        port = self.data.get("$ports", {}).get(port_name, {})
+
+        if port_name in self.port_positions:
+            return self.port_positions[port_name]
+
+        start, start_helper = self.get_magnet_position(
+            target_point=target_point,
+            magnet=port.get("magnet", Magnet.CENTER),
+            offset=port.get("offset", 0),
+        )
+        self.port_positions[port_name] = (start, start_helper)
+
+        return start, start_helper
+
+    def connect_port(self, port_name: str):
+        # TODO check
+        self.connected_ports.append(port_name)
+
+    def get_port_buffers(self) -> list[StripBuffer]:
+        pass
 
 
 def _default_content_renderer(
@@ -311,7 +345,7 @@ def rasterize_node(
 
 
 @dataclass(kw_only=True)
-class EdgeLabelBuffer(NodeBuffer):
+class EdgeLabelBuffer(ShapeBuffer):
     edge: tuple[Hashable, Hashable]
 
     @property
@@ -323,27 +357,20 @@ class EdgeLabelBuffer(NodeBuffer):
         cls,
         strips: list[Strip],
         edge: tuple[Hashable, Hashable],
-        data: dict[str, Any],
         center: Point,
         shape: Shape,
         z_index: int = 0,
-        margin: int = 0,
-        lod: int = 1,
     ) -> "EdgeLabelBuffer":
         width = max(
             sum(segment.cell_length for segment in strip.segments) for strip in strips
         )
 
         return cls(
-            node=edge[0],
             edge=edge,
             shape=shape,
             center=center,
             z_index=z_index,
-            node_width=width,
-            node_height=len(strips),
+            shape_width=width,
+            shape_height=len(strips),
             strips=strips,
-            margin=margin,
-            data=data,
-            lod=lod,
         )

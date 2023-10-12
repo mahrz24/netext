@@ -66,21 +66,26 @@ def rasterize_edge(
         style = data.get(f"$style-{lod}", style)
 
     if "$start-port" in data:
-        port_label = data["$start-port"]
-        port = u_buffer.data.get("$ports", {}).get(port_label, {})
-        start, start_helper = u_buffer.get_magnet_position(
-            target_point=v_buffer.center,
-            magnet=port.get("magnet", Magnet.CENTER),
-            offset=port.get("offset", 0),
+        port_name = data["$start-port"]
+        start, start_helper = u_buffer.get_port_position(
+            port_name=port_name, target_point=v_buffer.center
         )
+        u_buffer.connect_port(port_name)
     else:
         start, start_helper = u_buffer.get_magnet_position(
             v_buffer.center, data.get("$start-magnet", Magnet.CENTER)
         )
 
-    end, end_helper = v_buffer.get_magnet_position(
-        u_buffer.center, data.get("$end-magnet", Magnet.CENTER)
-    )
+    if "$end-port" in data:
+        port_name = data["$end-port"]
+        end, end_helper = v_buffer.get_port_position(
+            port_name=port_name, target_point=u_buffer.center
+        )
+        v_buffer.connect_port(port_name)
+    else:
+        end, end_helper = v_buffer.get_magnet_position(
+            u_buffer.center, data.get("$end-magnet", Magnet.CENTER)
+        )
 
     edge_input = EdgeInput(
         start=start,
