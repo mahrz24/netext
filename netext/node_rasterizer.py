@@ -1,3 +1,4 @@
+from collections import defaultdict
 import math
 from collections.abc import Hashable
 from dataclasses import dataclass, field
@@ -206,6 +207,46 @@ class ShapeBuffer(StripBuffer):
 
 
 @dataclass(kw_only=True)
+class PortBuffer(ShapeBuffer):
+    port_name: str
+    node: Hashable
+
+    @property
+    def reference(self) -> Reference | None:
+        return Reference(type="port", ref=(self.node, self.port_name))
+
+    @classmethod
+    def from_strips_and_node(
+        cls,
+        strips: list[Strip],
+        port_name: str,
+        node: Hashable,
+        center: Point,
+        shape: Shape,
+        z_index: int = 0,
+    ) -> "PortBuffer":
+        width = max(
+            sum(segment.cell_length for segment in strip.segments) for strip in strips
+        )
+
+        return cls(
+            port_name=port_name,
+            node=node,
+            shape=shape,
+            center=center,
+            z_index=z_index,
+            shape_width=width,
+            shape_height=len(strips),
+            strips=strips,
+        )
+
+
+@dataclass(kw_only=True)
+class PortLabelBuffer(PortBuffer):
+    ...
+
+
+@dataclass(kw_only=True)
 class NodeBuffer(ShapeBuffer):
     node: Hashable
 
@@ -213,7 +254,9 @@ class NodeBuffer(ShapeBuffer):
     margin: int = 0
     lod: int = 1
 
-    port_positions: dict[str, tuple[Point, Point | None]] = field(default_factory=dict)
+    port_positions: dict[int, dict[str, tuple[Point, Point | None]]] = field(
+        default_factory=lambda: defaultdict(dict)
+    )
     connected_ports: list[str] = field(default_factory=list)
 
     @property
@@ -273,21 +316,21 @@ class NodeBuffer(ShapeBuffer):
         return self.node_height + self.margin * 2
 
     def get_port_position(
-        self, port_name: str, target_point: Point
+        self, port_name: str, target_point: Point, lod: int
     ) -> tuple[Point, Point | None]:
         # TODO should we raise on wrong port?
         # TODO more tests for non happy path
         port = self.data.get("$ports", {}).get(port_name, {})
 
-        if port_name in self.port_positions:
-            return self.port_positions[port_name]
+        if port_name in self.port_positions[lod]:
+            return self.port_positions[lod][port_name]
 
         start, start_helper = self.get_magnet_position(
             target_point=target_point,
             magnet=port.get("magnet", Magnet.CENTER),
             offset=port.get("offset", 0),
         )
-        self.port_positions[port_name] = (start, start_helper)
+        self.port_positions[lod][port_name] = (start, start_helper)
 
         return start, start_helper
 
@@ -295,8 +338,28 @@ class NodeBuffer(ShapeBuffer):
         # TODO check
         self.connected_ports.append(port_name)
 
-    def get_port_buffers(self) -> list[StripBuffer]:
-        pass
+    def get_port_buffers(self, console: Console, lod: int) -> list[StripBuffer]:
+        buffers: list[StripBuffer] = []
+        for port_name, port_settings in self.data.get("$ports", {}).items():
+            shape = JustContent()
+            port_strips = shape.render_shape(console, port_name, style=Style(), data={})
+
+            port_position = self.get_port_position(
+                port_name=port_name, target_point=self.center, lod=lod
+            )[0]
+
+            port_buffer = PortBuffer.from_strips_and_node(
+                port_strips,
+                port_name=port_name,
+                node=self.node,
+                # TODO Z indices need a layer concept
+                z_index=-2,
+                shape=shape,
+                center=port_position,
+            )
+            buffers.append(port_buffer)
+
+        return buffers
 
 
 def _default_content_renderer(

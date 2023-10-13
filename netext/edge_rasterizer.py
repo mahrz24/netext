@@ -68,7 +68,7 @@ def rasterize_edge(
     if "$start-port" in data:
         port_name = data["$start-port"]
         start, start_helper = u_buffer.get_port_position(
-            port_name=port_name, target_point=v_buffer.center
+            port_name=port_name, target_point=v_buffer.center, lod=lod
         )
         u_buffer.connect_port(port_name)
     else:
@@ -79,7 +79,7 @@ def rasterize_edge(
     if "$end-port" in data:
         port_name = data["$end-port"]
         end, end_helper = v_buffer.get_port_position(
-            port_name=port_name, target_point=u_buffer.center
+            port_name=port_name, target_point=u_buffer.center, lod=lod
         )
         v_buffer.connect_port(port_name)
     else:

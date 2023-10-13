@@ -23,7 +23,7 @@ from netext.buffer_renderer import render_buffers
 from netext.edge_rasterizer import rasterize_edge
 from netext.layout_engines.engine import LayoutEngine, G
 from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
-from netext.node_rasterizer import NodeBuffer, rasterize_node
+from netext.node_rasterizer import NodeBuffer, PortBuffer, rasterize_node
 
 
 class RenderState(Enum):
@@ -151,6 +151,11 @@ class ConsoleGraph(Generic[G]):
             dict
         )
         self.node_buffers_current_lod: dict[Hashable, NodeBuffer] = dict()
+
+        self.port_buffers_per_lod: dict[
+            int, dict[Hashable, [PortBuffer]]
+        ] = defaultdict(dict)
+        self.port_buffers_current_lod: dict[Hashable, [PortBuffer]] = dict()
 
         self.node_positions: dict[Hashable, FloatPoint] = dict()
 
@@ -972,6 +977,24 @@ class ConsoleGraph(Generic[G]):
                 edge_layouts.append(edge_layout)
                 self.edge_layouts_current_lod[(u, v)] = edge_layout
 
+        # Also render the port buffers now
+        self._render_port_buffers_current_lod()
+
+    def _render_port_buffers_current_lod(self) -> None:
+        if self._zoom_factor is None:
+            raise RuntimeError(
+                "Invalid transition, lod buffers can only be rendered once zoom is"
+                " computed."
+            )
+
+        for node in self._nx_graph.nodes:
+            node_buffer = self.node_buffers_current_lod[node]
+            lod = determine_lod(self._nx_graph.nodes[node], self._zoom_factor)
+            self.port_buffers_per_lod[lod][node] = node_buffer.get_port_buffers(
+                self.console, lod
+            )
+            self.port_buffers_current_lod[node] = self.port_buffers_per_lod[lod][node]
+
     def _unconstrained_lod_1_viewport(self) -> Region:
         return Region.union([buffer.region for buffer in self._all_lod_1_buffers()])
 
@@ -1006,10 +1029,19 @@ class ConsoleGraph(Generic[G]):
             for node, node_buffer in self.node_buffers_current_lod.items()
             if node in visible_nodes
         ]
+
+        port_buffers = [
+            port_buffers
+            for node, port_buffers in self.port_buffers_current_lod.items()
+            if node in visible_nodes
+        ]
+        print(node_buffers)
+        print(port_buffers)
         return chain(
             node_buffers,
             self.edge_buffers_current_lod.values(),
             itertools.chain(*self.label_buffers_current_lod.values()),
+            itertools.chain(*port_buffers),
         )
 
     def _unconstrained_viewport(self) -> Region:
