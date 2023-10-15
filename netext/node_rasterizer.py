@@ -35,6 +35,7 @@ class Shape(Protocol):
         console: Console,
         content_renderable: RenderableType,
         style: Style,
+        padding: int,
         data: dict[str, Any],
     ) -> list[Strip]:
         return NotImplemented
@@ -81,7 +82,7 @@ class RectangularShapeMixin:
                 )
             case Magnet.LEFT:
                 extruded_point = Point(
-                    x=node_buffer.left_x + extrusion_offset,
+                    x=node_buffer.left_x - extrusion_offset,
                     y=node_buffer.center.y + offset,
                 )
                 return (
@@ -99,7 +100,7 @@ class RectangularShapeMixin:
                 )
             case Magnet.RIGHT:
                 extruded_point = Point(
-                    x=node_buffer.right_x - extrusion_offset,
+                    x=node_buffer.right_x + extrusion_offset,
                     y=node_buffer.center.y - offset,
                 )
                 return (
@@ -154,6 +155,7 @@ class JustContent(RectangularShapeMixin):
         console: Console,
         content_renderable: RenderableType,
         style: Style,
+        padding: int,
         data: dict[str, Any],
     ) -> list[Strip]:
         return self._renderable_type_to_strips(console, content_renderable)
@@ -165,11 +167,19 @@ class Box(RectangularShapeMixin):
         console: Console,
         content_renderable: RenderableType,
         style: Style,
+        padding: int,
         data: dict[str, Any],
     ) -> list[Strip]:
         box_type = data.get("$box-type", box.ROUNDED)
         return self._renderable_type_to_strips(
-            console, Panel(content_renderable, expand=False, style=style, box=box_type)
+            console,
+            Panel(
+                content_renderable,
+                expand=False,
+                style=style,
+                padding=padding,
+                box=box_type,
+            ),
         )
 
 
@@ -342,11 +352,16 @@ class NodeBuffer(ShapeBuffer):
         buffers: list[StripBuffer] = []
         for port_name, port_settings in self.data.get("$ports", {}).items():
             shape = JustContent()
-            port_strips = shape.render_shape(console, port_name, style=Style(), data={})
+            port_symbol = port_settings.get("symbol", "○")
+            if port_name in self.connected_ports:
+                port_symbol = port_settings.get("symbol", "●")
+            port_strips = shape.render_shape(
+                console, port_symbol, style=Style(), padding=0, data={}
+            )
 
-            port_position = self.get_port_position(
+            port_position, port_helper = self.get_port_position(
                 port_name=port_name, target_point=self.center, lod=lod
-            )[0]
+            )
 
             port_buffer = PortBuffer.from_strips_and_node(
                 port_strips,
@@ -358,6 +373,27 @@ class NodeBuffer(ShapeBuffer):
                 center=port_position,
             )
             buffers.append(port_buffer)
+
+            if (port_label := port_settings.get("label", None)) is not None:
+                # TODO depends on the direction of the port
+                #  "\n".join([c for c in port_label])
+                port_label_strips = shape.render_shape(
+                    console, port_label, style=Style(), padding=0, data={}
+                )
+
+                # This is inaccurate, and needs to take into account the size of the label
+                label_position = port_position - (port_helper - port_position) * 0.5
+
+                port_label_buffer = PortLabelBuffer.from_strips_and_node(
+                    port_label_strips,
+                    port_name=port_name,
+                    node=self.node,
+                    # TODO Z indices need a layer concept
+                    z_index=-2,
+                    shape=shape,
+                    center=label_position,
+                )
+                buffers.append(port_label_buffer)
 
         return buffers
 
@@ -382,6 +418,7 @@ def rasterize_node(
     style: Style = data.get("$style", Style())
     content_style = data.get("$content-style", Style())
     margin: int = data.get("$margin", 0)
+    padding: int = data.get("$padding", 0)
     content_renderer = data.get("$content-renderer", _default_content_renderer)
     content_renderable = content_renderer(str(node), data, content_style)
 
@@ -390,10 +427,20 @@ def rasterize_node(
         style = data.get(f"$style-{lod}", style)
         content_style = data.get(f"$content-style-{lod}", content_style)
         margin = data.get(f"$margin-{lod}", margin)
+        padding = data.get(f"$margin-{lod}", 0)
         content_renderer = data.get(f"$content-renderer-{lod}", content_renderer)
         content_renderable = content_renderer(str(node), data, content_style)
 
-    strips = shape.render_shape(console, content_renderable, style=style, data=data)
+    if "$ports" in data:
+        # Determine longest padding label length
+        max_padding_length = (
+            max(len(port["label"]) for port in data["$ports"].values()) + 1
+        )
+        padding = max(padding, max_padding_length)
+
+    strips = shape.render_shape(
+        console, content_renderable, style=style, padding=padding, data=data
+    )
 
     return NodeBuffer.from_strips(
         strips,

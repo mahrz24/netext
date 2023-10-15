@@ -20,11 +20,14 @@ for routing, drawing in [
             "$y": 1,
             "$ports": {
                 "a": {
-                    "magnet": Magnet.BOTTOM,
+                    "magnet": Magnet.RIGHT,
                     "offset": -2,
-                    "symbol": "o",
-                    "symbol-connected": "x",
-                    "label": "A",
+                    "label": "AB",
+                },
+                "b": {
+                    "magnet": Magnet.BOTTOM,
+                    "offset": 0,
+                    "label": "B",
                 },
             },
         }
