@@ -61,6 +61,45 @@ class RectangularShapeMixin:
             ]
         )
 
+    # TODO add method that returns the closet magnet
+    def get_closest_magnet(
+        self,
+        node_buffer: "NodeBuffer",
+        target_point: Point,
+        offset: int = 0,
+        extrusion_offset: int = 2,
+    ) -> Magnet:
+        direct_line = LineString([node_buffer.center.shapely, target_point.shapely])
+        node_polygon = self.polygon(node_buffer)
+        intersection = direct_line.intersection(node_polygon)
+        intersection_point = intersection.line_interpolate_point(1.0, normalized=True)
+
+        closest_magnet = Magnet.TOP
+        closest_point, _ = self.get_magnet_position(
+            node_buffer=node_buffer,
+            target_point=target_point,
+            magnet=closest_magnet,
+            offset=offset,
+            extrusion_offset=extrusion_offset,
+        )
+
+        closest_distance = intersection_point.distance(closest_point.shapely)
+
+        for magnet in [Magnet.LEFT, Magnet.RIGHT, Magnet.BOTTOM]:
+            point, _ = self.get_magnet_position(
+                node_buffer=node_buffer,
+                target_point=target_point,
+                magnet=magnet,
+                offset=offset,
+                extrusion_offset=extrusion_offset,
+            )
+            distance = intersection_point.distance(point.shapely)
+            if distance < closest_distance:
+                closest_point = point
+                closest_distance = distance
+
+        return closest_magnet
+
     def get_magnet_position(
         self,
         node_buffer: "NodeBuffer",
@@ -118,8 +157,6 @@ class RectangularShapeMixin:
                 intersection_point = intersection.line_interpolate_point(
                     1.0, normalized=True
                 )
-                if intersection_point.is_empty:
-                    return node_buffer.center, None
 
                 closest_magnet = Magnet.TOP
                 closest_point, closest_extruded_point = self.get_magnet_position(
@@ -129,6 +166,7 @@ class RectangularShapeMixin:
                     offset=offset,
                     extrusion_offset=extrusion_offset,
                 )
+
                 closest_distance = intersection_point.distance(closest_point.shapely)
 
                 for magnet in [Magnet.LEFT, Magnet.RIGHT, Magnet.BOTTOM]:
@@ -267,6 +305,10 @@ class NodeBuffer(ShapeBuffer):
     port_positions: dict[int, dict[str, tuple[Point, Point | None]]] = field(
         default_factory=lambda: defaultdict(dict)
     )
+    ports_per_side: dict[Magnet, list[str]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
+
     connected_ports: list[str] = field(default_factory=list)
 
     @property
@@ -332,12 +374,28 @@ class NodeBuffer(ShapeBuffer):
         # TODO more tests for non happy path
         port = self.data.get("$ports", {}).get(port_name, {})
 
+        if not self.ports_per_side:
+            # Count all the ports per side, count closest ports for each side separately
+            for port_name, port_settings in sorted(
+                self.data.get("$ports", {}).items(), key=lambda x: x[1].get("key", 0)
+            ):
+                port_magnet = port_settings.get("magnet", Magnet.CLOSEST)
+                if port_magnet == Magnet.CENTER:
+                    continue
+                elif port_magnet == Magnet.CLOSEST:
+                    self.ports_per_side[Magnet.TOP].append(port_name)
+                    self.ports_per_side[Magnet.BOTTOM].append(port_name)
+                    self.ports_per_side[Magnet.LEFT].append(port_name)
+                    self.ports_per_side[Magnet.RIGHT].append(port_name)
+                else:
+                    self.ports_per_side[port_magnet].append(port_name)
+
         if port_name in self.port_positions[lod]:
             return self.port_positions[lod][port_name]
 
         start, start_helper = self.get_magnet_position(
             target_point=target_point,
-            magnet=port.get("magnet", Magnet.CENTER),
+            magnet=port.get("magnet", Magnet.CLOSEST),
             offset=port.get("offset", 0),
         )
         self.port_positions[lod][port_name] = (start, start_helper)
