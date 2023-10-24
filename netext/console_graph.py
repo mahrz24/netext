@@ -1035,8 +1035,6 @@ class ConsoleGraph(Generic[G]):
             for node, port_buffers in self.port_buffers_current_lod.items()
             if node in visible_nodes
         ]
-        print(node_buffers)
-        print(port_buffers)
         return chain(
             node_buffers,
             self.edge_buffers_current_lod.values(),

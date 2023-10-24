@@ -21,11 +21,11 @@ for routing, drawing in [
             "$ports": {
                 "a": {
                     # TODO ports need to refer to sides not magnets
-                    "magnet": Magnet.CLOSEST,
+                    "magnet": Magnet.TOP,
                     "label": "AB",
                 },
                 "b": {
-                    "magnet": Magnet.CLOSEST,
+                    "magnet": Magnet.BOTTOM,
                     "label": "B",
                 },
             },
@@ -55,7 +55,7 @@ for routing, drawing in [
         3,
         **{
             "$edge-routing-mode": routing,
-            "$start-port": "a",
+            "$start-port": "b",
             "$edge-segment-drawing-mode": drawing,
             "$end-arrow-tip": ArrowTip.ARROW,
             "$start-magnet": Magnet.LEFT,

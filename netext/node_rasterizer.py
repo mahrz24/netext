@@ -61,7 +61,6 @@ class RectangularShapeMixin:
             ]
         )
 
-    # TODO add method that returns the closet magnet
     def get_closest_magnet(
         self,
         node_buffer: "NodeBuffer",
@@ -359,6 +358,19 @@ class NodeBuffer(ShapeBuffer):
             extrusion_offset=extrusion_offset,
         )
 
+    def get_closest_magnet(
+        self,
+        target_point: Point,
+        offset: int = 0,
+        extrusion_offset: int = 2,
+    ) -> tuple[Point, Point | None]:
+        return self.shape.get_closest_magnet(
+            self,
+            target_point=target_point,
+            offset=offset,
+            extrusion_offset=extrusion_offset,
+        )
+
     @property
     def layout_width(self) -> int:
         return self.node_width + self.margin * 2
@@ -374,29 +386,58 @@ class NodeBuffer(ShapeBuffer):
         # TODO more tests for non happy path
         port = self.data.get("$ports", {}).get(port_name, {})
 
+        if port_name in self.port_positions[lod]:
+            return self.port_positions[lod][port_name]
+
         if not self.ports_per_side:
             # Count all the ports per side, count closest ports for each side separately
-            for port_name, port_settings in sorted(
+            for current_port_name, port_settings in sorted(
                 self.data.get("$ports", {}).items(), key=lambda x: x[1].get("key", 0)
             ):
                 port_magnet = port_settings.get("magnet", Magnet.CLOSEST)
                 if port_magnet == Magnet.CENTER:
                     continue
                 elif port_magnet == Magnet.CLOSEST:
-                    self.ports_per_side[Magnet.TOP].append(port_name)
-                    self.ports_per_side[Magnet.BOTTOM].append(port_name)
-                    self.ports_per_side[Magnet.LEFT].append(port_name)
-                    self.ports_per_side[Magnet.RIGHT].append(port_name)
+                    self.ports_per_side[Magnet.TOP].append(current_port_name)
+                    self.ports_per_side[Magnet.BOTTOM].append(current_port_name)
+                    self.ports_per_side[Magnet.LEFT].append(current_port_name)
+                    self.ports_per_side[Magnet.RIGHT].append(current_port_name)
                 else:
-                    self.ports_per_side[port_magnet].append(port_name)
+                    self.ports_per_side[port_magnet].append(current_port_name)
 
-        if port_name in self.port_positions[lod]:
-            return self.port_positions[lod][port_name]
+        magnet = port.get("magnet", Magnet.CLOSEST)
+        closest_magnet = magnet
+        if magnet == Magnet.CENTER or magnet == Magnet.CLOSEST:
+            closest_magnet = self.get_closest_magnet(target_point=target_point)
+        from rich import print
+
+        print(port)
+        print(closest_magnet)
+        ports_on_side = self.ports_per_side[closest_magnet]
+        port_index = ports_on_side.index(port_name)
+
+        # TODO 1 is a special case, port should be centered
+        if closest_magnet == Magnet.TOP or closest_magnet == Magnet.BOTTOM:
+            port_offset = round(
+                (float(port_index + 1) / (len(ports_on_side)) - 0.5)
+                * (self.width - 2)
+                * 0.5
+            )
+        else:
+            port_offset = round(
+                (float(port_index + 1) / (len(ports_on_side)) - 0.5)
+                * (self.height - 2)
+                * 0.5
+            )
+
+        print(self.node)
+        print(ports_on_side)
+        print(port_index, port_offset)
 
         start, start_helper = self.get_magnet_position(
             target_point=target_point,
-            magnet=port.get("magnet", Magnet.CLOSEST),
-            offset=port.get("offset", 0),
+            magnet=closest_magnet,
+            offset=port.get("offset", port_offset),
         )
         self.port_positions[lod][port_name] = (start, start_helper)
 
