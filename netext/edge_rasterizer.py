@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Hashable
 
 from rich.console import Console
 from rich.style import Style
@@ -14,6 +14,7 @@ from netext.edge_routing.route import route_edge
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.geometry import Magnet
 from netext.geometry.index import BufferIndex
+from netext.geometry.magnet import ShapeSide
 
 from netext.node_rasterizer import EdgeLabelBuffer, JustContent, NodeBuffer
 from netext.rendering.segment_buffer import StripBuffer
@@ -34,6 +35,8 @@ def rasterize_edge(
     edge_idx: BufferIndex[EdgeBuffer, EdgeLayout] | None = None,
     lod: int = 1,
     edge_layout: EdgeLayout | None = None,
+    port_sides: dict[Hashable, dict[str, ShapeSide]] = dict(),
+    port_side_assignments: dict[Hashable, dict[ShapeSide, list[str]]] = dict(),
 ) -> tuple[EdgeBuffer, EdgeLayout, list[StripBuffer]] | None:
     show = data.get("$show", True)
 
@@ -65,10 +68,19 @@ def rasterize_edge(
         label = data.get(f"$label-{lod}", label)
         style = data.get(f"$style-{lod}", style)
 
+    print(f"RASTERIZE EDGE {(u_buffer.node,v_buffer.node)}")
+    print(data)
     if "$start-port" in data:
         port_name = data["$start-port"]
+        print("Getting port position")
+        # TODO we can precompute here as we do not need the target anymore
         start, start_helper = u_buffer.get_port_position(
-            port_name=port_name, target_point=v_buffer.center, lod=lod
+            port_name=port_name,
+            lod=lod,
+            port_side=port_sides[u_buffer.node][port_name],
+            ports_on_side=port_side_assignments[u_buffer.node][
+                port_sides[u_buffer.node][port_name]
+            ],
         )
         u_buffer.connect_port(port_name)
     else:
@@ -79,7 +91,13 @@ def rasterize_edge(
     if "$end-port" in data:
         port_name = data["$end-port"]
         end, end_helper = v_buffer.get_port_position(
-            port_name=port_name, target_point=u_buffer.center, lod=lod
+            port_name=port_name,
+            target_point=u_buffer.center,
+            lod=lod,
+            port_side=port_sides[v_buffer.node][port_name],
+            ports_on_side=port_side_assignments[u_buffer.node][
+                port_sides[u_buffer.node][port_name]
+            ],
         )
         v_buffer.connect_port(port_name)
     else:

@@ -21,11 +21,11 @@ for routing, drawing in [
             "$ports": {
                 "a": {
                     # TODO ports need to refer to sides not magnets
-                    "magnet": Magnet.TOP,
+                    "magnet": Magnet.CLOSEST,
                     "label": "AB",
                 },
                 "b": {
-                    "magnet": Magnet.BOTTOM,
+                    "magnet": Magnet.CLOSEST,
                     "label": "B",
                 },
             },

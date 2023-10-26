@@ -7,11 +7,13 @@ from typing import Any, Protocol, cast
 from rich import box
 from rich.console import Console, RenderableType
 from rich.panel import Panel
+from rich.padding import PaddingDimensions
 from rich.segment import Segment
 from rich.style import Style
 from rich.text import Text
 from netext.geometry import Magnet, Point
 from shapely import LineString, Polygon
+from netext.geometry.magnet import ShapeSide
 
 from netext.rendering.segment_buffer import Reference, Strip, StripBuffer, Spacer
 
@@ -27,6 +29,15 @@ class Shape(Protocol):
     ) -> tuple[Point, Point | None]:
         return NotImplemented
 
+    def get_closest_magnet(
+        self,
+        node_buffer: "NodeBuffer",
+        target_point: Point,
+        offset: int = 0,
+        extrusion_offset: int = 2,
+    ) -> Magnet:
+        return NotImplemented
+
     def polygon(self, node_buffer: "NodeBuffer", margin: float = 0) -> Polygon:
         return NotImplemented
 
@@ -35,7 +46,7 @@ class Shape(Protocol):
         console: Console,
         content_renderable: RenderableType,
         style: Style,
-        padding: int,
+        padding: PaddingDimensions,
         data: dict[str, Any],
     ) -> list[Strip]:
         return NotImplemented
@@ -94,8 +105,8 @@ class RectangularShapeMixin:
             )
             distance = intersection_point.distance(point.shapely)
             if distance < closest_distance:
-                closest_point = point
                 closest_distance = distance
+                closest_magnet = magnet
 
         return closest_magnet
 
@@ -192,7 +203,7 @@ class JustContent(RectangularShapeMixin):
         console: Console,
         content_renderable: RenderableType,
         style: Style,
-        padding: int,
+        padding: PaddingDimensions,
         data: dict[str, Any],
     ) -> list[Strip]:
         return self._renderable_type_to_strips(console, content_renderable)
@@ -204,7 +215,7 @@ class Box(RectangularShapeMixin):
         console: Console,
         content_renderable: RenderableType,
         style: Style,
-        padding: int,
+        padding: PaddingDimensions,
         data: dict[str, Any],
     ) -> list[Strip]:
         box_type = data.get("$box-type", box.ROUNDED)
@@ -363,7 +374,7 @@ class NodeBuffer(ShapeBuffer):
         target_point: Point,
         offset: int = 0,
         extrusion_offset: int = 2,
-    ) -> tuple[Point, Point | None]:
+    ) -> Magnet:
         return self.shape.get_closest_magnet(
             self,
             target_point=target_point,
@@ -373,14 +384,14 @@ class NodeBuffer(ShapeBuffer):
 
     @property
     def layout_width(self) -> int:
-        return self.node_width + self.margin * 2
+        return self.width + self.margin * 2
 
     @property
     def layout_height(self) -> int:
-        return self.node_height + self.margin * 2
+        return self.height + self.margin * 2
 
     def get_port_position(
-        self, port_name: str, target_point: Point, lod: int
+        self, port_name: str, port_side: ShapeSide, lod: int, ports_on_side: list[str]
     ) -> tuple[Point, Point | None]:
         # TODO should we raise on wrong port?
         # TODO more tests for non happy path
@@ -389,35 +400,10 @@ class NodeBuffer(ShapeBuffer):
         if port_name in self.port_positions[lod]:
             return self.port_positions[lod][port_name]
 
-        if not self.ports_per_side:
-            # Count all the ports per side, count closest ports for each side separately
-            for current_port_name, port_settings in sorted(
-                self.data.get("$ports", {}).items(), key=lambda x: x[1].get("key", 0)
-            ):
-                port_magnet = port_settings.get("magnet", Magnet.CLOSEST)
-                if port_magnet == Magnet.CENTER:
-                    continue
-                elif port_magnet == Magnet.CLOSEST:
-                    self.ports_per_side[Magnet.TOP].append(current_port_name)
-                    self.ports_per_side[Magnet.BOTTOM].append(current_port_name)
-                    self.ports_per_side[Magnet.LEFT].append(current_port_name)
-                    self.ports_per_side[Magnet.RIGHT].append(current_port_name)
-                else:
-                    self.ports_per_side[port_magnet].append(current_port_name)
-
-        magnet = port.get("magnet", Magnet.CLOSEST)
-        closest_magnet = magnet
-        if magnet == Magnet.CENTER or magnet == Magnet.CLOSEST:
-            closest_magnet = self.get_closest_magnet(target_point=target_point)
-        from rich import print
-
-        print(port)
-        print(closest_magnet)
-        ports_on_side = self.ports_per_side[closest_magnet]
         port_index = ports_on_side.index(port_name)
 
         # TODO 1 is a special case, port should be centered
-        if closest_magnet == Magnet.TOP or closest_magnet == Magnet.BOTTOM:
+        if port_side == ShapeSide.TOP or port_side == ShapeSide.BOTTOM:
             port_offset = round(
                 (float(port_index + 1) / (len(ports_on_side)) - 0.5)
                 * (self.width - 2)
@@ -430,13 +416,11 @@ class NodeBuffer(ShapeBuffer):
                 * 0.5
             )
 
-        print(self.node)
-        print(ports_on_side)
-        print(port_index, port_offset)
-
+        # The magnet has been derived from the shape side, so it's determined and the target point
+        # does not matter
         start, start_helper = self.get_magnet_position(
-            target_point=target_point,
-            magnet=closest_magnet,
+            target_point=Point(0, 0),
+            magnet=Magnet(port_side.value),
             offset=port.get("offset", port_offset),
         )
         self.port_positions[lod][port_name] = (start, start_helper)
@@ -447,7 +431,13 @@ class NodeBuffer(ShapeBuffer):
         # TODO check
         self.connected_ports.append(port_name)
 
-    def get_port_buffers(self, console: Console, lod: int) -> list[StripBuffer]:
+    def get_port_buffers(
+        self,
+        console: Console,
+        lod: int,
+        port_side_assignement: dict[ShapeSide, list[str]],
+        port_sides: dict[str, ShapeSide],
+    ) -> list[StripBuffer]:
         buffers: list[StripBuffer] = []
         for port_name, port_settings in self.data.get("$ports", {}).items():
             shape = JustContent()
@@ -459,7 +449,10 @@ class NodeBuffer(ShapeBuffer):
             )
 
             port_position, port_helper = self.get_port_position(
-                port_name=port_name, target_point=self.center, lod=lod
+                port_name=port_name,
+                lod=lod,
+                ports_on_side=port_side_assignement[port_name],
+                port_side=port_sides[port_name],
             )
 
             port_buffer = PortBuffer.from_strips_and_node(
@@ -518,6 +511,7 @@ def rasterize_node(
     content_style = data.get("$content-style", Style())
     margin: int = data.get("$margin", 0)
     padding: int = data.get("$padding", 0)
+    # TODO cache content renderer
     content_renderer = data.get("$content-renderer", _default_content_renderer)
     content_renderable = content_renderer(str(node), data, content_style)
 

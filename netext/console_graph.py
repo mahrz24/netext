@@ -15,6 +15,7 @@ from netext.geometry import Point, Region
 from netext.edge_rendering.buffer import EdgeBuffer
 from netext.edge_routing.edge import EdgeLayout
 from netext.geometry.index import BufferIndex
+from netext.geometry.magnet import Magnet, ShapeSide
 from netext.geometry.point import FloatPoint
 
 from netext.rendering.segment_buffer import StripBuffer
@@ -182,6 +183,11 @@ class ConsoleGraph(Generic[G]):
         self.label_buffers_current_lod: dict[
             tuple[Hashable, Hashable], list[StripBuffer]
         ] = dict()
+
+        self.port_side_assignments: dict[
+            Hashable, dict[ShapeSide, list[str]]
+        ] = defaultdict(lambda: defaultdict(list))
+        self.port_sides: dict[Hashable, dict[str, ShapeSide]] = defaultdict(dict)
 
         self.node_idx_1_lod: BufferIndex[NodeBuffer, None] = BufferIndex()
         self.edge_idx_1_lod: BufferIndex[EdgeBuffer, EdgeLayout] = BufferIndex()
@@ -747,6 +753,53 @@ class ConsoleGraph(Generic[G]):
                 x=round(position.x), y=round(position.y)
             )
 
+        for node, data in self._nx_graph.nodes(data=True):
+            if "$ports" in data:
+                for current_port_name, port_settings in sorted(
+                    data.get("$ports", {}).items(), key=lambda x: x[1].get("key", 0)
+                ):
+                    port_magnet = port_settings.get("magnet", Magnet.CLOSEST)
+
+                    if port_magnet == Magnet.CENTER or port_magnet == Magnet.CLOSEST:
+                        # Determine the port magnet
+                        neighbours = self._nx_graph.neighbors(node)
+                        for v_node in neighbours:
+                            if (node, v_node) in self._nx_graph.edges:
+                                if (
+                                    self._nx_graph.edges[(node, v_node)].get(
+                                        "$start-port"
+                                    )
+                                    == current_port_name
+                                ):
+                                    port_side = ShapeSide(
+                                        self.node_buffers[node]
+                                        .get_closest_magnet(
+                                            self.node_buffers[v_node].center
+                                        )
+                                        .value
+                                    )
+                                elif (
+                                    self._nx_graph.edges[(v_node, node)].get(
+                                        "$end-port"
+                                    )
+                                    == current_port_name
+                                ):
+                                    port_side = ShapeSide(
+                                        self.node_buffers[node]
+                                        .get_closest_magnet(
+                                            self.node_buffers[v_node].center
+                                        )
+                                        .value
+                                    )
+
+                    else:
+                        port_side = ShapeSide(port_magnet)
+
+                    self.port_sides[node][current_port_name] = port_side
+                    self.port_side_assignments[node][port_side].append(
+                        current_port_name
+                    )
+
     def _transition_compute_zoomed_positions(self) -> None:
         zoom_x, zoom_y = self._compute_current_zoom()
         self.zoom_x = zoom_x
@@ -845,6 +898,8 @@ class ConsoleGraph(Generic[G]):
                 self.node_idx_1_lod,
                 self.edge_idx_1_lod,
                 lod=1,
+                port_sides=self.port_sides,
+                port_side_assignments=self.port_side_assignments,
             )
             if result is not None:
                 edge_buffer, edge_layout, label_nodes = result
@@ -961,6 +1016,8 @@ class ConsoleGraph(Generic[G]):
                     self.node_idx_current_lod,
                     self.edge_idx_current_lod,
                     edge_lod,
+                    port_sides=self.port_sides,
+                    port_side_assignments=self.port_side_assignments,
                 )
                 if result is not None:
                     edge_buffer, edge_layout, label_nodes = result
@@ -981,6 +1038,7 @@ class ConsoleGraph(Generic[G]):
         self._render_port_buffers_current_lod()
 
     def _render_port_buffers_current_lod(self) -> None:
+        print("Render Port Buffers")
         if self._zoom_factor is None:
             raise RuntimeError(
                 "Invalid transition, lod buffers can only be rendered once zoom is"
@@ -991,7 +1049,10 @@ class ConsoleGraph(Generic[G]):
             node_buffer = self.node_buffers_current_lod[node]
             lod = determine_lod(self._nx_graph.nodes[node], self._zoom_factor)
             self.port_buffers_per_lod[lod][node] = node_buffer.get_port_buffers(
-                self.console, lod
+                self.console,
+                lod,
+                self.port_side_assignments[node],
+                self.port_sides[node],
             )
             self.port_buffers_current_lod[node] = self.port_buffers_per_lod[lod][node]
 
