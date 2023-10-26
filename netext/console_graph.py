@@ -24,7 +24,7 @@ from netext.buffer_renderer import render_buffers
 from netext.edge_rasterizer import rasterize_edge
 from netext.layout_engines.engine import LayoutEngine, G
 from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
-from netext.node_rasterizer import NodeBuffer, PortBuffer, rasterize_node
+from netext.node_rasterizer import NodeBuffer, rasterize_node
 
 
 class RenderState(Enum):
@@ -154,9 +154,9 @@ class ConsoleGraph(Generic[G]):
         self.node_buffers_current_lod: dict[Hashable, NodeBuffer] = dict()
 
         self.port_buffers_per_lod: dict[
-            int, dict[Hashable, [PortBuffer]]
+            int, dict[Hashable, list[StripBuffer]]
         ] = defaultdict(dict)
-        self.port_buffers_current_lod: dict[Hashable, [PortBuffer]] = dict()
+        self.port_buffers_current_lod: dict[Hashable, list[StripBuffer]] = dict()
 
         self.node_positions: dict[Hashable, FloatPoint] = dict()
 
@@ -188,6 +188,9 @@ class ConsoleGraph(Generic[G]):
             Hashable, dict[ShapeSide, list[str]]
         ] = defaultdict(lambda: defaultdict(list))
         self.port_sides: dict[Hashable, dict[str, ShapeSide]] = defaultdict(dict)
+        self.port_positions: dict[
+            Hashable, dict[str, tuple[Point, Point | None]]
+        ] = defaultdict(dict)
 
         self.node_idx_1_lod: BufferIndex[NodeBuffer, None] = BufferIndex()
         self.edge_idx_1_lod: BufferIndex[EdgeBuffer, EdgeLayout] = BufferIndex()
@@ -793,7 +796,7 @@ class ConsoleGraph(Generic[G]):
                                     )
 
                     else:
-                        port_side = ShapeSide(port_magnet)
+                        port_side = ShapeSide(port_magnet.value)
 
                     self.port_sides[node][current_port_name] = port_side
                     self.port_side_assignments[node][port_side].append(
@@ -887,6 +890,10 @@ class ConsoleGraph(Generic[G]):
             self.node_idx_1_lod.insert(node_buffer)
             all_node_buffers.append(node_buffer)
 
+        # These are needed for the edges also on lod=1
+        for node, data in self._nx_graph.nodes(data=True):
+            self._determine_port_positions(node, lod=1, data=data)
+
         for u, v, data in self._nx_graph.edges(data=True):
             result = rasterize_edge(
                 self.console,
@@ -898,8 +905,7 @@ class ConsoleGraph(Generic[G]):
                 self.node_idx_1_lod,
                 self.edge_idx_1_lod,
                 lod=1,
-                port_sides=self.port_sides,
-                port_side_assignments=self.port_side_assignments,
+                port_positions=self.port_positions,
             )
             if result is not None:
                 edge_buffer, edge_layout, label_nodes = result
@@ -931,6 +937,24 @@ class ConsoleGraph(Generic[G]):
             )
 
             self._render_node_buffer_current_lod(node, data, lod, position_view_space)
+            self._determine_port_positions(node, lod, data)
+
+    def _determine_port_positions(self, node: Hashable, lod: int, data: dict[str, Any]):
+        # Determine the port positions as this is now possible
+        if "$ports" in data:
+            for current_port_name, _ in sorted(
+                data.get("$ports", {}).items(), key=lambda x: x[1].get("key", 0)
+            ):
+                port_side = self.port_sides[node][current_port_name]
+                pos, pos_helper = self.node_buffers_per_lod[lod][
+                    node
+                ].get_port_position(
+                    port_name=current_port_name,
+                    lod=lod,
+                    port_side=port_side,
+                    ports_on_side=self.port_side_assignments[node][port_side],
+                )
+                self.port_positions[node][current_port_name] = (pos, pos_helper)
 
     def _render_node_buffer_current_lod(
         self,
@@ -942,8 +966,14 @@ class ConsoleGraph(Generic[G]):
     ) -> list[tuple[Hashable, Hashable]]:
         affected_edges: list[tuple[Hashable, Hashable]] = []
         node_buffer = self.node_buffers_per_lod.get(lod, dict()).get(node)
-        if node_buffer is None:
-            node_buffer = rasterize_node(self.console, node, data, lod=lod)
+        if node_buffer is None or "$ports" in data:
+            node_buffer = rasterize_node(
+                self.console,
+                node,
+                data,
+                lod=lod,
+                port_side_assignments=self.port_side_assignments[node],
+            )
             self.node_buffers_per_lod[lod][node] = node_buffer
             force_edge_rerender = True
         # Node moved, we need to re-render the edges
@@ -1016,8 +1046,7 @@ class ConsoleGraph(Generic[G]):
                     self.node_idx_current_lod,
                     self.edge_idx_current_lod,
                     edge_lod,
-                    port_sides=self.port_sides,
-                    port_side_assignments=self.port_side_assignments,
+                    port_positions=self.port_positions,
                 )
                 if result is not None:
                     edge_buffer, edge_layout, label_nodes = result
@@ -1038,7 +1067,6 @@ class ConsoleGraph(Generic[G]):
         self._render_port_buffers_current_lod()
 
     def _render_port_buffers_current_lod(self) -> None:
-        print("Render Port Buffers")
         if self._zoom_factor is None:
             raise RuntimeError(
                 "Invalid transition, lod buffers can only be rendered once zoom is"

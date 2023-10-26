@@ -14,30 +14,29 @@ for routing, drawing in [
 ]:
     g = nx.Graph()
     g.add_node(
-        "FOOOOOO",
+        "FOOOOOO\nFOO\nDOO",
         **{
             "$x": 1,
             "$y": 1,
             "$ports": {
                 "a": {
-                    # TODO ports need to refer to sides not magnets
-                    "magnet": Magnet.CLOSEST,
-                    "label": "AB",
+                    "magnet": Magnet.LEFT,
+                    "label": "ABCDE",
                 },
                 "b": {
-                    "magnet": Magnet.CLOSEST,
+                    "magnet": Magnet.LEFT,
                     "label": "B",
                 },
             },
         }
     )
-    g.add_node(2, **{"$x": 1, "$y": -10})
+    g.add_node(2, **{"$x": 15, "$y": -10})
 
     g.add_node(3, **{"$x": 1, "$y": 10})
     g.add_node(4, **{"$x": 15, "$y": 10})
 
     g.add_edge(
-        "FOOOOOO",
+        "FOOOOOO\nFOO\nDOO",
         2,
         **{
             "$edge-routing-mode": routing,
@@ -45,13 +44,12 @@ for routing, drawing in [
             "$edge-segment-drawing-mode": drawing,
             "$end-arrow-tip": ArrowTip.ARROW,
             "$start-magnet": Magnet.LEFT,
-            "$end-magnet": Magnet.TOP,
             "$style": Style(color="green"),
         }
     )
 
     g.add_edge(
-        "FOOOOOO",
+        "FOOOOOO\nFOO\nDOO",
         3,
         **{
             "$edge-routing-mode": routing,

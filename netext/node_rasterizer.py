@@ -7,7 +7,7 @@ from typing import Any, Protocol, cast
 from rich import box
 from rich.console import Console, RenderableType
 from rich.panel import Panel
-from rich.padding import PaddingDimensions
+from rich.padding import Padding, PaddingDimensions
 from rich.segment import Segment
 from rich.style import Style
 from rich.text import Text
@@ -403,18 +403,21 @@ class NodeBuffer(ShapeBuffer):
         port_index = ports_on_side.index(port_name)
 
         # TODO 1 is a special case, port should be centered
-        if port_side == ShapeSide.TOP or port_side == ShapeSide.BOTTOM:
-            port_offset = round(
-                (float(port_index + 1) / (len(ports_on_side)) - 0.5)
-                * (self.width - 2)
-                * 0.5
-            )
+        if len(ports_on_side) == 1:
+            port_offset = 0
         else:
-            port_offset = round(
-                (float(port_index + 1) / (len(ports_on_side)) - 0.5)
-                * (self.height - 2)
-                * 0.5
-            )
+            if port_side == ShapeSide.TOP or port_side == ShapeSide.BOTTOM:
+                port_offset = round(
+                    (float(port_index) / (len(ports_on_side) - 1) - 0.5)
+                    * (self.width - 2)
+                    * 0.5
+                )
+            else:
+                port_offset = round(
+                    (float(port_index) / (len(ports_on_side) - 1) - 0.5)
+                    * (self.height - 2)
+                    * 0.5
+                )
 
         # The magnet has been derived from the shape side, so it's determined and the target point
         # does not matter
@@ -439,7 +442,8 @@ class NodeBuffer(ShapeBuffer):
         port_sides: dict[str, ShapeSide],
     ) -> list[StripBuffer]:
         buffers: list[StripBuffer] = []
-        for port_name, port_settings in self.data.get("$ports", {}).items():
+        ports = self.data.get("$ports", {})
+        for port_name, port_settings in ports.items():
             shape = JustContent()
             port_symbol = port_settings.get("symbol", "○")
             if port_name in self.connected_ports:
@@ -466,16 +470,26 @@ class NodeBuffer(ShapeBuffer):
             )
             buffers.append(port_buffer)
 
-            if (port_label := port_settings.get("label", None)) is not None:
-                # TODO depends on the direction of the port
-                #  "\n".join([c for c in port_label])
+            # The second should always be not None
+            if (
+                port_label := port_settings.get("label", None)
+            ) is not None and port_helper is not None:
+                # This does not work well with unicode chars, use rich methods here instead
+                port_label_length = len(port_label)
+                if port_sides[port_name] in [ShapeSide.TOP, ShapeSide.BOTTOM]:
+                    port_label = "\n".join([c for c in port_label])
                 port_label_strips = shape.render_shape(
                     console, port_label, style=Style(), padding=0, data={}
                 )
 
-                # This is inaccurate, and needs to take into account the size of the label
-                label_position = port_position - (port_helper - port_position) * 0.5
+                normalizer = port_helper.distance_to(port_position)
 
+                offset: float = 1
+                if port_sides[port_name] in [ShapeSide.BOTTOM, ShapeSide.TOP]:
+                    offset = 0.5
+                label_position = port_position - (port_helper - port_position) * (
+                    1.0 / normalizer * ((port_label_length) * 0.5 + offset)
+                )
                 port_label_buffer = PortLabelBuffer.from_strips_and_node(
                     port_label_strips,
                     port_name=port_name,
@@ -497,7 +511,11 @@ def _default_content_renderer(
 
 
 def rasterize_node(
-    console: Console, node: Hashable, data: dict[str, Any], lod: int = 1
+    console: Console,
+    node: Hashable,
+    data: dict[str, Any],
+    lod: int = 1,
+    port_side_assignments: dict[ShapeSide, list[str]] = dict(),
 ) -> NodeBuffer:
     # TODO make helper function to get node from data
     to_be_ignored = []
@@ -510,8 +528,8 @@ def rasterize_node(
     style: Style = data.get("$style", Style())
     content_style = data.get("$content-style", Style())
     margin: int = data.get("$margin", 0)
-    padding: int = data.get("$padding", 0)
-    # TODO cache content renderer
+    padding: PaddingDimensions = data.get("$padding", (0, 1))
+    # TODO Cache content renderer for rerendering due to port existing
     content_renderer = data.get("$content-renderer", _default_content_renderer)
     content_renderable = content_renderer(str(node), data, content_style)
 
@@ -526,10 +544,45 @@ def rasterize_node(
 
     if "$ports" in data:
         # Determine longest padding label length
-        max_padding_length = (
-            max(len(port["label"]) for port in data["$ports"].values()) + 1
+        padding = Padding.unpack(padding)
+        additional_top_padding = max(
+            [
+                len(port["label"]) + 1
+                for port_name, port in data["$ports"].items()
+                if port_name in port_side_assignments.get(ShapeSide.TOP, [])
+            ]
+            + [0]
         )
-        padding = max(padding, max_padding_length)
+        additional_left_padding = max(
+            [
+                len(port["label"]) + 1
+                for port_name, port in data["$ports"].items()
+                if port_name in port_side_assignments.get(ShapeSide.LEFT, [])
+            ]
+            + [0]
+        )
+        additional_bottom_padding = max(
+            [
+                len(port["label"]) + 1
+                for port_name, port in data["$ports"].items()
+                if port_name in port_side_assignments.get(ShapeSide.BOTTOM, [])
+            ]
+            + [0]
+        )
+        additional_right_padding = max(
+            [
+                len(port["label"]) + 1
+                for port_name, port in data["$ports"].items()
+                if port_name in port_side_assignments.get(ShapeSide.RIGHT, [])
+            ]
+            + [0]
+        )
+        padding = (
+            padding[0] + additional_top_padding,
+            padding[1] + additional_right_padding,
+            padding[2] + additional_bottom_padding,
+            padding[3] + additional_left_padding,
+        )
 
     strips = shape.render_shape(
         console, content_renderable, style=style, padding=padding, data=data
