@@ -48,6 +48,7 @@ class Shape(Protocol):
         style: Style,
         padding: PaddingDimensions,
         data: dict[str, Any],
+        port_side_assignments: dict[ShapeSide, list[str]] = dict(),
     ) -> list[Strip]:
         return NotImplemented
 
@@ -205,7 +206,9 @@ class JustContent(RectangularShapeMixin):
         style: Style,
         padding: PaddingDimensions,
         data: dict[str, Any],
+        port_side_assignments: dict[ShapeSide, list[str]] = dict(),
     ) -> list[Strip]:
+        # TODO Add padding and allow for ports
         return self._renderable_type_to_strips(console, content_renderable)
 
 
@@ -217,9 +220,14 @@ class Box(RectangularShapeMixin):
         style: Style,
         padding: PaddingDimensions,
         data: dict[str, Any],
+        port_side_assignments: dict[ShapeSide, list[str]] = dict(),
     ) -> list[Strip]:
+        padding = Padding.unpack(padding)
+
         box_type = data.get("$box-type", box.ROUNDED)
-        return self._renderable_type_to_strips(
+
+        # Measure content
+        result = self._renderable_type_to_strips(
             console,
             Panel(
                 content_renderable,
@@ -229,6 +237,61 @@ class Box(RectangularShapeMixin):
                 box=box_type,
             ),
         )
+
+        height = len(result)
+        width = max(
+            sum([segment.cell_length for segment in strip.segments]) for strip in result
+        )
+        rerender = False
+
+        if port_side_assignments:
+            if (
+                missing_space := width
+                - 2
+                - max(
+                    len(port_side_assignments.get(ShapeSide.TOP, [])),
+                    len(port_side_assignments.get(ShapeSide.BOTTOM, [])),
+                )
+            ) < 0:
+                additional_padding = int(math.ceil(-missing_space / 2))
+                padding = (
+                    padding[0],
+                    padding[1] + additional_padding,
+                    padding[2],
+                    padding[3] + additional_padding,
+                )
+                rerender = True
+
+            if (
+                missing_space := height
+                - 2
+                - max(
+                    len(port_side_assignments.get(ShapeSide.LEFT, [])),
+                    len(port_side_assignments.get(ShapeSide.RIGHT, [])),
+                )
+            ) < 0:
+                additional_padding = int(math.ceil(-missing_space / 2))
+                padding = (
+                    padding[0] + additional_padding,
+                    padding[1],
+                    padding[2] + additional_padding,
+                    padding[3],
+                )
+                rerender = True
+
+        if rerender:
+            result = self._renderable_type_to_strips(
+                console,
+                Panel(
+                    content_renderable,
+                    expand=False,
+                    style=style,
+                    padding=padding,
+                    box=box_type,
+                ),
+            )
+
+        return result
 
 
 @dataclass(kw_only=True)
@@ -393,6 +456,8 @@ class NodeBuffer(ShapeBuffer):
     def get_port_position(
         self, port_name: str, port_side: ShapeSide, lod: int, ports_on_side: list[str]
     ) -> tuple[Point, Point | None]:
+        # TODO This needs to be moved to the shape, as it's shape specific
+        # E.g. the port offset computation makes some assumptions about the border size
         # TODO should we raise on wrong port?
         # TODO more tests for non happy path
         port = self.data.get("$ports", {}).get(port_name, {})
@@ -401,23 +466,24 @@ class NodeBuffer(ShapeBuffer):
             return self.port_positions[lod][port_name]
 
         port_index = ports_on_side.index(port_name)
+        print(f"{port_name} {port_index} {ports_on_side}")
+        print(self.height)
 
         # TODO 1 is a special case, port should be centered
         if len(ports_on_side) == 1:
             port_offset = 0
         else:
+            # TODO Looks a bit weird for odd port numbers as the space is not centered
             if port_side == ShapeSide.TOP or port_side == ShapeSide.BOTTOM:
-                port_offset = round(
-                    (float(port_index) / (len(ports_on_side) - 1) - 0.5)
-                    * (self.width - 2)
-                    * 0.5
-                )
+                port_offset = math.ceil(
+                    (float(port_index) / (len(ports_on_side) - 1)) * (self.width - 3)
+                ) - math.floor((self.width - 2) / 2)
             else:
-                port_offset = round(
-                    (float(port_index) / (len(ports_on_side) - 1) - 0.5)
-                    * (self.height - 2)
-                    * 0.5
-                )
+                port_offset = math.ceil(
+                    (float(port_index) / (len(ports_on_side) - 1)) * (self.height - 3)
+                ) - math.floor((self.height - 2) / 2)
+
+        print(port_offset)
 
         # The magnet has been derived from the shape side, so it's determined and the target point
         # does not matter
@@ -544,6 +610,8 @@ def rasterize_node(
 
     if "$ports" in data:
         # Determine longest padding label length
+        # TODO: This can be shape specific and might be moved into the shape like
+        # the additional padding on the number of ports
         padding = Padding.unpack(padding)
         additional_top_padding = max(
             [
@@ -585,7 +653,12 @@ def rasterize_node(
         )
 
     strips = shape.render_shape(
-        console, content_renderable, style=style, padding=padding, data=data
+        console,
+        content_renderable,
+        style=style,
+        padding=padding,
+        data=data,
+        port_side_assignments=port_side_assignments,
     )
 
     return NodeBuffer.from_strips(

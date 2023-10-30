@@ -14,18 +14,34 @@ for routing, drawing in [
 ]:
     g = nx.Graph()
     g.add_node(
-        "FOOOOOO\nFOO\nDOO",
+        "FOOOOOO",
         **{
             "$x": 1,
             "$y": 1,
             "$ports": {
                 "a": {
                     "magnet": Magnet.LEFT,
-                    "label": "ABCDE",
+                    "label": "A",
                 },
                 "b": {
                     "magnet": Magnet.LEFT,
                     "label": "B",
+                },
+                "c": {
+                    "magnet": Magnet.LEFT,
+                    "label": "C",
+                },
+                "d": {
+                    "magnet": Magnet.LEFT,
+                    "label": "D",
+                },
+                "e": {
+                    "magnet": Magnet.LEFT,
+                    "label": "E",
+                },
+                "f": {
+                    "magnet": Magnet.LEFT,
+                    "label": "F",
                 },
             },
         }
@@ -36,7 +52,7 @@ for routing, drawing in [
     g.add_node(4, **{"$x": 15, "$y": 10})
 
     g.add_edge(
-        "FOOOOOO\nFOO\nDOO",
+        "FOOOOOO",
         2,
         **{
             "$edge-routing-mode": routing,
@@ -49,7 +65,7 @@ for routing, drawing in [
     )
 
     g.add_edge(
-        "FOOOOOO\nFOO\nDOO",
+        "FOOOOOO",
         3,
         **{
             "$edge-routing-mode": routing,
@@ -63,13 +79,13 @@ for routing, drawing in [
     )
 
     g.add_edge(
-        3,
+        "FOOOOOO",
         4,
         **{
             "$edge-routing-mode": routing,
             "$edge-segment-drawing-mode": drawing,
             "$end-arrow-tip": ArrowTip.ARROW,
-            "$start-magnet": Magnet.TOP,
+            "$start-port": "c",
             "$end-magnet": Magnet.BOTTOM,
             "$style": Style(color="green"),
         }
