@@ -1,4 +1,5 @@
 import uuid
+from netext.geometry.magnet import Magnet
 from netext.rendering.segment_buffer import Reference
 from netext.textual.widget import GraphView
 from textual import events
@@ -109,7 +110,11 @@ class MainScreen(Screen):
         g.add_node(
             node_uuid,
             g.to_graph_coordinates(Offset(x, y)),
-            data={"title": "Untitled New Node", "$content-renderer": _render},
+            data={
+                "title": "Untitled New Node",
+                "$content-renderer": _render,
+                "$ports": {"a": {"magnet": Magnet.LEFT, "label": "A"}},
+            },
         )
         self.edit_node_label(node_uuid)
 

@@ -322,9 +322,15 @@ class ConsoleGraph(Generic[G]):
         self.node_buffers[node].center = position_view_space
 
         lod = determine_lod(data, zoom_factor)
-        return self._render_node_buffer_current_lod(
+        result = self._render_node_buffer_current_lod(
             node, data, lod, position_view_space, force_edge_rerender
         )
+
+        self._determine_port_positions(node, lod=1, data=data)
+        self._determine_port_positions(node, lod=lod, data=data)
+        self._render_port_buffer_for_node_current_lod(node)
+
+        return result
 
     def add_node(
         self,
@@ -346,7 +352,24 @@ class ConsoleGraph(Generic[G]):
             data = dict()
 
         self._nx_graph.add_node(node, **data)
-        self.node_buffers[node] = rasterize_node(self.console, node, data)
+
+        for current_port_name, port_settings in sorted(
+            data.get("$ports", {}).items(), key=lambda x: x[1].get("key", 0)
+        ):
+            port_magnet = port_settings.get("magnet", Magnet.LEFT)
+
+            if port_magnet == Magnet.CENTER or port_magnet == Magnet.CLOSEST:
+                port_magnet = Magnet.LEFT
+            port_side = ShapeSide(port_magnet.value)
+            self.port_sides[node][current_port_name] = port_side
+            self.port_side_assignments[node][port_side].append(current_port_name)
+
+        self.node_buffers[node] = rasterize_node(
+            self.console,
+            node,
+            data,
+            port_side_assignments=self.port_side_assignments[node],
+        )
 
         if position is not None:
             # We add a new node and first need to transform the point from the buffer space to the not zoomed
@@ -476,8 +499,11 @@ class ConsoleGraph(Generic[G]):
         node_buffer_1_lod = self.node_buffers.pop(node)
         node_buffer_current_lod = self.node_buffers_current_lod.pop(node)
 
+        self.port_buffers_current_lod.pop(node)
+
         for lod in self.node_buffers_per_lod.keys():
             self.node_buffers_per_lod[lod].pop(node, None)
+            self.port_buffers_per_lod[lod].pop(node, None)
 
         if node_buffer_1_lod is not None:
             self.node_idx_1_lod.delete(node_buffer_1_lod)
@@ -548,7 +574,12 @@ class ConsoleGraph(Generic[G]):
 
             self._nx_graph.nodes[node].update(new_data)
             old_position = self.node_buffers[node].center
-            new_node = rasterize_node(self.console, node, new_data)
+            new_node = rasterize_node(
+                self.console,
+                node,
+                new_data,
+                port_side_assignments=self.port_side_assignments[node],
+            )
             old_node = self.node_buffers[node]
             new_node.center = old_position
             self.node_buffers[node] = new_node
@@ -974,6 +1005,8 @@ class ConsoleGraph(Generic[G]):
                 lod=lod,
                 port_side_assignments=self.port_side_assignments[node],
             )
+            if lod == 1:
+                self.node_buffers[node] = node_buffer
             self.node_buffers_per_lod[lod][node] = node_buffer
             force_edge_rerender = True
         # Node moved, we need to re-render the edges
@@ -1074,15 +1107,24 @@ class ConsoleGraph(Generic[G]):
             )
 
         for node in self._nx_graph.nodes:
-            node_buffer = self.node_buffers_current_lod[node]
-            lod = determine_lod(self._nx_graph.nodes[node], self._zoom_factor)
-            self.port_buffers_per_lod[lod][node] = node_buffer.get_port_buffers(
-                self.console,
-                lod,
-                self.port_side_assignments[node],
-                self.port_sides[node],
+            self._render_port_buffer_for_node_current_lod(node)
+
+    def _render_port_buffer_for_node_current_lod(self, node):
+        if self._zoom_factor is None:
+            raise RuntimeError(
+                "Invalid transition, lod buffers can only be rendered once zoom is"
+                " computed."
             )
-            self.port_buffers_current_lod[node] = self.port_buffers_per_lod[lod][node]
+
+        node_buffer = self.node_buffers_current_lod[node]
+        lod = determine_lod(self._nx_graph.nodes[node], self._zoom_factor)
+        self.port_buffers_per_lod[lod][node] = node_buffer.get_port_buffers(
+            self.console,
+            lod,
+            self.port_side_assignments[node],
+            self.port_sides[node],
+        )
+        self.port_buffers_current_lod[node] = self.port_buffers_per_lod[lod][node]
 
     def _unconstrained_lod_1_viewport(self) -> Region:
         return Region.union([buffer.region for buffer in self._all_lod_1_buffers()])

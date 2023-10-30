@@ -466,8 +466,6 @@ class NodeBuffer(ShapeBuffer):
             return self.port_positions[lod][port_name]
 
         port_index = ports_on_side.index(port_name)
-        print(f"{port_name} {port_index} {ports_on_side}")
-        print(self.height)
 
         # TODO 1 is a special case, port should be centered
         if len(ports_on_side) == 1:
@@ -482,8 +480,6 @@ class NodeBuffer(ShapeBuffer):
                 port_offset = math.ceil(
                     (float(port_index) / (len(ports_on_side) - 1)) * (self.height - 3)
                 ) - math.floor((self.height - 2) / 2)
-
-        print(port_offset)
 
         # The magnet has been derived from the shape side, so it's determined and the target point
         # does not matter
