@@ -327,7 +327,6 @@ class ConsoleGraph(Generic[G]):
         )
 
         self._determine_port_positions(node, lod=1, data=data)
-        self._determine_port_positions(node, lod=lod, data=data)
         self._render_port_buffer_for_node_current_lod(node)
 
         return result
@@ -457,22 +456,23 @@ class ConsoleGraph(Generic[G]):
         edge_layout = self.edge_layouts_per_lod[edge_lod].get((u, v))
         label_nodes = self.label_buffers_per_lod[edge_lod].get((u, v))
 
-        if edge_buffer is None or edge_layout is None or label_nodes is None:
-            result = rasterize_edge(
-                self.console,
-                self.node_buffers_per_lod[u_lod][u],
-                self.node_buffers_per_lod[v_lod][v],
-                list(self.node_buffers_current_lod.values()),
-                list(self.edge_layouts_current_lod.values()),
-                data,
-                self.node_idx_current_lod,
-                self.edge_idx_current_lod,
-                edge_lod,
-                port_positions=self.port_positions,
-            )
+        # if edge_buffer is None or edge_layout is None or label_nodes is None:
+        # TODO: We only know how the edgebuffer looks here
+        result = rasterize_edge(
+            self.console,
+            self.node_buffers_per_lod[u_lod][u],
+            self.node_buffers_per_lod[v_lod][v],
+            list(self.node_buffers_current_lod.values()),
+            list(self.edge_layouts_current_lod.values()),
+            data,
+            self.node_idx_current_lod,
+            self.edge_idx_current_lod,
+            edge_lod,
+            port_positions=self.port_positions,
+        )
 
-            if result is not None:
-                edge_buffer, edge_layout, label_nodes = result
+        if result is not None:
+            edge_buffer, edge_layout, label_nodes = result
 
         if edge_buffer is not None:
             self.edge_idx_current_lod.insert(edge_buffer, edge_layout)
@@ -484,6 +484,9 @@ class ConsoleGraph(Generic[G]):
         if edge_layout is not None:
             self.edge_layouts_per_lod[edge_lod][(u, v)] = edge_layout
             self.edge_layouts_current_lod[(u, v)] = edge_layout
+
+        self._render_port_buffer_for_node_current_lod(u)
+        self._render_port_buffer_for_node_current_lod(v)
 
     def remove_node(self, node: Hashable) -> None:
         """Removes the specified node from the graph, along with any edges that are connected to it.
@@ -600,7 +603,9 @@ class ConsoleGraph(Generic[G]):
 
         data = cast(dict[str, Any], self._nx_graph.nodes(data=True)[node])
 
-        force_edge_rerender = force_edge_rerender or (position is not None)
+        force_edge_rerender = (
+            force_edge_rerender or (position is not None) or "$ports" in data
+        )
 
         affected_edges_or_break = self._position_and_render_node(
             node=node,
@@ -614,7 +619,6 @@ class ConsoleGraph(Generic[G]):
 
         self.node_idx_1_lod.update(self.node_buffers[node])
         self.node_idx_current_lod.update(self.node_buffers_current_lod[node])
-
         if force_edge_rerender:
             for u, v in affected_edges_or_break:
                 self.update_edge(u, v, self._nx_graph.edges[u, v], update_data=False)
@@ -696,6 +700,8 @@ class ConsoleGraph(Generic[G]):
 
         self.node_buffers[v].disconnect(u)
         self.node_buffers[u].disconnect(v)
+
+        del self.edge_layouts[(u, v)]
 
         result = rasterize_edge(
             self.console,
@@ -1014,7 +1020,7 @@ class ConsoleGraph(Generic[G]):
     ) -> list[tuple[Hashable, Hashable]]:
         affected_edges: list[tuple[Hashable, Hashable]] = []
         node_buffer = self.node_buffers_per_lod.get(lod, dict()).get(node)
-        if node_buffer is None:
+        if node_buffer is None or "$ports" in data:
             node_buffer = rasterize_node(
                 self.console,
                 node,
@@ -1026,7 +1032,7 @@ class ConsoleGraph(Generic[G]):
                 self.node_buffers[node] = node_buffer
             self.node_buffers_per_lod[lod][node] = node_buffer
             force_edge_rerender = True
-        # Node moved, we need to re-render the edges
+        # Node moved or we need to re-rennder because of some other reason
         if node_buffer.center != position or force_edge_rerender:
             node_buffer.center = position
             if lod in self.edge_buffers_per_lod:

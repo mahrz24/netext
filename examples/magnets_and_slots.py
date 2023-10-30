@@ -16,7 +16,7 @@ for routing, drawing in [
     g.add_node(
         "FOOOOOO",
         **{
-            "$x": 1,
+            "$x": 30,
             "$y": 1,
             "$ports": {
                 "a": {
@@ -90,5 +90,23 @@ for routing, drawing in [
             "$style": Style(color="green"),
         }
     )
+    g.add_node(5, **{"$x": -15, "$y": 5})  # FloatPoint(-15, 5))
 
-    print(ConsoleGraph(g, layout_engine=StaticLayout()))
+    cg = ConsoleGraph(g, layout_engine=StaticLayout())
+    print("Graph created")
+    cg.add_edge(
+        "FOOOOOO",
+        5,
+        {
+            "$edge-routing-mode": routing,
+            "$edge-segment-drawing-mode": drawing,
+            "$end-arrow-tip": ArrowTip.ARROW,
+            "$start-port": "e",
+            "$end-magnet": Magnet.TOP,
+            "$style": Style(color="green"),
+        },
+    )
+    # cg.update_node("FOOOOOO", data={"$style": Style(color="blue")})
+    cg.update_edge("FOOOOOO", 5, data={"$style": Style(color="blue")})
+
+    print(cg)
