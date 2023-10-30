@@ -90,6 +90,8 @@ class MainScreen(Screen):
                 data={"$style": Style(color="green")},
                 update_layout=False,
             )
+        if g._console_graph is not None:
+            self.log(g._console_graph.edge_buffers_current_lod)
 
         if old_value is not None and old_value.type == "node":
             g.update_node(old_value.ref, data={"$style": None})
@@ -113,7 +115,10 @@ class MainScreen(Screen):
             data={
                 "title": "Untitled New Node",
                 "$content-renderer": _render,
-                "$ports": {"a": {"magnet": Magnet.LEFT, "label": "A"}},
+                "$ports": {
+                    "in": {"magnet": Magnet.LEFT, "label": "IN"},
+                    "out": {"magnet": Magnet.RIGHT, "label": "OUT"},
+                },
             },
         )
         self.edit_node_label(node_uuid)
@@ -127,6 +132,8 @@ class MainScreen(Screen):
                 "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
                 "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
                 "$end-arrow-tip": ArrowTip.ARROW,
+                "$start-port": "out",
+                "$end-port": "in",
             },
         )
 

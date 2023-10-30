@@ -436,6 +436,7 @@ class ConsoleGraph(Generic[G]):
             self.node_idx_1_lod,
             self.edge_idx_1_lod,
             lod=1,
+            port_positions=self.port_positions,
         )
 
         if result is not None:
@@ -467,6 +468,7 @@ class ConsoleGraph(Generic[G]):
                 self.node_idx_current_lod,
                 self.edge_idx_current_lod,
                 edge_lod,
+                port_positions=self.port_positions,
             )
 
             if result is not None:
@@ -495,11 +497,18 @@ class ConsoleGraph(Generic[G]):
 
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
+        edges = list(self._nx_graph.edges())
+        for u, v in edges:
+            if u == node or v == node:
+                self.remove_edge(u, v)
+
         self.node_positions.pop(node)
         node_buffer_1_lod = self.node_buffers.pop(node)
         node_buffer_current_lod = self.node_buffers_current_lod.pop(node)
 
-        self.port_buffers_current_lod.pop(node)
+        self.port_buffers_current_lod.pop(node, None)
+        self.port_positions.pop(node, None)
+        self.port_side_assignments.pop(node, None)
 
         for lod in self.node_buffers_per_lod.keys():
             self.node_buffers_per_lod[lod].pop(node, None)
@@ -509,11 +518,6 @@ class ConsoleGraph(Generic[G]):
             self.node_idx_1_lod.delete(node_buffer_1_lod)
         if node_buffer_current_lod is not None:
             self.node_idx_current_lod.delete(node_buffer_current_lod)
-
-        edges = list(self._nx_graph.edges())
-        for u, v in edges:
-            if u == node or v == node:
-                self.remove_edge(u, v)
 
         self._nx_graph.remove_node(node)
 
@@ -529,6 +533,9 @@ class ConsoleGraph(Generic[G]):
         """
         self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
 
+        self.node_buffers[v].disconnect(u)
+        self.node_buffers[u].disconnect(v)
+
         self._nx_graph.remove_edge(u, v)
         edge_buffer_1_lod = self.edge_buffers.pop((u, v))
         edge_buffer_current_lod = self.edge_buffers_current_lod.pop((u, v))
@@ -540,6 +547,9 @@ class ConsoleGraph(Generic[G]):
             self.edge_idx_1_lod.delete(edge_buffer_1_lod)
         if edge_buffer_current_lod is not None:
             self.edge_idx_current_lod.delete(edge_buffer_current_lod)
+
+        self._render_port_buffer_for_node_current_lod(u)
+        self._render_port_buffer_for_node_current_lod(v)
 
     def update_node(
         self,
@@ -684,6 +694,9 @@ class ConsoleGraph(Generic[G]):
         if not update_layout:
             old_edge_layout = self.edge_layouts.get((u, v))
 
+        self.node_buffers[v].disconnect(u)
+        self.node_buffers[u].disconnect(v)
+
         result = rasterize_edge(
             self.console,
             self.node_buffers[u],
@@ -695,6 +708,7 @@ class ConsoleGraph(Generic[G]):
             self.edge_idx_1_lod,
             lod=1,
             edge_layout=old_edge_layout,
+            port_positions=self.port_positions,
         )
 
         if result is not None:
@@ -726,7 +740,10 @@ class ConsoleGraph(Generic[G]):
             self.edge_idx_current_lod,
             edge_lod,
             edge_layout=old_edge_layout,
+            port_positions=self.port_positions,
         )
+        self._render_port_buffer_for_node_current_lod(u)
+        self._render_port_buffer_for_node_current_lod(v)
 
         if result is not None:
             edge_buffer, edge_layout, label_nodes = result
@@ -997,7 +1014,7 @@ class ConsoleGraph(Generic[G]):
     ) -> list[tuple[Hashable, Hashable]]:
         affected_edges: list[tuple[Hashable, Hashable]] = []
         node_buffer = self.node_buffers_per_lod.get(lod, dict()).get(node)
-        if node_buffer is None or "$ports" in data:
+        if node_buffer is None:
             node_buffer = rasterize_node(
                 self.console,
                 node,

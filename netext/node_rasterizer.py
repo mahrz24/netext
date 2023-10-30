@@ -382,7 +382,9 @@ class NodeBuffer(ShapeBuffer):
         default_factory=lambda: defaultdict(list)
     )
 
-    connected_ports: list[str] = field(default_factory=list)
+    connected_ports: dict[str, list[Hashable]] = field(
+        default_factory=lambda: defaultdict(list)
+    )
 
     @property
     def reference(self) -> Reference | None:
@@ -492,9 +494,14 @@ class NodeBuffer(ShapeBuffer):
 
         return start, start_helper
 
-    def connect_port(self, port_name: str):
+    def connect_port(self, port_name: str, node: Hashable):
         # TODO check
-        self.connected_ports.append(port_name)
+        self.connected_ports[port_name].append(node)
+
+    def disconnect(self, node: Hashable):
+        for port_name in self.connected_ports.keys():
+            if node in self.connected_ports[port_name]:
+                self.connected_ports[port_name].remove(node)
 
     def get_port_buffers(
         self,
