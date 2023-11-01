@@ -31,8 +31,8 @@ class RenderState(Enum):
     INITIAL = "initial"
     """The initial state, no rendering has happened yet."""
 
-    NODE_BUFFERS_RENDERED_1_LOD = "node_buffers_rendered_1_lod"
-    """The node buffers have been rendered for 1 lod."""
+    NODE_BUFFERS_RENDERED_FOR_LAYOUT = "node_buffers_rendered_for_layout"
+    """The node buffers have been rendered for layout."""
 
     NODE_LAYOUT_COMPUTED = "node_layout_computed"
     """The node layout has been computed."""
@@ -40,25 +40,22 @@ class RenderState(Enum):
     ZOOMED_POSITIONS_COMPUTED = "zoomed_positions_computed"
     """The zoomed node positions have been computed."""
 
-    EDGES_RENDERED_1_LOD = "edges_rendered_1_lod"
-    """The edges have been rendered for 1 lod."""
-
-    NODE_BUFFERS_RENDERED_CURRENT_LOD = "node_buffers_rendered_current_lod"
+    NODE_BUFFERS_RENDERED = "node_buffers_rendered"
     """The node buffers have ben rendered for the current lod."""
 
-    EDGES_RENDERED_CURRENT_LOD = "edges_rendered_current_lod"
-    """The edges have ben rendered for the current lod."""
+    EDGES_RENDERED = "edges_rendered"
+    """The edges have been rendered for the current lod."""
 
 
 transition_graph = nx.DiGraph()
 
 transition_graph.add_edge(
     RenderState.INITIAL,
-    RenderState.NODE_BUFFERS_RENDERED_1_LOD,
-    transition="render_node_buffers_1_lod",
+    RenderState.NODE_BUFFERS_RENDERED_FOR_LAYOUT,
+    transition="render_node_buffers_for_layout",
 )
 transition_graph.add_edge(
-    RenderState.NODE_BUFFERS_RENDERED_1_LOD,
+    RenderState.NODE_BUFFERS_RENDERED_FOR_LAYOUT,
     RenderState.NODE_LAYOUT_COMPUTED,
     transition="compute_node_layout",
 )
@@ -69,18 +66,14 @@ transition_graph.add_edge(
 )
 transition_graph.add_edge(
     RenderState.ZOOMED_POSITIONS_COMPUTED,
-    RenderState.EDGES_RENDERED_1_LOD,
-    transition="render_edges_1_lod",
+    RenderState.NODE_BUFFERS_RENDERED,
+    transition="render_node_buffers",
 )
+
 transition_graph.add_edge(
-    RenderState.EDGES_RENDERED_1_LOD,
-    RenderState.NODE_BUFFERS_RENDERED_CURRENT_LOD,
-    transition="render_node_buffers_current_lod",
-)
-transition_graph.add_edge(
-    RenderState.NODE_BUFFERS_RENDERED_CURRENT_LOD,
-    RenderState.EDGES_RENDERED_CURRENT_LOD,
-    transition="render_edges_current_lod",
+    RenderState.NODE_BUFFERS_RENDERED,
+    RenderState.EDGES_RENDERED,
+    transition="render_edges",
 )
 
 
@@ -147,42 +140,17 @@ class ConsoleGraph(Generic[G]):
         self.layout_engine: LayoutEngine[G] = layout_engine
         self._nx_graph: G = cast(G, graph.copy())
 
+        self.node_buffers_for_layout: dict[Hashable, NodeBuffer] = dict()
         self.node_buffers: dict[Hashable, NodeBuffer] = dict()
-        self.node_buffers_per_lod: dict[int, dict[Hashable, NodeBuffer]] = defaultdict(
-            dict
-        )
-        self.node_buffers_current_lod: dict[Hashable, NodeBuffer] = dict()
 
-        self.port_buffers_per_lod: dict[
-            int, dict[Hashable, list[StripBuffer]]
-        ] = defaultdict(dict)
-        self.port_buffers_current_lod: dict[Hashable, list[StripBuffer]] = dict()
+        self.port_buffers: dict[Hashable, list[StripBuffer]] = dict()
 
         self.node_positions: dict[Hashable, FloatPoint] = dict()
 
         self.edge_buffers: dict[tuple[Hashable, Hashable], EdgeBuffer] = dict()
-        self.edge_buffers_per_lod: dict[
-            int, dict[tuple[Hashable, Hashable], EdgeBuffer]
-        ] = defaultdict(dict)
-        self.edge_buffers_current_lod: dict[
-            tuple[Hashable, Hashable], EdgeBuffer
-        ] = dict()
-
         self.edge_layouts: dict[tuple[Hashable, Hashable], EdgeLayout] = dict()
-        self.edge_layouts_per_lod: dict[
-            int, dict[tuple[Hashable, Hashable], EdgeLayout]
-        ] = defaultdict(dict)
-        self.edge_layouts_current_lod: dict[
-            tuple[Hashable, Hashable], EdgeLayout
-        ] = dict()
 
         self.label_buffers: dict[tuple[Hashable, Hashable], list[StripBuffer]] = dict()
-        self.label_buffers_per_lod: dict[
-            int, dict[tuple[Hashable, Hashable], list[StripBuffer]]
-        ] = defaultdict(dict)
-        self.label_buffers_current_lod: dict[
-            tuple[Hashable, Hashable], list[StripBuffer]
-        ] = dict()
 
         self.port_side_assignments: dict[
             Hashable, dict[ShapeSide, list[str]]
@@ -192,11 +160,8 @@ class ConsoleGraph(Generic[G]):
             Hashable, dict[str, tuple[Point, Point | None]]
         ] = defaultdict(dict)
 
-        self.node_idx_1_lod: BufferIndex[NodeBuffer, None] = BufferIndex()
-        self.edge_idx_1_lod: BufferIndex[EdgeBuffer, EdgeLayout] = BufferIndex()
-
-        self.node_idx_current_lod: BufferIndex[NodeBuffer, None] = BufferIndex()
-        self.edge_idx_current_lod: BufferIndex[EdgeBuffer, EdgeLayout] = BufferIndex()
+        self.node_idx: BufferIndex[NodeBuffer, None] = BufferIndex()
+        self.edge_idx: BufferIndex[EdgeBuffer, EdgeLayout] = BufferIndex()
 
     def _require(self, required_state: RenderState):
         if required_state in nx.descendants(transition_graph, self._render_state):
@@ -287,7 +252,6 @@ class ConsoleGraph(Generic[G]):
         node: Hashable,
         position: FloatPoint | None,
         data: dict[str, Any],
-        force_edge_rerender: bool = False,
     ) -> list[tuple[Hashable, Hashable]] | None:
         if position is None:
             node_position = self.node_positions[node]
@@ -322,12 +286,10 @@ class ConsoleGraph(Generic[G]):
         self.node_buffers[node].center = position_view_space
 
         lod = determine_lod(data, zoom_factor)
-        result = self._render_node_buffer_current_lod(
-            node, data, lod, position_view_space, force_edge_rerender
-        )
+        result = self._render_node_buffer_for_lod(node, data, lod, position_view_space)
 
         self._determine_port_positions(node, lod=1, data=data)
-        self._render_port_buffer_for_node_current_lod(node)
+        self._render_port_buffer_for_node(node)
 
         return result
 
@@ -345,7 +307,7 @@ class ConsoleGraph(Generic[G]):
                 space coordinates.
             data (dict[str, Any] | None): The data and attributes of the node.
         """
-        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
+        self._require(RenderState.EDGES_RENDERED)
 
         if data is None:
             data = dict()
@@ -377,15 +339,13 @@ class ConsoleGraph(Generic[G]):
                 node=node,
                 position=position,
                 data=data,
-                force_edge_rerender=False,
             )
             if do_continue is None:
                 return
 
-            self.node_idx_1_lod.insert(self.node_buffers[node])
-            self.node_idx_current_lod.insert(self.node_buffers_current_lod[node])
+            self.node_idx.insert(self.node_buffers[node])
         else:
-            self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_1_LOD)
+            self._reset_render_state(RenderState.ZOOMED_POSITIONS_COMPUTED)
 
     def add_edge(
         self, u: Hashable, v: Hashable, data: dict[str, Any] | None = None
@@ -401,7 +361,7 @@ class ConsoleGraph(Generic[G]):
             ValueError: Raised if one of the edges does not exist in the graph.
         """
 
-        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
+        self._require(RenderState.EDGES_RENDERED)
 
         edge_buffer: EdgeBuffer | None = None
         edge_layout: EdgeLayout | None = None
@@ -425,6 +385,8 @@ class ConsoleGraph(Generic[G]):
 
         self._nx_graph.add_edge(u, v, **data)
 
+        edge_lod = determine_lod(data, self._zoom_factor)
+
         result = rasterize_edge(
             self.console,
             self.node_buffers[u],
@@ -432,41 +394,8 @@ class ConsoleGraph(Generic[G]):
             list(self.node_buffers.values()),
             list(self.edge_layouts.values()),
             data,
-            self.node_idx_1_lod,
-            self.edge_idx_1_lod,
-            lod=1,
-            port_positions=self.port_positions,
-        )
-
-        if result is not None:
-            edge_buffer, edge_layout, label_nodes = result
-
-            self.edge_idx_1_lod.insert(edge_buffer, edge_layout)
-
-            self.edge_buffers[(u, v)] = edge_buffer
-            self.edge_layouts[(u, v)] = edge_layout
-            self.label_buffers[(u, v)] = label_nodes
-
-        u_lod = determine_lod(self._nx_graph.nodes[u], self._zoom_factor)
-        v_lod = determine_lod(self._nx_graph.nodes[v], self._zoom_factor)
-
-        edge_lod = determine_lod(data, self._zoom_factor)
-
-        edge_buffer = self.edge_buffers_per_lod[edge_lod].get((u, v))
-        edge_layout = self.edge_layouts_per_lod[edge_lod].get((u, v))
-        label_nodes = self.label_buffers_per_lod[edge_lod].get((u, v))
-
-        # if edge_buffer is None or edge_layout is None or label_nodes is None:
-        # TODO: We only know how the edgebuffer looks here
-        result = rasterize_edge(
-            self.console,
-            self.node_buffers_per_lod[u_lod][u],
-            self.node_buffers_per_lod[v_lod][v],
-            list(self.node_buffers_current_lod.values()),
-            list(self.edge_layouts_current_lod.values()),
-            data,
-            self.node_idx_current_lod,
-            self.edge_idx_current_lod,
+            self.node_idx,
+            self.edge_idx,
             edge_lod,
             port_positions=self.port_positions,
         )
@@ -475,18 +404,15 @@ class ConsoleGraph(Generic[G]):
             edge_buffer, edge_layout, label_nodes = result
 
         if edge_buffer is not None:
-            self.edge_idx_current_lod.insert(edge_buffer, edge_layout)
-            self.edge_buffers_per_lod[edge_lod][(u, v)] = edge_buffer
-            self.edge_buffers_current_lod[(u, v)] = edge_buffer
+            self.edge_idx.insert(edge_buffer, edge_layout)
+            self.edge_buffers[(u, v)] = edge_buffer
         if label_nodes is not None:
-            self.label_buffers_current_lod[(u, v)] = label_nodes
-            self.label_buffers_per_lod[edge_lod][(u, v)] = label_nodes
+            self.label_buffers[(u, v)] = label_nodes
         if edge_layout is not None:
-            self.edge_layouts_per_lod[edge_lod][(u, v)] = edge_layout
-            self.edge_layouts_current_lod[(u, v)] = edge_layout
+            self.edge_layouts[(u, v)] = edge_layout
 
-        self._render_port_buffer_for_node_current_lod(u)
-        self._render_port_buffer_for_node_current_lod(v)
+        self._render_port_buffer_for_node(u)
+        self._render_port_buffer_for_node(v)
 
     def remove_node(self, node: Hashable) -> None:
         """Removes the specified node from the graph, along with any edges that are connected to it.
@@ -498,7 +424,7 @@ class ConsoleGraph(Generic[G]):
             None
         """
 
-        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
+        self._require(RenderState.EDGES_RENDERED)
 
         edges = list(self._nx_graph.edges())
         for u, v in edges:
@@ -506,21 +432,15 @@ class ConsoleGraph(Generic[G]):
                 self.remove_edge(u, v)
 
         self.node_positions.pop(node)
-        node_buffer_1_lod = self.node_buffers.pop(node)
-        node_buffer_current_lod = self.node_buffers_current_lod.pop(node)
+        self.node_buffers_for_layout.pop(node)
+        node_buffer = self.node_buffers.pop(node)
 
-        self.port_buffers_current_lod.pop(node, None)
+        self.port_buffers.pop(node, None)
         self.port_positions.pop(node, None)
         self.port_side_assignments.pop(node, None)
 
-        for lod in self.node_buffers_per_lod.keys():
-            self.node_buffers_per_lod[lod].pop(node, None)
-            self.port_buffers_per_lod[lod].pop(node, None)
-
-        if node_buffer_1_lod is not None:
-            self.node_idx_1_lod.delete(node_buffer_1_lod)
-        if node_buffer_current_lod is not None:
-            self.node_idx_current_lod.delete(node_buffer_current_lod)
+        if node_buffer is not None:
+            self.node_idx.delete(node_buffer)
 
         self._nx_graph.remove_node(node)
 
@@ -534,25 +454,18 @@ class ConsoleGraph(Generic[G]):
         Returns:
             None
         """
-        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
+        self._require(RenderState.EDGES_RENDERED)
 
         self.node_buffers[v].disconnect(u)
         self.node_buffers[u].disconnect(v)
 
         self._nx_graph.remove_edge(u, v)
-        edge_buffer_1_lod = self.edge_buffers.pop((u, v))
-        edge_buffer_current_lod = self.edge_buffers_current_lod.pop((u, v))
 
-        for lod in self.edge_buffers_per_lod.keys():
-            self.edge_buffers_per_lod[lod].pop((u, v), None)
+        edge_buffer = self.edge_buffers.pop((u, v))
+        self.edge_idx.delete(edge_buffer)
 
-        if edge_buffer_1_lod is not None:
-            self.edge_idx_1_lod.delete(edge_buffer_1_lod)
-        if edge_buffer_current_lod is not None:
-            self.edge_idx_current_lod.delete(edge_buffer_current_lod)
-
-        self._render_port_buffer_for_node_current_lod(u)
-        self._render_port_buffer_for_node_current_lod(v)
+        self._render_port_buffer_for_node(u)
+        self._render_port_buffer_for_node(v)
 
     def update_node(
         self,
@@ -572,7 +485,7 @@ class ConsoleGraph(Generic[G]):
         Returns:
             None
         """
-        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
+        self._require(RenderState.EDGES_RENDERED)
         force_edge_rerender = False
 
         if data is None and position is None:
@@ -608,19 +521,17 @@ class ConsoleGraph(Generic[G]):
         )
 
         affected_edges_or_break = self._position_and_render_node(
-            node=node,
-            position=position,
-            data=data,
-            force_edge_rerender=force_edge_rerender,
+            node=node, position=position, data=data
         )
 
         if affected_edges_or_break is None:
             return
 
-        self.node_idx_1_lod.update(self.node_buffers[node])
-        self.node_idx_current_lod.update(self.node_buffers_current_lod[node])
+        self.node_idx.update(self.node_buffers[node])
         if force_edge_rerender:
             for u, v in affected_edges_or_break:
+                self.edge_buffers.pop((u, v), None)
+                self.label_buffers.pop((u, v), None)
                 self.update_edge(u, v, self._nx_graph.edges[u, v], update_data=False)
 
     def to_graph_coordinates(self, p: Point) -> FloatPoint:
@@ -678,7 +589,7 @@ class ConsoleGraph(Generic[G]):
             None
 
         """
-        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
+        self._require(RenderState.EDGES_RENDERED)
 
         # This should not happen as we require the render state to have zoomed positions computed.
         if self._zoom_factor is None:
@@ -703,6 +614,8 @@ class ConsoleGraph(Generic[G]):
 
         del self.edge_layouts[(u, v)]
 
+        edge_lod = determine_lod(data, self._zoom_factor)
+
         result = rasterize_edge(
             self.console,
             self.node_buffers[u],
@@ -710,76 +623,42 @@ class ConsoleGraph(Generic[G]):
             list(self.node_buffers.values()),
             list(self.edge_layouts.values()),
             data,
-            self.node_idx_1_lod,
-            self.edge_idx_1_lod,
-            lod=1,
-            edge_layout=old_edge_layout,
-            port_positions=self.port_positions,
-        )
-
-        if result is not None:
-            edge_buffer, edge_layout, label_nodes = result
-
-            self.edge_idx_1_lod.insert(edge_buffer, edge_layout)
-
-            self.edge_buffers[(u, v)] = edge_buffer
-            self.edge_layouts[(u, v)] = edge_layout
-            self.label_buffers[(u, v)] = label_nodes
-
-        u_lod = determine_lod(self._nx_graph.nodes[u], self._zoom_factor)
-        v_lod = determine_lod(self._nx_graph.nodes[v], self._zoom_factor)
-
-        edge_lod = determine_lod(data, self._zoom_factor)
-
-        old_edge_layout = None
-        if not update_layout:
-            old_edge_layout = self.edge_layouts_current_lod.get((u, v))
-
-        result = rasterize_edge(
-            self.console,
-            self.node_buffers_per_lod[u_lod][u],
-            self.node_buffers_per_lod[v_lod][v],
-            list(self.node_buffers_current_lod.values()),
-            list(self.edge_layouts_current_lod.values()),
-            data,
-            self.node_idx_current_lod,
-            self.edge_idx_current_lod,
+            self.node_idx,
+            self.edge_idx,
             edge_lod,
             edge_layout=old_edge_layout,
             port_positions=self.port_positions,
         )
-        self._render_port_buffer_for_node_current_lod(u)
-        self._render_port_buffer_for_node_current_lod(v)
+        self._render_port_buffer_for_node(u)
+        self._render_port_buffer_for_node(v)
 
         if result is not None:
             edge_buffer, edge_layout, label_nodes = result
         if edge_buffer is not None:
-            self.edge_idx_current_lod.update(edge_buffer, edge_layout)
-            self.edge_buffers_per_lod[edge_lod][(u, v)] = edge_buffer
-            self.edge_buffers_current_lod[(u, v)] = edge_buffer
+            self.edge_idx.update(edge_buffer, edge_layout)
+            self.edge_buffers[(u, v)] = edge_buffer
         if label_nodes is not None:
-            self.label_buffers_current_lod[(u, v)] = label_nodes
-            self.label_buffers_per_lod[edge_lod][(u, v)] = label_nodes
+            self.label_buffers[(u, v)] = label_nodes
         if edge_layout is not None:
-            self.edge_layouts_per_lod[edge_lod][(u, v)] = edge_layout
-            self.edge_layouts_current_lod[(u, v)] = edge_layout
+            self.edge_layouts[(u, v)] = edge_layout
 
     def layout(self) -> None:
-        self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_1_LOD)
+        self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_FOR_LAYOUT)
 
-    def _transition_render_node_buffers_1_lod(self) -> None:
+    def _transition_render_node_buffers_for_layout(self) -> None:
         # First we create the node buffers, this allows us to pass the sizing information to the
         # layout engine. For each node in the graph we generate a node buffer that contains the
         # segments to render the node and metadata where to place the buffer.
-        self.node_buffers = {
+        self.node_buffers_for_layout = {
             node: rasterize_node(self.console, node, cast(dict[str, Any], data))
             for node, data in self._nx_graph.nodes(data=True)
         }
-        self.node_buffers_per_lod[1] = self.node_buffers
 
     def _transition_compute_node_layout(self) -> None:
         # Store the node buffers in the graph itself
-        nx.set_node_attributes(self._nx_graph, self.node_buffers, "_netext_node_buffer")
+        nx.set_node_attributes(
+            self._nx_graph, self.node_buffers_for_layout, "_netext_node_buffer"
+        )
 
         # Position the nodes and store these original positions
         self.node_positions = self.layout_engine(self._nx_graph)
@@ -806,10 +685,11 @@ class ConsoleGraph(Generic[G]):
             }
 
         for node, position in self.node_positions.items():
-            self.node_buffers[node].center = Point(
+            self.node_buffers_for_layout[node].center = Point(
                 x=round(position.x), y=round(position.y)
             )
 
+        # TODO Split off into own step
         for node, data in self._nx_graph.nodes(data=True):
             if "$ports" in data:
                 for current_port_name, port_settings in sorted(
@@ -872,10 +752,10 @@ class ConsoleGraph(Generic[G]):
 
             # Compute the zoom value for both axes
             max_buffer_width = max(
-                [buffer.width for buffer in self.node_buffers.values()]
+                [buffer.width for buffer in self.node_buffers_for_layout.values()]
             )
             max_buffer_height = max(
-                [buffer.height for buffer in self.node_buffers.values()]
+                [buffer.height for buffer in self.node_buffers_for_layout.values()]
             )
 
             max_width = (max_node_x - min_node_x) + max_buffer_width + 2
@@ -909,71 +789,7 @@ class ConsoleGraph(Generic[G]):
             zoom_y = 1
         return zoom_x, zoom_y
 
-    def _transition_render_edges_1_lod(self) -> None:
-        if self._zoom_factor is None:
-            raise RuntimeError(
-                "Invalid transition, edges can only be rendered once zoom is computed."
-            )
-
-        self.edge_buffers = dict()
-        self.label_buffers = dict()
-        self.edge_layouts = dict()
-
-        self.edge_buffers_per_lod = dict()
-        self.edge_buffers_current_lod = dict()
-
-        self.label_buffers_per_lod = dict()
-        self.label_buffers_current_lod = dict()
-
-        self.edge_layouts_per_lod = dict()
-        self.edge_layouts_current_lod = dict()
-
-        # Iterate over all edges (so far in no particular order)
-        self.node_idx_1_lod.reset()
-        self.edge_idx_1_lod.reset()
-
-        # Make sure we use the lod 1 positions:
-        for node, node_buffer in self.node_buffers.items():
-            node_buffer.center = Point(
-                x=round(self.node_positions[node].x),
-                y=round(self.node_positions[node].y),
-            )
-
-        all_node_buffers = []
-        for i, (node, node_buffer) in enumerate(self.node_buffers.items()):
-            self.node_idx_1_lod.insert(node_buffer)
-            all_node_buffers.append(node_buffer)
-
-        # These are needed for the edges also on lod=1
-        for node, data in self._nx_graph.nodes(data=True):
-            self._determine_port_positions(node, lod=1, data=data)
-
-        for u, v, data in self._nx_graph.edges(data=True):
-            result = rasterize_edge(
-                self.console,
-                self.node_buffers[u],
-                self.node_buffers[v],
-                all_node_buffers,
-                list(self.edge_layouts.values()),
-                data,
-                self.node_idx_1_lod,
-                self.edge_idx_1_lod,
-                lod=1,
-                port_positions=self.port_positions,
-            )
-            if result is not None:
-                edge_buffer, edge_layout, label_nodes = result
-                self.edge_idx_1_lod.insert(edge_buffer, edge_layout)
-
-                self.edge_buffers[(u, v)] = edge_buffer
-                self.edge_layouts[(u, v)] = edge_layout
-                self.label_buffers[(u, v)] = label_nodes
-
-        self.edge_buffers_per_lod[1] = self.edge_buffers
-        self.edge_layouts_per_lod[1] = self.edge_layouts
-        self.label_buffers_per_lod[1] = self.label_buffers
-
-    def _transition_render_node_buffers_current_lod(self) -> None:
+    def _transition_render_node_buffers(self) -> None:
         if self._zoom_factor is None:
             raise RuntimeError(
                 "Invalid transition, lod buffers can only be rendered once zoom is"
@@ -990,7 +806,7 @@ class ConsoleGraph(Generic[G]):
                 round(position.x * self.zoom_x), round(position.y * self.zoom_y)
             )
 
-            self._render_node_buffer_current_lod(node, data, lod, position_view_space)
+            self._render_node_buffer_for_lod(node, data, lod, position_view_space)
             self._determine_port_positions(node, lod, data)
 
     def _determine_port_positions(self, node: Hashable, lod: int, data: dict[str, Any]):
@@ -1000,9 +816,7 @@ class ConsoleGraph(Generic[G]):
                 data.get("$ports", {}).items(), key=lambda x: x[1].get("key", 0)
             ):
                 port_side = self.port_sides[node][current_port_name]
-                pos, pos_helper = self.node_buffers_per_lod[lod][
-                    node
-                ].get_port_position(
+                pos, pos_helper = self.node_buffers[node].get_port_position(
                     port_name=current_port_name,
                     lod=lod,
                     port_side=port_side,
@@ -1010,53 +824,33 @@ class ConsoleGraph(Generic[G]):
                 )
                 self.port_positions[node][current_port_name] = (pos, pos_helper)
 
-    def _render_node_buffer_current_lod(
+    def _render_node_buffer_for_lod(
         self,
         node: Hashable,
         data: dict[str, Any],
         lod: int,
         position: Point,
-        force_edge_rerender: bool = False,
     ) -> list[tuple[Hashable, Hashable]]:
         affected_edges: list[tuple[Hashable, Hashable]] = []
-        node_buffer = self.node_buffers_per_lod.get(lod, dict()).get(node)
-        if node_buffer is None or "$ports" in data:
-            node_buffer = rasterize_node(
-                self.console,
-                node,
-                data,
-                lod=lod,
-                port_side_assignments=self.port_side_assignments[node],
-            )
-            if lod == 1:
-                self.node_buffers[node] = node_buffer
-            self.node_buffers_per_lod[lod][node] = node_buffer
-            force_edge_rerender = True
-        # Node moved or we need to re-rennder because of some other reason
-        if node_buffer.center != position or force_edge_rerender:
-            node_buffer.center = position
-            if lod in self.edge_buffers_per_lod:
-                for v in nx.all_neighbors(self._nx_graph, node):
-                    if (node, v) in self.edge_buffers_per_lod[lod]:
-                        affected_edges.append((node, v))
-                    if (v, node) in self.edge_buffers_per_lod[lod]:
-                        affected_edges.append((v, node))
 
-                    self.edge_buffers_per_lod[lod].pop((node, v), None)
-                    self.edge_buffers_per_lod[lod].pop((v, node), None)
-                    self.label_buffers_per_lod[lod].pop((node, v), None)
-                    self.label_buffers_per_lod[lod].pop((v, node), None)
+        node_buffer = rasterize_node(
+            self.console,
+            node,
+            data,
+            lod=lod,
+            port_side_assignments=self.port_side_assignments[node],
+        )
+        node_buffer.center = position
+        self.node_buffers[node] = node_buffer
 
-                    self.edge_buffers_current_lod.pop((node, v), None)
-                    self.edge_buffers_current_lod.pop((v, node), None)
-                    self.label_buffers_current_lod.pop((node, v), None)
-                    self.label_buffers_current_lod.pop((v, node), None)
-
-        self.node_buffers_current_lod[node] = node_buffer
-
+        for v in nx.all_neighbors(self._nx_graph, node):
+            if (node, v) in self.edge_buffers:
+                affected_edges.append((node, v))
+            if (v, node) in self.edge_buffers:
+                affected_edges.append((v, node))
         return affected_edges
 
-    def _transition_render_edges_current_lod(self) -> None:
+    def _transition_render_edges(self) -> None:
         if self._zoom_factor is None:
             raise RuntimeError(
                 "Invalid transition, lod buffers can only be rendered once zoom is"
@@ -1066,63 +860,49 @@ class ConsoleGraph(Generic[G]):
         # Now we rasterize the edges
 
         # Iterate over all edges (so far in no particular order)
-        self.node_idx_current_lod.reset()
-        self.edge_idx_current_lod.reset()
+        self.node_idx.reset()
+        self.edge_idx.reset()
 
         edge_layouts: list[EdgeLayout] = []
 
         all_node_buffers = []
-        for _, node_buffer in self.node_buffers_current_lod.items():
-            self.node_idx_current_lod.insert(node_buffer)
+        for _, node_buffer in self.node_buffers.items():
+            self.node_idx.insert(node_buffer)
             all_node_buffers.append(node_buffer)
 
         for u, v, data in self._nx_graph.edges(data=True):
-            u_lod = determine_lod(self._nx_graph.nodes[u], self._zoom_factor)
-            v_lod = determine_lod(self._nx_graph.nodes[v], self._zoom_factor)
-
             edge_lod = determine_lod(data, self._zoom_factor)
 
-            if edge_lod not in self.edge_buffers_per_lod:
-                self.edge_buffers_per_lod[edge_lod] = dict()
-                self.edge_layouts_per_lod[edge_lod] = dict()
-                self.label_buffers_per_lod[edge_lod] = dict()
+            result = rasterize_edge(
+                self.console,
+                self.node_buffers[u],
+                self.node_buffers[v],
+                all_node_buffers,
+                edge_layouts,
+                data,
+                self.node_idx,
+                self.edge_idx,
+                edge_lod,
+                port_positions=self.port_positions,
+            )
 
-            edge_buffer = self.edge_buffers_per_lod[edge_lod].get((u, v))
-            edge_layout = self.edge_layouts_per_lod[edge_lod].get((u, v))
-            label_nodes = self.label_buffers_per_lod[edge_lod].get((u, v))
-
-            if edge_buffer is None or label_nodes is None or edge_layout is None:
-                result = rasterize_edge(
-                    self.console,
-                    self.node_buffers_per_lod[u_lod][u],
-                    self.node_buffers_per_lod[v_lod][v],
-                    all_node_buffers,
-                    edge_layouts,
-                    data,
-                    self.node_idx_current_lod,
-                    self.edge_idx_current_lod,
-                    edge_lod,
-                    port_positions=self.port_positions,
-                )
-                if result is not None:
-                    edge_buffer, edge_layout, label_nodes = result
-                    self.edge_buffers_per_lod[edge_lod][(u, v)] = edge_buffer
-                    self.edge_layouts_per_lod[edge_lod][(u, v)] = edge_layout
-                    self.label_buffers_per_lod[edge_lod][(u, v)] = label_nodes
+            if result is not None:
+                edge_buffer, edge_layout, label_nodes = result
 
             if edge_buffer is not None:
-                self.edge_idx_current_lod.insert(edge_buffer, edge_layout)
-                self.edge_buffers_current_lod[(u, v)] = edge_buffer
+                self.edge_idx.insert(edge_buffer, edge_layout)
+                self.edge_buffers[(u, v)] = edge_buffer
             if label_nodes is not None:
-                self.label_buffers_current_lod[(u, v)] = label_nodes
+                self.label_buffers[(u, v)] = label_nodes
             if edge_layout is not None:
                 edge_layouts.append(edge_layout)
-                self.edge_layouts_current_lod[(u, v)] = edge_layout
+                self.edge_layouts[(u, v)] = edge_layout
 
         # Also render the port buffers now
-        self._render_port_buffers_current_lod()
+        # TODO move to its own step
+        self._render_port_buffers()
 
-    def _render_port_buffers_current_lod(self) -> None:
+    def _render_port_buffers(self) -> None:
         if self._zoom_factor is None:
             raise RuntimeError(
                 "Invalid transition, lod buffers can only be rendered once zoom is"
@@ -1130,29 +910,26 @@ class ConsoleGraph(Generic[G]):
             )
 
         for node in self._nx_graph.nodes:
-            self._render_port_buffer_for_node_current_lod(node)
+            self._render_port_buffer_for_node(node)
 
-    def _render_port_buffer_for_node_current_lod(self, node):
+    def _render_port_buffer_for_node(self, node):
         if self._zoom_factor is None:
             raise RuntimeError(
                 "Invalid transition, lod buffers can only be rendered once zoom is"
                 " computed."
             )
 
-        node_buffer = self.node_buffers_current_lod[node]
+        node_buffer = self.node_buffers[node]
         lod = determine_lod(self._nx_graph.nodes[node], self._zoom_factor)
-        self.port_buffers_per_lod[lod][node] = node_buffer.get_port_buffers(
+        self.port_buffers[node] = node_buffer.get_port_buffers(
             self.console,
             lod,
             self.port_side_assignments[node],
             self.port_sides[node],
         )
-        self.port_buffers_current_lod[node] = self.port_buffers_per_lod[lod][node]
 
-    def _unconstrained_lod_1_viewport(self) -> Region:
-        return Region.union([buffer.region for buffer in self._all_lod_1_buffers()])
-
-    def _all_lod_1_buffers(self) -> Iterable[StripBuffer]:
+    def _all_buffers(self) -> Iterable[StripBuffer]:
+        self._require(RenderState.EDGES_RENDERED)
         # Get graph subview
         visible_nodes = nx.subgraph_view(
             self._nx_graph,
@@ -1164,40 +941,21 @@ class ConsoleGraph(Generic[G]):
             for node, node_buffer in self.node_buffers.items()
             if node in visible_nodes
         ]
+
+        port_buffers = [
+            port_buffers
+            for node, port_buffers in self.port_buffers.items()
+            if node in visible_nodes
+        ]
         return chain(
             node_buffers,
             self.edge_buffers.values(),
             itertools.chain(*self.label_buffers.values()),
-        )
-
-    def _all_current_lod_buffers(self) -> Iterable[StripBuffer]:
-        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
-        # Get graph subview
-        visible_nodes = nx.subgraph_view(
-            self._nx_graph,
-            filter_node=lambda n: self._nx_graph.nodes[n].get("$show", True),
-        )
-
-        node_buffers = [
-            node_buffer
-            for node, node_buffer in self.node_buffers_current_lod.items()
-            if node in visible_nodes
-        ]
-
-        port_buffers = [
-            port_buffers
-            for node, port_buffers in self.port_buffers_current_lod.items()
-            if node in visible_nodes
-        ]
-        return chain(
-            node_buffers,
-            self.edge_buffers_current_lod.values(),
-            itertools.chain(*self.label_buffers_current_lod.values()),
             itertools.chain(*port_buffers),
         )
 
     def _unconstrained_viewport(self) -> Region:
-        regions = [buffer.region for buffer in self._all_current_lod_buffers()]
+        regions = [buffer.region for buffer in self._all_buffers()]
 
         if not regions:
             return Region(0, 0, 0, 0)
@@ -1210,10 +968,10 @@ class ConsoleGraph(Generic[G]):
         self.max_width = options.max_width
         self.max_height = options.max_height
 
-        self._require(RenderState.EDGES_RENDERED_CURRENT_LOD)
+        self._require(RenderState.EDGES_RENDERED)
 
         strips, _ = render_buffers(
-            self._all_current_lod_buffers(),
+            self._all_buffers(),
             self.viewport,
         )
 

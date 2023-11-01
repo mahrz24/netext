@@ -860,8 +860,8 @@ def test_render_node_buffer(console):
         node=0,
         z_index=0,
         center=Point(x=1, y=1),
-        node_width=3,
-        node_height=3,
+        shape_width=3,
+        shape_height=3,
         strips=[
             Strip(segments=[Spacer(width=1), Segment("X")]),
             Strip(segments=[Segment("X X")]),
@@ -882,8 +882,8 @@ def test_render_node_buffer_with_spacers(console):
         node=0,
         z_index=0,
         center=Point(x=1, y=1),
-        node_width=3,
-        node_height=3,
+        shape_width=3,
+        shape_height=3,
         strips=[
             Strip(segments=[Segment("X"), Spacer(width=1), Spacer(width=1)]),
             Strip(
@@ -909,8 +909,8 @@ def test_render_node_buffers_with_spacers(console):
             node=0,
             z_index=0,
             center=Point(x=1, y=1),
-            node_width=3,
-            node_height=3,
+            shape_width=3,
+            shape_height=3,
             strips=[
                 Strip(
                     segments=[Segment("X"), Spacer(width=1), Spacer(width=1)],
@@ -927,8 +927,8 @@ def test_render_node_buffers_with_spacers(console):
             node=0,
             z_index=1,
             center=Point(x=1, y=1),
-            node_width=3,
-            node_height=3,
+            shape_width=3,
+            shape_height=3,
             strips=[
                 Strip(
                     segments=[Spacer(width=1), Segment("Y"), Spacer(width=1)],
@@ -956,8 +956,8 @@ def test_render_node_buffer_with_empty_line(console):
         node=0,
         z_index=0,
         center=Point(x=1, y=1),
-        node_width=3,
-        node_height=3,
+        shape_width=3,
+        shape_height=3,
         strips=[
             Strip(segments=[Spacer(width=1), Segment("X")]),
             Strip(segments=[Segment("")]),
@@ -978,8 +978,8 @@ def test_render_node_buffer_with_empty_line_and_no_buffer(console):
         node=0,
         z_index=0,
         center=Point(x=1, y=1),
-        node_width=3,
-        node_height=3,
+        shape_width=3,
+        shape_height=3,
         strips=[
             Strip(segments=[Spacer(width=1), Segment("X")]),
             Strip(segments=[Segment("")]),
