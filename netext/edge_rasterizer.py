@@ -75,8 +75,8 @@ def rasterize_edge(
 
     if (port_name := data.get("$end-port")) is not None and port_name in port_positions[
         v_buffer.node
-    ][port_name]:
-        end, end_helper = port_positions[v_buffer.node]
+    ]:
+        end, end_helper = port_positions[v_buffer.node][port_name]
         v_buffer.connect_port(port_name, u_buffer.node)
     else:
         end, end_helper = v_buffer.get_magnet_position(

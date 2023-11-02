@@ -247,52 +247,6 @@ class ConsoleGraph(Generic[G]):
     def reset_viewport(self) -> None:
         self._viewport = None
 
-    def _position_and_render_node(
-        self,
-        node: Hashable,
-        position: FloatPoint | None,
-        data: dict[str, Any],
-    ) -> list[tuple[Hashable, Hashable]] | None:
-        if position is None:
-            node_position = self.node_positions[node]
-            zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
-        else:
-            node_position = cast(FloatPoint, position)
-            node_position += self.offset
-            self.node_positions[node] = node_position
-            self.node_buffers[node].center = Point(
-                round(node_position.x * self.zoom_x),
-                round(node_position.y * self.zoom_y),
-            )
-
-            # Then we recompute zoom (in case we have a zoom to fit)
-            zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
-            if (
-                self._zoom is AutoZoom.FIT
-                or self._zoom is AutoZoom.FIT_PROPORTIONAL
-                or self._zoom_factor is None
-            ):
-                zoom_x, zoom_y = self._compute_current_zoom()
-                zoom_factor = min([zoom_x, zoom_y])
-
-            if zoom_factor != self._zoom_factor:
-                self._zoom_factor = zoom_factor
-                self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
-                return None
-
-        position_view_space = Point(
-            round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y)
-        )
-        self.node_buffers[node].center = position_view_space
-
-        lod = determine_lod(data, zoom_factor)
-        result = self._render_node_buffer_for_lod(node, data, lod, position_view_space)
-
-        self._determine_port_positions(node, lod=1, data=data)
-        self._render_port_buffer_for_node(node)
-
-        return result
-
     def add_node(
         self,
         node: Hashable,
@@ -314,6 +268,12 @@ class ConsoleGraph(Generic[G]):
 
         self._nx_graph.add_node(node, **data)
 
+        # Add to node buffers for layout
+        self.node_buffers_for_layout[node] = rasterize_node(
+            self.console, node, cast(dict[str, Any], data)
+        )
+
+        # Determine port side assignment
         for current_port_name, port_settings in sorted(
             data.get("$ports", {}).items(), key=lambda x: x[1].get("key", 0)
         ):
@@ -333,19 +293,43 @@ class ConsoleGraph(Generic[G]):
         )
 
         if position is not None:
-            # We add a new node and first need to transform the point from the buffer space to the not zoomed
-            # coordinate space of the nodes
-            do_continue = self._position_and_render_node(
-                node=node,
-                position=position,
-                data=data,
+            node_position = cast(FloatPoint, position)
+            node_position += self.offset
+            self.node_positions[node] = node_position
+            self.node_buffers[node].center = Point(
+                round(node_position.x * self.zoom_x),
+                round(node_position.y * self.zoom_y),
             )
-            if do_continue is None:
+
+            # Then we recompute zoom (in case we have a zoom to fit)
+            zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
+            if (
+                self._zoom is AutoZoom.FIT
+                or self._zoom is AutoZoom.FIT_PROPORTIONAL
+                or self._zoom_factor is None
+            ):
+                zoom_x, zoom_y = self._compute_current_zoom()
+                zoom_factor = min([zoom_x, zoom_y])
+
+            if zoom_factor != self._zoom_factor:
+                self._zoom_factor = zoom_factor
+                self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
                 return
 
+            lod = determine_lod(data, zoom_factor)
+            self._determine_port_positions(node, lod=lod, data=data)
+
+            position_view_space = Point(
+                round(node_position.x * self.zoom_x),
+                round(node_position.y * self.zoom_y),
+            )
+            self.node_buffers[node].center = position_view_space
+
             self.node_idx.insert(self.node_buffers[node])
+
+            self._render_port_buffer_for_node(node)
         else:
-            self._reset_render_state(RenderState.ZOOMED_POSITIONS_COMPUTED)
+            self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_FOR_LAYOUT)
 
     def add_edge(
         self, u: Hashable, v: Hashable, data: dict[str, Any] | None = None
@@ -491,6 +475,8 @@ class ConsoleGraph(Generic[G]):
         if data is None and position is None:
             return
 
+        connected_ports = self.node_buffers[node].connected_ports
+
         if data is not None:
             # Replace the data of the node with the new data
             if update_data:
@@ -500,12 +486,34 @@ class ConsoleGraph(Generic[G]):
 
             self._nx_graph.nodes[node].update(new_data)
             old_position = self.node_buffers[node].center
+
+            # Update node buffers for layout
+            self.node_buffers_for_layout[node] = rasterize_node(
+                self.console, node, cast(dict[str, Any], new_data)
+            )
+
+            # Update port side assignment
+
+            # Determine port side assignment
+            # TODO this is duplicated
+            for current_port_name, port_settings in sorted(
+                data.get("$ports", {}).items(), key=lambda x: x[1].get("key", 0)
+            ):
+                port_magnet = port_settings.get("magnet", Magnet.LEFT)
+
+                if port_magnet == Magnet.CENTER or port_magnet == Magnet.CLOSEST:
+                    port_magnet = Magnet.LEFT
+                port_side = ShapeSide(port_magnet.value)
+                self.port_sides[node][current_port_name] = port_side
+                self.port_side_assignments[node][port_side].append(current_port_name)
+
             new_node = rasterize_node(
                 self.console,
                 node,
                 new_data,
                 port_side_assignments=self.port_side_assignments[node],
             )
+
             old_node = self.node_buffers[node]
             new_node.center = old_position
             self.node_buffers[node] = new_node
@@ -520,16 +528,68 @@ class ConsoleGraph(Generic[G]):
             force_edge_rerender or (position is not None) or "$ports" in data
         )
 
-        affected_edges_or_break = self._position_and_render_node(
-            node=node, position=position, data=data
-        )
+        if position is None:
+            node_position = self.node_positions[node]
+            zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
+        else:
+            node_position = cast(FloatPoint, position)
+            node_position += self.offset
+            self.node_positions[node] = node_position
+            self.node_buffers[node].center = Point(
+                round(node_position.x * self.zoom_x),
+                round(node_position.y * self.zoom_y),
+            )
 
-        if affected_edges_or_break is None:
-            return
+            # Then we recompute zoom (in case we have a zoom to fit)
+            zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
+            if (
+                self._zoom is AutoZoom.FIT
+                or self._zoom is AutoZoom.FIT_PROPORTIONAL
+                or self._zoom_factor is None
+            ):
+                zoom_x, zoom_y = self._compute_current_zoom()
+                zoom_factor = min([zoom_x, zoom_y])
+
+            if zoom_factor != self._zoom_factor:
+                self._zoom_factor = zoom_factor
+                self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
+                return
+
+        lod = determine_lod(data, zoom_factor)
+
+        if lod != 1:
+            self.node_buffers[node] = rasterize_node(
+                self.console,
+                node,
+                data,
+                lod=lod,
+                port_side_assignments=self.port_side_assignments[node],
+            )
+
+        # This seems quite weird to keep
+        # TODO also ports could have changed with data update needs some proper treatment
+        self.node_buffers[node].connected_ports = connected_ports
+
+        self._determine_port_positions(node, lod=lod, data=data)
+        self._render_port_buffer_for_node(node)
+
+        affected_edges: list[tuple[Hashable, Hashable]] = []
+
+        position_view_space = Point(
+            round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y)
+        )
+        self.node_buffers[node].center = position_view_space
+
+        for v in nx.all_neighbors(self._nx_graph, node):
+            if (node, v) in self.edge_buffers:
+                affected_edges.append((node, v))
+            if (v, node) in self.edge_buffers:
+                affected_edges.append((v, node))
 
         self.node_idx.update(self.node_buffers[node])
-        if force_edge_rerender:
-            for u, v in affected_edges_or_break:
+
+        if affected_edges and force_edge_rerender:
+            for u, v in affected_edges:
                 self.edge_buffers.pop((u, v), None)
                 self.label_buffers.pop((u, v), None)
                 self.update_edge(u, v, self._nx_graph.edges[u, v], update_data=False)
@@ -799,14 +859,21 @@ class ConsoleGraph(Generic[G]):
         for node, data in self._nx_graph.nodes(data=True):
             lod = determine_lod(data, self._zoom_factor)
             # Get the zoomed position of the node
-
-            # TODO: We might want to precompute this as well
             position = self.node_positions[node]
             position_view_space = Point(
                 round(position.x * self.zoom_x), round(position.y * self.zoom_y)
             )
 
-            self._render_node_buffer_for_lod(node, data, lod, position_view_space)
+            node_buffer = rasterize_node(
+                self.console,
+                node,
+                data,
+                lod=lod,
+                port_side_assignments=self.port_side_assignments[node],
+            )
+            node_buffer.center = position_view_space
+            self.node_buffers[node] = node_buffer
+
             self._determine_port_positions(node, lod, data)
 
     def _determine_port_positions(self, node: Hashable, lod: int, data: dict[str, Any]):
@@ -823,32 +890,6 @@ class ConsoleGraph(Generic[G]):
                     ports_on_side=self.port_side_assignments[node][port_side],
                 )
                 self.port_positions[node][current_port_name] = (pos, pos_helper)
-
-    def _render_node_buffer_for_lod(
-        self,
-        node: Hashable,
-        data: dict[str, Any],
-        lod: int,
-        position: Point,
-    ) -> list[tuple[Hashable, Hashable]]:
-        affected_edges: list[tuple[Hashable, Hashable]] = []
-
-        node_buffer = rasterize_node(
-            self.console,
-            node,
-            data,
-            lod=lod,
-            port_side_assignments=self.port_side_assignments[node],
-        )
-        node_buffer.center = position
-        self.node_buffers[node] = node_buffer
-
-        for v in nx.all_neighbors(self._nx_graph, node):
-            if (node, v) in self.edge_buffers:
-                affected_edges.append((node, v))
-            if (v, node) in self.edge_buffers:
-                affected_edges.append((v, node))
-        return affected_edges
 
     def _transition_render_edges(self) -> None:
         if self._zoom_factor is None:

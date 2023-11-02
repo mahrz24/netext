@@ -152,7 +152,7 @@ class GraphView(ScrollView, Generic[G]):
             self._attached_widgets_lookup[widget] = node
             self.mount(widget)
 
-            node_buffer = self._console_graph.node_buffers_current_lod[node]
+            node_buffer = self._console_graph.node_buffers[node]
 
             if size is None:
                 widget.styles.width = node_buffer.width

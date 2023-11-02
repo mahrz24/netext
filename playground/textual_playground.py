@@ -90,8 +90,6 @@ class MainScreen(Screen):
                 data={"$style": Style(color="green")},
                 update_layout=False,
             )
-        if g._console_graph is not None:
-            self.log(g._console_graph.edge_buffers_current_lod)
 
         if old_value is not None and old_value.type == "node":
             g.update_node(old_value.ref, data={"$style": None})
