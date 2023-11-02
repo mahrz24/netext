@@ -19,10 +19,6 @@ from netext.geometry.point import Point
 from netext.node_rasterizer import EdgeLabelBuffer, JustContent, NodeBuffer
 from netext.rendering.segment_buffer import StripBuffer
 
-# label_position: Point | None
-# start_tip_position: Point | None
-# end_tip_position: Point | None
-
 
 def rasterize_edge(
     console: Console,
@@ -172,7 +168,9 @@ def rasterize_edge(
     # and link it to the creating shape?
     if label is not None:
         shape = JustContent()
-        label_strips = shape.render_shape(console, label, style=Style(), data={})
+        label_strips = shape.render_shape(
+            console, label, style=Style(), data={}, padding=0
+        )
 
         label_position = edge_segments.edge_iter_point(round(edge_segments.length / 2))
 

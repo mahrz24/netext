@@ -371,7 +371,7 @@ class PortLabelBuffer(PortBuffer):
 class NodeBuffer(ShapeBuffer):
     node: Hashable
 
-    data: dict[str, Any]
+    data: dict[str, Any] = field(default_factory=dict)
     margin: int = 0
     lod: int = 1
 

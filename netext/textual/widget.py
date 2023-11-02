@@ -448,7 +448,7 @@ class GraphView(ScrollView, Generic[G]):
                 self._refresh_scrollbars()
 
             for node, (widget, resize) in self._attached_widgets.items():
-                node_buffer = self._console_graph.node_buffers_current_lod[node]
+                node_buffer = self._console_graph.node_buffers[node]
                 if resize:
                     widget.styles.width = node_buffer.width
                     widget.styles.height = node_buffer.height
@@ -460,7 +460,7 @@ class GraphView(ScrollView, Generic[G]):
 
     def pre_render_strips(self) -> list[list[Segment]]:
         if self._console_graph is not None:
-            all_buffers = list(self._console_graph._all_current_lod_buffers())
+            all_buffers = list(self._console_graph._all_buffers())
             strips, self._reverse_click_map = render_buffers(
                 all_buffers, self._console_graph.viewport
             )
