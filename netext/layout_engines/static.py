@@ -8,5 +8,6 @@ class StaticLayout(LayoutEngine[G]):
 
     def __call__(self, graph: G) -> dict[Hashable, FloatPoint]:
         return {
-            n: FloatPoint(x=d.get("$x", 0), y=d.get("$y", 0)) for (n, d) in graph.nodes(data=True)
+            n: FloatPoint(x=d.get("$x", 0), y=d.get("$y", 0))
+            for (n, d) in graph.nodes(data=True)
         }
