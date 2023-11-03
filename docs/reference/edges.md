@@ -132,6 +132,29 @@ g.add_edge("G", "H"
 output = ConsoleGraph(g, layout_engine=StaticLayout())
 ```
 
+## Magnets
+
+The `start-magnet` and `end-magnet` attributes determine to which side of the node the edge is connected.
+
+Type: [Magnet][netext.geometry.magnet.Magnet] | None
+
+Possible values are:
+
+| Magnet | Value | Description |
+| ----------------- | ------------------| --------------------------|
+| Left          | [Magnet.LEFT][netext.geometry.magnet.Magnet.LEFT]     | Connect to the left side of the node |
+| Right          | [Magnet.RIGHT][netext.geometry.magnet.Magnet.RIGHT]     | Connect to the right side of the node |
+| Top          | [Magnet.TOP][netext.geometry.magnet.Magnet.TOP]     | Connect to the top side of the node |
+| Bottom          | [Magnet.BOTTOM][netext.geometry.magnet.Magnet.BOTTOM]     | Connect to the bottom side of the node |
+| Center          | [Magnet.CENTER][netext.geometry.magnet.Magnet.CENTER]     | Connect to the center of the node, edge will be cut at the node boundary. |
+| Closest          | [Magnet.CLOSEST][netext.geometry.magnet.Magnet.CLOSEST]     | Connect to the closest magnet position. |
+
+## Ports
+
+The `start-port` and `end-port` attributes determine to which port of the corresponding node the edge is connected to. The port needs to be declared as a property of the node. If set, the `start-magnet` and `end-magnet` attributes are ignored respectively.
+
+Type: str | None
+
 ## Edge Routing Mode
 
 The `edge-routing-mode` attribute determines how edges are routed from start to end point.

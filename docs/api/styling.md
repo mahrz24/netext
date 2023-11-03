@@ -23,6 +23,12 @@
 
 ## Edges
 
+::: netext.geometry.magnet.Magnet
+    handler: python
+    options:
+      show_source: false
+      members: ["TOP", "LEFT", "RIGHT", "BOTTOM", "CENTER", "CLOSEST"]
+
 ::: netext.edge_rendering.arrow_tips.ArrowTip
     handler: python
     options:
