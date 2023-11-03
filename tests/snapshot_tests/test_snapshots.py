@@ -29,3 +29,7 @@ def test_mst_example(snap_compare):
 
 def test_zoom_and_viewports_example(snap_compare):
     assert snap_compare(EXAMPLES_DIR / "zoom_and_viewports.py", terminal_size=(160, 40))
+
+
+def test_magnets_and_ports(snap_compare):
+    assert snap_compare(EXAMPLES_DIR / "magnets_and_ports.py")
