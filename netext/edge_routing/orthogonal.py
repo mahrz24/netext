@@ -110,7 +110,7 @@ def route_orthogonal_edge(
 
                     distance_factor *= 1.5
 
-            if new_helper_point is not None:
+            if new_helper_point is not None and helper_start is not None:
                 new_helper_point
                 helper_segments_start.append(
                     EdgeSegment(start=helper_start, end=new_helper_point)
@@ -151,7 +151,7 @@ def route_orthogonal_edge(
                     helper_end = helper_point
                     last_helper_segment = helper_segments_end[-1].shapely
 
-                    helper_point_candidates: list[tuple[bool, int, int, Point]] = []
+                    helper_point_candidates = []
 
                     candidate = Point.from_shapely(
                         last_helper_segment.offset_curve(
@@ -190,7 +190,7 @@ def route_orthogonal_edge(
 
                     distance_factor *= 1.5
 
-            if new_helper_point is not None:
+            if new_helper_point is not None and helper_end is not None:
                 helper_segments_end.insert(
                     0, EdgeSegment(start=new_helper_point, end=helper_end)
                 )

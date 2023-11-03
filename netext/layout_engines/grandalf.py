@@ -2,7 +2,7 @@ from collections.abc import Hashable
 from typing import Any
 
 from grandalf.graphs import Edge, Vertex, Graph  # type: ignore
-from grandalf.layouts import SugiyamaLayout
+from grandalf.layouts import SugiyamaLayout  # type: ignore
 
 from netext.geometry.point import FloatPoint  # type: ignore
 
@@ -49,7 +49,8 @@ class GrandalfSugiyamaLayout(LayoutEngine[G]):
         x_offset = 0
         for c in graph.components():
             component = {
-                v.data: FloatPoint(x=v.view.xy[0] / 4 + x_offset, y=v.view.xy[1] / 6) for v in c.sV
+                v.data: FloatPoint(x=v.view.xy[0] / 4 + x_offset, y=v.view.xy[1] / 6)
+                for v in c.sV
             }
             x_offset = max([v.view.xy[0] / 4 + x_offset + v.view.w + 2 for v in c.sV])
             result.update(component)
