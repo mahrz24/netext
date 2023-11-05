@@ -111,7 +111,6 @@ Type: [Style][rich.style.Style] | None
 ##### Example
 
 ```{.rich title='Content Style' }
-from netext.node_rasterizer import JustContent
 from netext import ConsoleGraph
 from netext.layout_engines.static import StaticLayout
 from rich import print
@@ -132,3 +131,61 @@ output = ConsoleGraph(g, layout_engine=StaticLayout())
 The `content-renderer` attribute is a function that takes three parameters, node label (`str`), node data (`Any`) and content [style][rich.style.Style] and returns a rich [renderable][rich.console.ConsoleRenderable].
 
 Type: Callable | None
+
+## Ports
+
+The `ports` attribute determines the ports of the node. Ports are used to connect edges to nodes. Ports are defined as a dictionary mapping port names to port specifications. The port specifications are a dictionary with the following keys: `magnet`, `label`, `offset`, `symbol`, `symbol-connected`, `key`.
+
+Ports are optional and a port only needs to be specified if it is used as a target or source of an edge. A port specification must at least contain a `label`. All other keys are optional.
+
+| Key               | Type     | Description                                                                 |
+|-------------------|----------|-----------------------------------------------------------------------------|
+| `magnet`          | `str`    | The magnet position of the port.                                            |
+| `label`           | `str`    | The label of the port.                                                      |
+| `offset`          | `Tuple[int, int]` | The offset of the port from the node position.                        |
+| `symbol`          | `str`    | The symbol to use for the port.                                              |
+| `symbol-connected` | `str`    | The symbol to use for the port when it is connected to an edge.              |
+| `key`             | `str`    | The key of the port used when sorting ports on a side of a node.                                         |
+
+
+##### Example
+
+```python
+from netext import ConsoleGraph
+from netext.layout_engines.static import StaticLayout
+from rich import print
+from rich.style import Style
+
+import networkx as nx
+g = nx.Graph()
+g.add_node("X", **{
+        "$x": 5,
+        "$y": 0,
+        "$ports": {"a": {"label": "a"}, "b": {"label": "b"}}
+    }
+)
+g.add_node("Y", **{
+    "$x": 20,
+    "$y": 0,
+    "$ports": {"a": {"label": "a"}, "b": {"label": "b"}}
+    }
+)
+g.add_edge("X", "Y", **{"$start-port": "a", "$end-port": "a"})
+
+print(ConsoleGraph(g, layout_engine=StaticLayout()))
+```
+
+```{.rich title='Ports' }
+from netext import ConsoleGraph
+from netext.layout_engines.static import StaticLayout
+from rich import print
+from rich.style import Style
+
+import networkx as nx
+g = nx.Graph()
+g.add_node("X", **{"$x": 5, "$y": 0, "$ports": {"a": {"label": "a"}, "b": {"label": "b"}}})
+g.add_node("Y", **{"$x": 20, "$y": 0, "$ports": {"a": {"label": "a"}, "b": {"label": "b"}}})
+g.add_edge("X", "Y", **{"$start-port": "a", "$end-port": "a"})
+
+output = ConsoleGraph(g, layout_engine=StaticLayout())
+```

@@ -8,6 +8,8 @@ from rich.style import Style
 
 import networkx as nx
 
+from netext.layout_engines.static import StaticLayout
+
 for routing, drawing in [
     (EdgeRoutingMode.ORTHOGONAL, EdgeSegmentDrawingMode.BOX),
 ]:
@@ -96,4 +98,4 @@ for routing, drawing in [
         },
     )
 
-    print(ConsoleGraph(g))
+    print(ConsoleGraph(g, layout_engine=StaticLayout()))

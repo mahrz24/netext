@@ -516,7 +516,7 @@ class NodeBuffer(ShapeBuffer):
             shape = JustContent()
             port_symbol = port_settings.get("symbol", "○")
             if port_name in self.connected_ports:
-                port_symbol = port_settings.get("symbol", "●")
+                port_symbol = port_settings.get("symbol-connected", "●")
             port_strips = shape.render_shape(
                 console, port_symbol, style=Style(), padding=0, data={}
             )

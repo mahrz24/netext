@@ -26,6 +26,10 @@ from netext.layout_engines.engine import LayoutEngine, G
 from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
 from netext.node_rasterizer import NodeBuffer, rasterize_node
 
+from rich.traceback import install
+
+install(show_locals=False)
+
 
 class RenderState(Enum):
     INITIAL = "initial"
@@ -759,6 +763,7 @@ class ConsoleGraph(Generic[G]):
 
                     if port_magnet == Magnet.CENTER or port_magnet == Magnet.CLOSEST:
                         # Determine the port magnet
+                        port_side = ShapeSide.LEFT
                         neighbours = self._nx_graph.neighbors(node)
                         for v_node in neighbours:
                             if (node, v_node) in self._nx_graph.edges:
@@ -769,9 +774,9 @@ class ConsoleGraph(Generic[G]):
                                     == current_port_name
                                 ):
                                     port_side = ShapeSide(
-                                        self.node_buffers[node]
+                                        self.node_buffers_for_layout[node]
                                         .get_closest_magnet(
-                                            self.node_buffers[v_node].center
+                                            self.node_buffers_for_layout[v_node].center
                                         )
                                         .value
                                     )
@@ -782,9 +787,9 @@ class ConsoleGraph(Generic[G]):
                                     == current_port_name
                                 ):
                                     port_side = ShapeSide(
-                                        self.node_buffers[node]
+                                        self.node_buffers_for_layout[node]
                                         .get_closest_magnet(
-                                            self.node_buffers[v_node].center
+                                            self.node_buffers_for_layout[v_node].center
                                         )
                                         .value
                                     )
@@ -927,8 +932,10 @@ class ConsoleGraph(Generic[G]):
                 port_positions=self.port_positions,
             )
 
-            if result is not None:
-                edge_buffer, edge_layout, label_nodes = result
+            if result is None:
+                continue
+
+            edge_buffer, edge_layout, label_nodes = result
 
             if edge_buffer is not None:
                 self.edge_idx.insert(edge_buffer, edge_layout)
