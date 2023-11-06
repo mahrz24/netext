@@ -1,6 +1,6 @@
 
 <a id='changelog-0.2.0'></a>
-# 0.2.0 — 2023-11-06
+# Textual Widget & Ports v0.2.0 — 2023-11-06
 
 ## Added
 

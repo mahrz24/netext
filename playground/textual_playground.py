@@ -60,8 +60,9 @@ class MainScreen(Screen):
     selected_element: Reactive[Reference | None] = reactive(
         cast(Reference | None, None)
     )
+    move_selected: bool = False
 
-    BINDINGS = []
+    BINDINGS = [("m", "move_node", "Move Node"), ("x", "delete", "Delete Node / Edge")]
 
     def compose(self) -> ComposeResult:
         yield Horizontal(
@@ -81,11 +82,12 @@ class MainScreen(Screen):
         g = self.query_one(GraphView)
 
         if old_value is not None and old_value.type == "edge":
-            g.update_edge(
-                *old_value.ref,
-                data={"$style": Style(color="white")},
-                update_layout=False,
-            )
+            if g.graph.has_edge(*old_value.ref):
+                g.update_edge(
+                    *old_value.ref,
+                    data={"$style": Style(color="white")},
+                    update_layout=False,
+                )
 
         if new_value is not None and new_value.type == "edge":
             g.update_edge(
@@ -95,7 +97,8 @@ class MainScreen(Screen):
             )
 
         if old_value is not None and old_value.type == "node":
-            g.update_node(old_value.ref, data={"$style": Style(color="white")})
+            if g.graph.has_node(old_value.ref):
+                g.update_node(old_value.ref, data={"$style": Style(color="white")})
 
         if new_value is not None and new_value.type == "node":
             g.update_node(new_value.ref, data={"$style": Style(color="blue")})
@@ -103,8 +106,27 @@ class MainScreen(Screen):
         statusbar = self.query_one(Statusbar)
         statusbar.update(f"selected: {str(new_value)} old: {str(old_value)}")
 
+    def action_move_node(self) -> None:
+        self.move_selected = True
+        w = self.query_one(Statusbar)
+        w.update("Move Node: Move mouse to place")
+
+    def action_delete(self) -> None:
+        g = self.query_one(GraphView)
+        if self.selected_element is not None:
+            if self.hover_element == self.selected_element:
+                self.hover_element = None
+            selected = self.selected_element
+            self.selected_element = None
+            if selected.type == "node":
+                g.remove_node(selected.ref)
+            elif selected.type == "edge":
+                g.remove_edge(*selected.ref)
+
     def reset_edge(self, edge: tuple[Hashable, Hashable]) -> None:
         g = self.query_one(GraphView)
+        if not g.graph.has_edge(*edge):
+            return
         if (
             self.selected_element is not None
             and self.selected_element.type == "edge"
@@ -122,6 +144,8 @@ class MainScreen(Screen):
 
     def reset_node(self, node: Hashable) -> None:
         g = self.query_one(GraphView)
+        if not g.graph.has_node(node):
+            return
         if (
             self.selected_element is not None
             and self.selected_element.type == "node"
@@ -152,7 +176,11 @@ class MainScreen(Screen):
         if old_value is not None and old_value.type == "node":
             self.reset_node(old_value.ref)
 
-        if new_value is not None and new_value.type == "node":
+        if (
+            new_value is not None
+            and new_value.type == "node"
+            and not self.move_selected
+        ):
             g.update_node(new_value.ref, data={"$style": Style(color="green")})
 
         statusbar = self.query_one(Statusbar)
@@ -222,6 +250,9 @@ class MainScreen(Screen):
         toolbar = self.query_one(Toolbar)
 
         if event.element_reference.type == "node":
+            if self.move_selected:
+                self.move_selected = False
+
             g = self.query_one(GraphView)
             if toolbar.current_tool == "add-edge-tool":
                 if self.edge_first_click is None:
@@ -238,6 +269,11 @@ class MainScreen(Screen):
                     self.selected_element = None
                 else:
                     self.selected_element = event.element_reference
+        elif event.element_reference.type == "edge":
+            if self.selected_element == event.element_reference:
+                self.selected_element = None
+            else:
+                self.selected_element = event.element_reference
 
     def on_graph_view_element_move(self, event: GraphView.ElementMove) -> None:
         pass
@@ -257,6 +293,13 @@ class MainScreen(Screen):
     def on_graph_view_element_leave(self, event: GraphView.ElementLeave) -> None:
         self.log(event, event.element_reference)
         self.hover_element = None
+
+    def on_mouse_move(self, event: events.MouseMove) -> None:
+        if self.move_selected and self.selected_element is not None:
+            g = self.query_one(GraphView)
+            g.update_node(
+                self.selected_element.ref, position=Offset(x=event.x, y=event.y)
+            )
 
 
 class GraphApp(App):
