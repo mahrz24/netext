@@ -1,5 +1,4 @@
 import uuid
-from netext.geometry.magnet import Magnet
 from netext.rendering.segment_buffer import Reference
 from netext.textual.widget import GraphView
 from textual import events
@@ -12,7 +11,7 @@ from netext.edge_rendering.arrow_tips import ArrowTip
 from textual.widgets import Button
 from textual.geometry import Offset
 from textual.screen import Screen
-from textual.widgets import Input, Footer, Placeholder
+from textual.widgets import Input, Footer, Placeholder, Static
 from textual.widget import Widget
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive, Reactive
@@ -29,32 +28,28 @@ def _render(n, d, s):
 g.add_node(uuid.uuid4(), **{"title": "Hello World", "$content-renderer": _render})
 
 
-# nx.set_node_attributes(g, Style(color="blue"), "$content-style")
-# nx.set_node_attributes(g, box.SQUARE, "$box-type")
-# nx.set_edge_attributes(g, Style(color="red"), "$style")
-# nx.set_edge_attributes(g, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
-# nx.set_edge_attributes(g, EdgeSegmentDrawingMode.BOX, "$edge-segment-drawing-mode")
-# nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
-# nx.set_edge_attributes(g, ArrowTip.ARROW, "$start-arrow-tip")
-# nx.set_node_attributes(g, _render2, "$content-renderer")
-
-
 class Toolbar(Widget):
     current_tool: str = "pointer-tool"
 
     def compose(self):
         yield Button(">", id="pointer-tool", classes="selected-tool")
-        yield Button("+O", id="add-node-tool")
-        yield Button("+/", id="add-edge-tool")
-        yield Button("+T", id="add-label-tool")
+        yield Button("O", id="add-node-tool")
+        yield Button("/", id="add-edge-tool")
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.switch_tool(event.button.id)
+
+    def switch_tool(self, tool: str) -> None:
         self.query(f"#{self.current_tool}").remove_class("selected-tool")
-        self.query(f"#{event.button.id}").add_class("selected-tool")
-        self.current_tool = event.button.id
+        self.query(f"#{tool}").add_class("selected-tool")
+        self.current_tool = tool
 
 
-class Statusbar(Placeholder):
+class GraphInspector(Placeholder):
+    pass
+
+
+class Statusbar(Static):
     pass
 
 
@@ -62,21 +57,29 @@ class MainScreen(Screen):
     current_editor: tuple[Input, Hashable] | None = None
     edge_first_click: Hashable | None = None
     hover_element: Reactive[Reference | None] = reactive(cast(Reference | None, None))
+    selected_element: Reactive[Reference | None] = reactive(
+        cast(Reference | None, None)
+    )
 
     BINDINGS = []
 
     def compose(self) -> ComposeResult:
         yield Horizontal(
             Vertical(
-                Toolbar(), GraphView(g, zoom=1, scroll_via_viewport=False, id="graph")
+                Toolbar(),
+                GraphView(g, zoom=1, scroll_via_viewport=False, id="graph"),
+                Footer(),
             ),
-            Vertical(Footer(), Statusbar("Status"), id="footer"),
+            Vertical(
+                GraphInspector("GraphINspector"), Statusbar("Status"), id="sidebar"
+            ),
         )
 
-    def watch_hover_element(
+    def watch_selected_element(
         self, old_value: Reference | None, new_value: Reference | None
     ) -> None:
         g = self.query_one(GraphView)
+
         if old_value is not None and old_value.type == "edge":
             g.update_edge(
                 *old_value.ref,
@@ -87,21 +90,83 @@ class MainScreen(Screen):
         if new_value is not None and new_value.type == "edge":
             g.update_edge(
                 *new_value.ref,
+                data={"$style": Style(color="blue")},
+                update_layout=False,
+            )
+
+        if old_value is not None and old_value.type == "node":
+            g.update_node(old_value.ref, data={"$style": Style(color="white")})
+
+        if new_value is not None and new_value.type == "node":
+            g.update_node(new_value.ref, data={"$style": Style(color="blue")})
+
+        statusbar = self.query_one(Statusbar)
+        statusbar.update(f"selected: {str(new_value)} old: {str(old_value)}")
+
+    def reset_edge(self, edge: tuple[Hashable, Hashable]) -> None:
+        g = self.query_one(GraphView)
+        if (
+            self.selected_element is not None
+            and self.selected_element.type == "edge"
+            and self.selected_element.ref == edge
+        ):
+            style = Style(color="blue")
+        else:
+            style = Style(color="white")
+
+        g.update_edge(
+            *edge,
+            data={"$style": style},
+            update_layout=False,
+        )
+
+    def reset_node(self, node: Hashable) -> None:
+        g = self.query_one(GraphView)
+        if (
+            self.selected_element is not None
+            and self.selected_element.type == "node"
+            and self.selected_element.ref == node
+        ):
+            style = Style(color="blue")
+        elif self.edge_first_click is not None and self.edge_first_click == node:
+            style = Style(color="red")
+        else:
+            style = Style(color="white")
+
+        g.update_node(node, data={"$style": style})
+
+    def watch_hover_element(
+        self, old_value: Reference | None, new_value: Reference | None
+    ) -> None:
+        g = self.query_one(GraphView)
+        if old_value is not None and old_value.type == "edge":
+            self.reset_edge(old_value.ref)
+
+        if new_value is not None and new_value.type == "edge":
+            g.update_edge(
+                *new_value.ref,
                 data={"$style": Style(color="green")},
                 update_layout=False,
             )
 
         if old_value is not None and old_value.type == "node":
-            g.update_node(old_value.ref, data={"$style": None})
+            self.reset_node(old_value.ref)
 
         if new_value is not None and new_value.type == "node":
             g.update_node(new_value.ref, data={"$style": Style(color="green")})
+
+        statusbar = self.query_one(Statusbar)
+        statusbar.update(str(new_value))
 
     def on_click(self, event: events.Click) -> None:
         toolbar = self.query_one(Toolbar)
 
         if toolbar.current_tool == "add-node-tool":
             self.add_node(event.x, event.y)
+            toolbar.switch_tool("pointer-tool")
+
+        if self.selected_element is not None:
+            self.selected_element = None
 
     def add_node(self, x: int, y: int) -> None:
         g = self.query_one(GraphView)
@@ -113,10 +178,6 @@ class MainScreen(Screen):
             data={
                 "title": "Untitled New Node",
                 "$content-renderer": _render,
-                "$ports": {
-                    "in": {"magnet": Magnet.LEFT, "label": "IN"},
-                    "out": {"magnet": Magnet.RIGHT, "label": "OUT"},
-                },
             },
         )
         self.edit_node_label(node_uuid)
@@ -130,8 +191,6 @@ class MainScreen(Screen):
                 "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
                 "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
                 "$end-arrow-tip": ArrowTip.ARROW,
-                "$start-port": "out",
-                "$end-port": "in",
             },
         )
 
@@ -162,20 +221,23 @@ class MainScreen(Screen):
     def on_graph_view_element_click(self, event: GraphView.ElementClick) -> None:
         toolbar = self.query_one(Toolbar)
 
-        if (
-            toolbar.current_tool == "add-edge-tool"
-            and event.element_reference.type == "node"
-        ):
+        if event.element_reference.type == "node":
             g = self.query_one(GraphView)
-            if self.edge_first_click is None:
-                self.edge_first_click = event.element_reference.ref
-                g.update_node(
-                    self.edge_first_click, data={"$style": Style(color="red")}
-                )
+            if toolbar.current_tool == "add-edge-tool":
+                if self.edge_first_click is None:
+                    self.edge_first_click = event.element_reference.ref
+                    g.update_node(
+                        self.edge_first_click, data={"$style": Style(color="red")}
+                    )
+                else:
+                    g.update_node(self.edge_first_click, data={"$style": None})
+                    self.add_edge(self.edge_first_click, event.element_reference.ref)
+                    self.edge_first_click = None
             else:
-                g.update_node(self.edge_first_click, data={"$style": None})
-                self.add_edge(self.edge_first_click, event.element_reference.ref)
-                self.edge_first_click = None
+                if self.selected_element == event.element_reference:
+                    self.selected_element = None
+                else:
+                    self.selected_element = event.element_reference
 
     def on_graph_view_element_move(self, event: GraphView.ElementMove) -> None:
         pass

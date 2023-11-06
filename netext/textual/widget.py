@@ -514,13 +514,16 @@ class GraphView(ScrollView, Generic[G]):
             )
 
             if ref != self._last_hover and self._last_hover is not None:
+                event.stop()
                 self.post_message(GraphView.ElementLeave(self._last_hover, event))
                 self._last_hover = None
 
             if ref is not None:
                 if ref != self._last_hover:
+                    event.stop()
                     self.post_message(GraphView.ElementEnter(ref, event))
                 else:
+                    event.stop()
                     self.post_message(GraphView.ElementMove(ref, event))
                 self._last_hover = ref
 
@@ -531,6 +534,7 @@ class GraphView(ScrollView, Generic[G]):
             )
 
             if ref is not None:
+                event.stop()
                 self.post_message(GraphView.ElementClick(ref, event))
 
     def on_mouse_down(self, event: events.MouseDown) -> None:
@@ -540,6 +544,7 @@ class GraphView(ScrollView, Generic[G]):
             )
 
             if ref is not None:
+                event.stop()
                 self.post_message(GraphView.ElementMouseDown(ref, event))
 
     def on_mouse_up(self, event: events.MouseDown) -> None:
@@ -549,6 +554,7 @@ class GraphView(ScrollView, Generic[G]):
             )
 
             if ref is not None:
+                event.stop()
                 self.post_message(GraphView.ElementMouseUp(ref, event))
 
 
