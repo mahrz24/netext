@@ -27,7 +27,10 @@ jobs:
       - name: Poetry Version
         id: poetry-version
         run: echo "::set-output name=version::$(poetry --version | grep -oP '[\d\.]+')"
-      - name: Build and Publish
+      - name: Build
         run: |
           poetry build
-          poetry publish
+      - name: Publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
