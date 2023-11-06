@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "netext"
-version = "0.1.1"
+version = "0.2.0"
 description = "A graph (network) rendering library for the terminal."
 authors = ["Malte Klemm <me@malteklemm.de>"]
 license = "MIT"
