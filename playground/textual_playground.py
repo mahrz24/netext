@@ -1,9 +1,10 @@
+from dataclasses import dataclass
 import uuid
 from netext.rendering.segment_buffer import Reference
 from netext.textual.widget import GraphView
 from textual import events
 from textual.app import App, ComposeResult
-from typing import Hashable, cast
+from typing import Any, Hashable, cast
 from rich.style import Style
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
@@ -11,10 +12,11 @@ from netext.edge_rendering.arrow_tips import ArrowTip
 from textual.widgets import Button
 from textual.geometry import Offset
 from textual.screen import Screen
-from textual.widgets import Input, Footer, Static, Tabs
+from textual.widgets import Input, Footer, Static, TabbedContent, Pretty, Label
 from textual.widget import Widget
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive, Reactive
+from textual.message import Message
 
 import networkx as nx
 
@@ -31,6 +33,10 @@ g.add_node(uuid.uuid4(), **{"title": "Hello World", "$content-renderer": _render
 class Toolbar(Widget):
     current_tool: str = "pointer-tool"
 
+    @dataclass
+    class ToolSwitched(Message):
+        tool: str
+
     def compose(self):
         yield Button(">", id="pointer-tool", classes="selected-tool")
         yield Button("O", id="add-node-tool")
@@ -43,10 +49,11 @@ class Toolbar(Widget):
         self.query(f"#{self.current_tool}").remove_class("selected-tool")
         self.query(f"#{tool}").add_class("selected-tool")
         self.current_tool = tool
+        self.post_message(self.ToolSwitched(tool=tool))
 
 
 class NodeInspector(Widget):
-    graph_view: GraphView
+    node_data: dict[str, Any]
     node: Hashable
 
     def __init__(
@@ -56,17 +63,28 @@ class NodeInspector(Widget):
         id: str | None = None,
         classes: str | None = None,
         disabled: bool = False,
-        graph_view: GraphView,
+        node_data: dict[str, Any],
         node: Hashable,
     ) -> None:
         self.node = node
-        self.graph_view = graph_view
+        self.node_data = node_data
         super().__init__(
             *children, name=name, id=id, classes=classes, disabled=disabled
         )
 
     def compose(self) -> ComposeResult:
-        yield Tabs("Style", "Ports", "Content")
+        netext_buffer = self.node_data["_netext_node_buffer"]
+        attr_dct = {k: v for k, v in self.node_data.items() if k.startswith("$")}
+
+        with TabbedContent("Node", "Style", "Ports", "Debug"):
+            yield Pretty(self.node_data)
+            yield Pretty(self.node_data)
+            yield Pretty(self.node_data)
+            with Vertical():
+                yield Label("Attributes", classes="section-title")
+                yield Pretty(attr_dct)
+                yield Label("Node Buffer", classes="section-title")
+                yield Pretty(netext_buffer)
 
 
 class Statusbar(Static):
@@ -81,6 +99,15 @@ class GraphArea(Widget):
         cast(Reference | None, None)
     )
     move_selected: bool = False
+    current_tool: str = "pointer-tool"
+
+    class ResetTool(Message):
+        """Reset the tool in the toolbar."""
+
+    @dataclass
+    class ElementSelected(Message):
+        element: Reference | None
+        element_data: dict[str, Any] | None
 
     def compose(self) -> ComposeResult:
         graph_view = GraphView(g, zoom=1, scroll_via_viewport=False, id="graph")
@@ -90,8 +117,8 @@ class GraphArea(Widget):
         self, old_value: Reference | None, new_value: Reference | None
     ) -> None:
         g = self.query_one(GraphView)
-        inspector = self.query_one(GraphInspector)
-        inspector.selected_element = new_value
+
+        element_message = self.ElementSelected(element=None, element_data=None)
 
         if old_value is not None and old_value.type == "edge":
             if g.graph.has_edge(*old_value.ref):
@@ -114,6 +141,11 @@ class GraphArea(Widget):
 
         if new_value is not None and new_value.type == "node":
             g.update_node(new_value.ref, data={"$style": Style(color="blue")})
+            element_message = self.ElementSelected(
+                element=new_value, element_data=g.graph.nodes(data=True)[new_value.ref]
+            )
+
+        self.post_message(element_message)
 
     def reset_edge(self, edge: tuple[Hashable, Hashable]) -> None:
         g = self.query_one(GraphView)
@@ -176,11 +208,9 @@ class GraphArea(Widget):
             g.update_node(new_value.ref, data={"$style": Style(color="green")})
 
     def on_click(self, event: events.Click) -> None:
-        toolbar = self.query_one(Toolbar)
-
-        if toolbar.current_tool == "add-node-tool":
+        if self.current_tool == "add-node-tool":
             self.add_node(event.x, event.y)
-            toolbar.switch_tool("pointer-tool")
+            self.post_message(self.ResetTool())
 
         if self.selected_element is not None:
             self.selected_element = None
@@ -236,14 +266,12 @@ class GraphArea(Widget):
         self.end_node_editing(control, node)
 
     def on_graph_view_element_click(self, event: GraphView.ElementClick) -> None:
-        toolbar = self.query_one(Toolbar)
-
         if event.element_reference.type == "node":
             if self.move_selected:
                 self.move_selected = False
 
             g = self.query_one(GraphView)
-            if toolbar.current_tool == "add-edge-tool":
+            if self.current_tool == "add-edge-tool":
                 if self.edge_first_click is None:
                     self.edge_first_click = event.element_reference.ref
                     g.update_node(
@@ -292,10 +320,10 @@ class GraphArea(Widget):
 
 
 class GraphInspector(Widget):
-    graph_area: GraphArea
     selected_element: Reactive[Reference | None] = reactive(
         cast(Reference | None, None)
     )
+    selected_element_data: dict[str, Any] | None = None
 
     def __init__(
         self,
@@ -304,9 +332,7 @@ class GraphInspector(Widget):
         id: str | None = None,
         classes: str | None = None,
         disabled: bool = False,
-        graph_area: GraphArea,
     ) -> None:
-        self.graph_area = graph_area
         super().__init__(
             *children, name=name, id=id, classes=classes, disabled=disabled
         )
@@ -326,7 +352,7 @@ class GraphInspector(Widget):
                 self.mount(
                     NodeInspector(
                         node=new_value.ref,
-                        graph_view=self.graph_view.query_one(GraphView),
+                        node_data=self.selected_element_data,
                     )
                 )
 
@@ -335,17 +361,27 @@ class MainScreen(Screen):
     BINDINGS = [("m", "move_node", "Move Node"), ("x", "delete", "Delete Node / Edge")]
 
     def compose(self) -> ComposeResult:
-        graph_area = GraphArea()
         yield Horizontal(
             Vertical(
                 Toolbar(),
-                graph_area,
+                GraphArea(),
                 Footer(),
             ),
-            Vertical(
-                GraphInspector(graph_area=graph_area), Statusbar("Status"), id="sidebar"
-            ),
+            Vertical(GraphInspector(), Statusbar("Status"), id="sidebar"),
         )
+
+    def on_graph_area_reset_tool(self, event: GraphArea.ResetTool) -> None:
+        toolbar = self.query_one(Toolbar)
+        toolbar.switch_tool("pointer-tool")
+
+    def on_graph_area_element_selected(self, event: GraphArea.ElementSelected) -> None:
+        graph_inspector = self.query_one(GraphInspector)
+        graph_inspector.selected_element_data = event.element_data
+        graph_inspector.selected_element = event.element
+
+    def on_toolbar_tool_switched(self, event: Toolbar.ToolSwitched) -> None:
+        graph_area = self.query_one(GraphArea)
+        graph_area.current_tool = event.tool
 
     def action_move_node(self) -> None:
         area = self.query_one(GraphArea)
