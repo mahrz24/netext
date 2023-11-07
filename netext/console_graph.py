@@ -154,7 +154,9 @@ class ConsoleGraph(Generic[G]):
         self.edge_buffers: dict[tuple[Hashable, Hashable], EdgeBuffer] = dict()
         self.edge_layouts: dict[tuple[Hashable, Hashable], EdgeLayout] = dict()
 
-        self.label_buffers: dict[tuple[Hashable, Hashable], list[StripBuffer]] = dict()
+        self.edge_label_buffers: dict[
+            tuple[Hashable, Hashable], list[StripBuffer]
+        ] = dict()
 
         self.port_side_assignments: dict[
             Hashable, dict[ShapeSide, list[str]]
@@ -395,7 +397,7 @@ class ConsoleGraph(Generic[G]):
             self.edge_idx.insert(edge_buffer, edge_layout)
             self.edge_buffers[(u, v)] = edge_buffer
         if label_nodes is not None:
-            self.label_buffers[(u, v)] = label_nodes
+            self.edge_label_buffers[(u, v)] = label_nodes
         if edge_layout is not None:
             self.edge_layouts[(u, v)] = edge_layout
 
@@ -450,6 +452,7 @@ class ConsoleGraph(Generic[G]):
         self._nx_graph.remove_edge(u, v)
 
         edge_buffer = self.edge_buffers.pop((u, v))
+        self.edge_label_buffers.pop((u, v))
         self.edge_idx.delete(edge_buffer)
 
         self._render_port_buffer_for_node(u)
@@ -595,7 +598,7 @@ class ConsoleGraph(Generic[G]):
         if affected_edges and force_edge_rerender:
             for u, v in affected_edges:
                 self.edge_buffers.pop((u, v), None)
-                self.label_buffers.pop((u, v), None)
+                self.edge_label_buffers.pop((u, v), None)
                 self.update_edge(u, v, self._nx_graph.edges[u, v], update_data=False)
 
     def to_graph_coordinates(self, p: Point) -> FloatPoint:
@@ -702,7 +705,7 @@ class ConsoleGraph(Generic[G]):
             self.edge_idx.update(edge_buffer, edge_layout)
             self.edge_buffers[(u, v)] = edge_buffer
         if label_nodes is not None:
-            self.label_buffers[(u, v)] = label_nodes
+            self.edge_label_buffers[(u, v)] = label_nodes
         if edge_layout is not None:
             self.edge_layouts[(u, v)] = edge_layout
 
@@ -941,7 +944,7 @@ class ConsoleGraph(Generic[G]):
                 self.edge_idx.insert(edge_buffer, edge_layout)
                 self.edge_buffers[(u, v)] = edge_buffer
             if label_nodes is not None:
-                self.label_buffers[(u, v)] = label_nodes
+                self.edge_label_buffers[(u, v)] = label_nodes
             if edge_layout is not None:
                 edge_layouts.append(edge_layout)
                 self.edge_layouts[(u, v)] = edge_layout
@@ -998,7 +1001,7 @@ class ConsoleGraph(Generic[G]):
         return chain(
             node_buffers,
             self.edge_buffers.values(),
-            itertools.chain(*self.label_buffers.values()),
+            itertools.chain(*self.edge_label_buffers.values()),
             itertools.chain(*port_buffers),
         )
 
