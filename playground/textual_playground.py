@@ -21,6 +21,7 @@ from textual.widgets import (
     Pretty,
     Label,
     # Placeholder,
+    Checkbox,
     RadioSet,
     RadioButton,
 )
@@ -28,6 +29,8 @@ from textual.widget import Widget
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive, Reactive
 from textual.message import Message
+from textual import on
+from rich import box
 
 import networkx as nx
 
@@ -89,17 +92,91 @@ class StyleEditor(Widget):
         node_data: dict[str, Any]
 
     def compose(self) -> ComposeResult:
+        # TODO with proper property system, defaults are materialized before this
+        shape = self.node_data.get("$shape", Box())
+        box_type = self.node_data.get("$box-type", box.ROUNDED)
         with Vertical():
             yield Label("Shape", classes="section-title")
             with RadioSet(id="shape-selector"):
-                yield RadioButton("Just Content", id="just-content")
-                yield RadioButton("Box", id="box")
+                yield RadioButton(
+                    "Just Content",
+                    id="just-content",
+                    value=isinstance(shape, JustContent),
+                )
+                yield RadioButton("Box", id="box", value=isinstance(shape, Box))
+            with RadioSet(
+                id="box-type-selector",
+                classes="invisible" if not isinstance(shape, Box) else None,
+            ):
+                yield RadioButton("ASCII", id="ascii", value=box_type == box.ASCII)
+                yield RadioButton("SQUARE", id="square", value=box_type == box.SQUARE)
+                yield RadioButton(
+                    "MINIMAL", id="minimal", value=box_type == box.MINIMAL
+                )
+                yield RadioButton(
+                    "HORIZONTALS", id="horizontals", value=box_type == box.HORIZONTALS
+                )
+                yield RadioButton(
+                    "ROUNDED", id="rounded", value=box_type == box.ROUNDED
+                )
+                yield RadioButton("HEAVY", id="heavy", value=box_type == box.HEAVY)
+                yield RadioButton("DOUBLE", id="double", value=box_type == box.DOUBLE)
+            yield Label("Node Style", classes="section-title")
+            yield Input(value=str(self.node_data.get("$style", Style()).color))
+            yield Checkbox("Bold", value=self.node_data.get("$style", Style()).bold)
+            yield Input(value=str(self.node_data.get("$style", Style()).bgcolor))
+            yield Label("Content Style", classes="section-title")
 
-    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+    @on(RadioSet.Changed, "#shape-selector")
+    def shape_changed(self, event: RadioSet.Changed) -> None:
         if event.index == 0:
             self.node_data["$shape"] = JustContent()
+            self.query("#box-type-selector").add_class("invisible")
         elif event.index == 1:
+            self.query("#box-type-selector").remove_class("invisible")
             self.node_data["$shape"] = Box()
+        self.post_message(self.StyleChanged(node=self.node, node_data=self.node_data))
+
+    @on(RadioSet.Changed, "#box-type-selector")
+    def box_type_changed(self, event: RadioSet.Changed) -> None:
+        if event.pressed.id == "rounded":
+            self.node_data["$box-type"] = box.ROUNDED
+        elif event.pressed.id == "ascii":
+            self.node_data["$box-type"] = box.ASCII
+        elif event.pressed.id == "ascii2":
+            self.node_data["$box-type"] = box.ASCII2
+        elif event.pressed.id == "ascii_double_head":
+            self.node_data["$box-type"] = box.ASCII_DOUBLE_HEAD
+        elif event.pressed.id == "square":
+            self.node_data["$box-type"] = box.SQUARE
+        elif event.pressed.id == "square_double_head":
+            self.node_data["$box-type"] = box.SQUARE_DOUBLE_HEAD
+        elif event.pressed.id == "minimal":
+            self.node_data["$box-type"] = box.MINIMAL
+        elif event.pressed.id == "minimal_heavy_head":
+            self.node_data["$box-type"] = box.MINIMAL_HEAVY_HEAD
+        elif event.pressed.id == "minimal_double_head":
+            self.node_data["$box-type"] = box.MINIMAL_DOUBLE_HEAD
+        elif event.pressed.id == "simple":
+            self.node_data["$box-type"] = box.SIMPLE
+        elif event.pressed.id == "simple_head":
+            self.node_data["$box-type"] = box.SIMPLE_HEAD
+        elif event.pressed.id == "simple_heavy":
+            self.node_data["$box-type"] = box.SIMPLE_HEAVY
+        elif event.pressed.id == "horizontals":
+            self.node_data["$box-type"] = box.HORIZONTALS
+        elif event.pressed.id == "heavy":
+            self.node_data["$box-type"] = box.HEAVY
+        elif event.pressed.id == "heavy_edge":
+            self.node_data["$box-type"] = box.HEAVY_EDGE
+        elif event.pressed.id == "heavy_head":
+            self.node_data["$box-type"] = box.HEAVY_HEAD
+        elif event.pressed.id == "double":
+            self.node_data["$box-type"] = box.DOUBLE
+        elif event.pressed.id == "double_edge":
+            self.node_data["$box-type"] = box.DOUBLE_EDGE
+        elif event.pressed.id == "markdown":
+            self.node_data["$box-type"] = box.MARKDOWN
         self.post_message(self.StyleChanged(node=self.node, node_data=self.node_data))
 
 
