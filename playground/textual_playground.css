@@ -25,14 +25,23 @@ Toolbar {
 GraphInspector {
     width: 100%;
     height: 100%;
+}
+
+NodeInspector TabbedContent {
+    height: 100%;
     overflow-y: auto;
 }
 
-NodeInspector {
-    height: auto;
+NodeInspector Input {
+    margin-top: 1;
+    margin-bottom: 1;
 }
 
 NodeInspector Vertical {
+    height: auto;
+}
+
+NodeInspector StyleEditor {
     height: auto;
 }
 

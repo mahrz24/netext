@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import uuid
+from netext.node_rasterizer import Box, JustContent
 from netext.rendering.segment_buffer import Reference
 from netext.textual.widget import GraphView
 from textual import events
@@ -12,7 +13,17 @@ from netext.edge_rendering.arrow_tips import ArrowTip
 from textual.widgets import Button
 from textual.geometry import Offset
 from textual.screen import Screen
-from textual.widgets import Input, Footer, Static, TabbedContent, Pretty, Label
+from textual.widgets import (
+    Input,
+    Footer,
+    Static,
+    TabbedContent,
+    Pretty,
+    Label,
+    # Placeholder,
+    RadioSet,
+    RadioButton,
+)
 from textual.widget import Widget
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive, Reactive
@@ -52,6 +63,46 @@ class Toolbar(Widget):
         self.post_message(self.ToolSwitched(tool=tool))
 
 
+class StyleEditor(Widget):
+    node_data: dict[str, Any]
+    node: Hashable
+
+    def __init__(
+        self,
+        *children: Widget,
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+        disabled: bool = False,
+        node: Hashable,
+        node_data: dict[str, Any],
+    ) -> None:
+        self.node_data = node_data
+        self.node = node
+        super().__init__(
+            *children, name=name, id=id, classes=classes, disabled=disabled
+        )
+
+    @dataclass
+    class StyleChanged(Message):
+        node: Hashable
+        node_data: dict[str, Any]
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Label("Shape", classes="section-title")
+            with RadioSet(id="shape-selector"):
+                yield RadioButton("Just Content", id="just-content")
+                yield RadioButton("Box", id="box")
+
+    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
+        if event.index == 0:
+            self.node_data["$shape"] = JustContent()
+        elif event.index == 1:
+            self.node_data["$shape"] = Box()
+        self.post_message(self.StyleChanged(node=self.node, node_data=self.node_data))
+
+
 class NodeInspector(Widget):
     node_data: dict[str, Any]
     node: Hashable
@@ -73,18 +124,24 @@ class NodeInspector(Widget):
         )
 
     def compose(self) -> ComposeResult:
-        netext_buffer = self.node_data["_netext_node_buffer"]
         attr_dct = {k: v for k, v in self.node_data.items() if k.startswith("$")}
+        node_dct = {
+            k: v
+            for k, v in self.node_data.items()
+            if not k.startswith("$") and not k.startswith("_")
+        }
 
         with TabbedContent("Node", "Style", "Ports", "Debug"):
-            yield Pretty(self.node_data)
-            yield Pretty(self.node_data)
+            with Vertical():
+                yield Label("Title", classes="section-title")
+                yield Input(value=self.node_data["title"])
+                yield Label("Node Dictionary", classes="section-title")
+                yield Pretty(node_dct)
+            yield StyleEditor(node_data=self.node_data, node=self.node)
             yield Pretty(self.node_data)
             with Vertical():
                 yield Label("Attributes", classes="section-title")
                 yield Pretty(attr_dct)
-                yield Label("Node Buffer", classes="section-title")
-                yield Pretty(netext_buffer)
 
 
 class Statusbar(Static):
@@ -382,6 +439,10 @@ class MainScreen(Screen):
     def on_toolbar_tool_switched(self, event: Toolbar.ToolSwitched) -> None:
         graph_area = self.query_one(GraphArea)
         graph_area.current_tool = event.tool
+
+    def on_style_editor_style_changed(self, event: StyleEditor.StyleChanged) -> None:
+        graph_view = self.query_one(GraphView)
+        graph_view.update_node(event.node, data=event.node_data)
 
     def action_move_node(self) -> None:
         area = self.query_one(GraphArea)
