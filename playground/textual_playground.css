@@ -45,6 +45,45 @@ NodeInspector StyleEditor {
     height: auto;
 }
 
+NodeInspector PortEditor {
+    height: auto;
+}
+
+Port {
+    height: 5;
+    width: 100%;
+    margin-top: 1
+}
+
+#port-row {
+    width: 100%;
+    margin: 0;
+}
+
+#port-row Input {
+    width: 50%;
+    margin: 0;
+}
+
+#port-row #magnet-buttons {
+    width: auto;
+    margin-right: 2;
+}
+
+#port-row #delete-button {
+    width: auto;
+}
+
+#magnet-buttons .magnet-button {
+    width: 3;
+    min-width: 3;
+}
+
+RadioSet {
+    margin-bottom: 1;
+    width: 100%;
+}
+
 Toolbar > Button {
     width: 7;
     min-width: 7;

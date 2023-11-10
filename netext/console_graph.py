@@ -503,6 +503,8 @@ class ConsoleGraph(Generic[G]):
 
             # Determine port side assignment
             # TODO this is duplicated
+            self.port_sides[node] = dict()
+            self.port_side_assignments[node] = defaultdict(list)
             for current_port_name, port_settings in sorted(
                 data.get("$ports", {}).items(), key=lambda x: x[1].get("key", 0)
             ):
@@ -513,7 +515,6 @@ class ConsoleGraph(Generic[G]):
                 port_side = ShapeSide(port_magnet.value)
                 self.port_sides[node][current_port_name] = port_side
                 self.port_side_assignments[node][port_side].append(current_port_name)
-
             new_node = rasterize_node(
                 self.console,
                 node,

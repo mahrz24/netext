@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import uuid
+from netext.geometry.magnet import Magnet
 from netext.node_rasterizer import Box, JustContent
 from netext.rendering.segment_buffer import Reference
 from netext.textual.widget import GraphView
@@ -21,7 +22,7 @@ from textual.widgets import (
     Pretty,
     Label,
     # Placeholder,
-    Checkbox,
+    # Checkbox,
     RadioSet,
     RadioButton,
 )
@@ -66,6 +67,169 @@ class Toolbar(Widget):
         self.post_message(self.ToolSwitched(tool=tool))
 
 
+class Port(Widget):
+    port: str
+    port_setting: dict[str, Any]
+
+    @dataclass
+    class DeletePort(Message):
+        port: str
+
+    @dataclass
+    class PortSettingChanged(Message):
+        port: str
+        port_setting: dict[str, Any]
+
+    def __init__(
+        self,
+        *children: Widget,
+        port: str,
+        port_setting: dict[str, Any],
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+        disabled: bool = False,
+    ) -> None:
+        self.port = port
+        self.port_setting = port_setting
+        super().__init__(
+            *children, name=name, id=id, classes=classes, disabled=disabled
+        )
+
+    def compose(self) -> ComposeResult:
+        with Horizontal(id="port-row"):
+            yield Input(self.port_setting["label"], id="port-label")
+            with Horizontal(id="magnet-buttons"):
+                yield Button("T", id="magnet-top", classes="magnet-button")
+                yield Button("B", id="magnet-bottom", classes="magnet-button")
+                yield Button("L", id="magnet-left", classes="magnet-button")
+                yield Button("R", id="magnet-right", classes="magnet-button")
+            yield Button("Delete", id="delete-button")
+
+    @on(Button.Pressed, "#delete-button")
+    def delete_port(self, event: Button.Pressed) -> None:
+        self.log("Delete Port")
+        self.post_message(self.DeletePort(port=self.port))
+
+    @on(Input.Submitted, "#port-label")
+    def port_label_changed(self, event: Input.Submitted) -> None:
+        self.log("Port Label Changed")
+        self.port_setting["label"] = event.control.value
+        self.post_message(
+            self.PortSettingChanged(port=self.port, port_setting=self.port_setting)
+        )
+
+    @on(Button.Pressed, "#magnet-top")
+    def magnet_top(self, event: Button.Pressed) -> None:
+        self.log("Magnet Top")
+        self.port_setting["magnet"] = Magnet.TOP
+        self.post_message(
+            self.PortSettingChanged(port=self.port, port_setting=self.port_setting)
+        )
+
+    @on(Button.Pressed, "#magnet-bottom")
+    def magnet_bottom(self, event: Button.Pressed) -> None:
+        self.log("Magnet Bottom")
+        self.port_setting["magnet"] = Magnet.BOTTOM
+        self.post_message(
+            self.PortSettingChanged(port=self.port, port_setting=self.port_setting)
+        )
+
+    @on(Button.Pressed, "#magnet-left")
+    def magnet_left(self, event: Button.Pressed) -> None:
+        self.log("Magnet Left")
+        self.port_setting["magnet"] = Magnet.LEFT
+        self.post_message(
+            self.PortSettingChanged(port=self.port, port_setting=self.port_setting)
+        )
+
+    @on(Button.Pressed, "#magnet-right")
+    def magnet_right(self, event: Button.Pressed) -> None:
+        self.log("Magnet Right")
+        self.port_setting["magnet"] = Magnet.RIGHT
+        self.post_message(
+            self.PortSettingChanged(port=self.port, port_setting=self.port_setting)
+        )
+
+
+class PortEditor(Widget):
+    node_data: dict[str, Any]
+    node: Hashable
+
+    def __init__(
+        self,
+        *children: Widget,
+        name: str | None = None,
+        id: str | None = None,
+        classes: str | None = None,
+        disabled: bool = False,
+        node: Hashable,
+        node_data: dict[str, Any],
+    ) -> None:
+        self.node_data = node_data
+        self.node = node
+        super().__init__(
+            *children, name=name, id=id, classes=classes, disabled=disabled
+        )
+
+    @dataclass
+    class PortChanged(Message):
+        node: Hashable
+        node_data: dict[str, Any]
+
+    def compose(self) -> ComposeResult:
+        ports = self.node_data.get("$ports", {})
+        with Vertical():
+            yield Button("Add Port", id="add-port")
+            with Vertical(id="port-list"):
+                if not ports:
+                    yield Label("No Ports")
+                else:
+                    for port, port_setting in ports.items():
+                        yield Port(
+                            port=port, port_setting=port_setting, id=f"port-{port}"
+                        )
+
+    @on(Button.Pressed, "#add-port")
+    def add_port(self, event: Button.Pressed) -> None:
+        self.log("Add Port")
+        port_name = str(uuid.uuid4())
+        if "$ports" not in self.node_data:
+            self.node_data["$ports"] = {}
+            self.query_one("#port-list").remove_children()
+        self.node_data["$ports"][port_name] = {
+            "magnet": Magnet.LEFT,
+            "label": "A",
+        }
+        self.post_message(self.PortChanged(node=self.node, node_data=self.node_data))
+        self.query_one("#port-list").mount(
+            Port(
+                port=port_name,
+                port_setting=self.node_data["$ports"][port_name],
+                id=f"port-{port_name}",
+            ),
+            before=0,
+        )
+        self.refresh()
+
+    @on(Port.DeletePort)
+    def delete_port(self, event: Port.DeletePort) -> None:
+        self.log("Delete Port")
+        del self.node_data["$ports"][event.port]
+        if not self.node_data["$ports"]:
+            del self.node_data["$ports"]
+        self.query_one(f"#port-{event.port}").remove()
+        self.post_message(self.PortChanged(node=self.node, node_data=self.node_data))
+        self.refresh()
+
+    @on(Port.PortSettingChanged)
+    def port_setting_changed(self, event: Port.PortSettingChanged) -> None:
+        self.log("Port Setting Changed")
+        self.node_data["$ports"][event.port] = event.port_setting
+        self.post_message(self.PortChanged(node=self.node, node_data=self.node_data))
+        self.refresh()
+
+
 class StyleEditor(Widget):
     node_data: dict[str, Any]
     node: Hashable
@@ -95,6 +259,7 @@ class StyleEditor(Widget):
         # TODO with proper property system, defaults are materialized before this
         shape = self.node_data.get("$shape", Box())
         box_type = self.node_data.get("$box-type", box.ROUNDED)
+
         with Vertical():
             yield Label("Shape", classes="section-title")
             with RadioSet(id="shape-selector"):
@@ -121,11 +286,6 @@ class StyleEditor(Widget):
                 )
                 yield RadioButton("HEAVY", id="heavy", value=box_type == box.HEAVY)
                 yield RadioButton("DOUBLE", id="double", value=box_type == box.DOUBLE)
-            yield Label("Node Style", classes="section-title")
-            yield Input(value=str(self.node_data.get("$style", Style()).color))
-            yield Checkbox("Bold", value=self.node_data.get("$style", Style()).bold)
-            yield Input(value=str(self.node_data.get("$style", Style()).bgcolor))
-            yield Label("Content Style", classes="section-title")
 
     @on(RadioSet.Changed, "#shape-selector")
     def shape_changed(self, event: RadioSet.Changed) -> None:
@@ -184,6 +344,11 @@ class NodeInspector(Widget):
     node_data: dict[str, Any]
     node: Hashable
 
+    @dataclass
+    class NodeChanged(Message):
+        node: Hashable
+        node_data: dict[str, Any]
+
     def __init__(
         self,
         *children: Widget,
@@ -211,14 +376,21 @@ class NodeInspector(Widget):
         with TabbedContent("Node", "Style", "Ports", "Debug"):
             with Vertical():
                 yield Label("Title", classes="section-title")
-                yield Input(value=self.node_data["title"])
+                yield Input(value=self.node_data["title"], id="title")
                 yield Label("Node Dictionary", classes="section-title")
                 yield Pretty(node_dct)
             yield StyleEditor(node_data=self.node_data, node=self.node)
-            yield Pretty(self.node_data)
+            yield PortEditor(node_data=self.node_data, node=self.node)
             with Vertical():
                 yield Label("Attributes", classes="section-title")
                 yield Pretty(attr_dct)
+
+    @on(Input.Submitted, "#title")
+    def title_changed(self, event: Input.Submitted) -> None:
+        self.node_data["title"] = event.control.value
+        self.post_message(
+            NodeInspector.NodeChanged(node=self.node, node_data=self.node_data)
+        )
 
 
 class Statusbar(Static):
@@ -518,6 +690,14 @@ class MainScreen(Screen):
         graph_area.current_tool = event.tool
 
     def on_style_editor_style_changed(self, event: StyleEditor.StyleChanged) -> None:
+        graph_view = self.query_one(GraphView)
+        graph_view.update_node(event.node, data=event.node_data)
+
+    def on_node_inspector_node_changed(self, event: NodeInspector.NodeChanged) -> None:
+        graph_view = self.query_one(GraphView)
+        graph_view.update_node(event.node, data=event.node_data)
+
+    def on_port_editor_port_changed(self, event: PortEditor.PortChanged) -> None:
         graph_view = self.query_one(GraphView)
         graph_view.update_node(event.node, data=event.node_data)
 
