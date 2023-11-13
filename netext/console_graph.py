@@ -460,8 +460,9 @@ class ConsoleGraph(Generic[G]):
 
         self._render_port_buffer_for_node(u)
         self._render_port_buffer_for_node(v)
-
         print(self.port_buffers)
+        print(self.node_buffers[u].connected_ports)
+        print(self.node_buffers[v].connected_ports)
 
     def update_node(
         self,
@@ -553,6 +554,7 @@ class ConsoleGraph(Generic[G]):
                 round(node_position.x * self.zoom_x),
                 round(node_position.y * self.zoom_y),
             )
+            self.node_buffers[node].port_positions = defaultdict(dict)
 
             # Then we recompute zoom (in case we have a zoom to fit)
             zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0

@@ -502,6 +502,8 @@ class NodeBuffer(ShapeBuffer):
         for port_name in self.connected_ports.keys():
             if node in self.connected_ports[port_name]:
                 self.connected_ports[port_name].remove(node)
+            if not self.connected_ports[port_name]:
+                del self.connected_ports[port_name]
 
     def get_port_buffers(
         self,

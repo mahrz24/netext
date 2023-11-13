@@ -1,4 +1,11 @@
 
+<a id='changelog-0.2.1'></a>
+# Port Repair v0.2.1 — 2023-11-13
+
+## Fixed
+
+- Multiple bugs around port rendering with update and removal of nodes.
+
 <a id='changelog-0.2.0'></a>
 # Textual Widget & Ports v0.2.0 — 2023-11-06
 
