@@ -499,7 +499,8 @@ class NodeBuffer(ShapeBuffer):
         self.connected_ports[port_name].append(node)
 
     def disconnect(self, node: Hashable):
-        for port_name in self.connected_ports.keys():
+        ports = list(self.connected_ports.keys())
+        for port_name in ports:
             if node in self.connected_ports[port_name]:
                 self.connected_ports[port_name].remove(node)
             if not self.connected_ports[port_name]:
