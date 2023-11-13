@@ -449,6 +449,9 @@ class ConsoleGraph(Generic[G]):
         self.node_buffers[v].disconnect(u)
         self.node_buffers[u].disconnect(v)
 
+        print(self.node_buffers[u].connected_ports)
+        print(self.node_buffers[v].connected_ports)
+
         self._nx_graph.remove_edge(u, v)
 
         edge_buffer = self.edge_buffers.pop((u, v))
@@ -457,6 +460,8 @@ class ConsoleGraph(Generic[G]):
 
         self._render_port_buffer_for_node(u)
         self._render_port_buffer_for_node(v)
+
+        print(self.port_buffers)
 
     def update_node(
         self,
@@ -506,7 +511,7 @@ class ConsoleGraph(Generic[G]):
             self.port_sides[node] = dict()
             self.port_side_assignments[node] = defaultdict(list)
             for current_port_name, port_settings in sorted(
-                data.get("$ports", {}).items(), key=lambda x: x[1].get("key", 0)
+                new_data.get("$ports", {}).items(), key=lambda x: x[1].get("key", 0)
             ):
                 port_magnet = port_settings.get("magnet", Magnet.LEFT)
 
@@ -515,6 +520,7 @@ class ConsoleGraph(Generic[G]):
                 port_side = ShapeSide(port_magnet.value)
                 self.port_sides[node][current_port_name] = port_side
                 self.port_side_assignments[node][port_side].append(current_port_name)
+
             new_node = rasterize_node(
                 self.console,
                 node,

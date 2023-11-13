@@ -400,6 +400,7 @@ class Statusbar(Static):
 class GraphArea(Widget):
     current_editor: tuple[Input, Hashable] | None = None
     edge_first_click: Hashable | None = None
+    port_first_click: str | None = None
     hover_element: Reactive[Reference | None] = reactive(cast(Reference | None, None))
     selected_element: Reactive[Reference | None] = reactive(
         cast(Reference | None, None)
@@ -535,7 +536,13 @@ class GraphArea(Widget):
         )
         self.edit_node_label(node_uuid)
 
-    def add_edge(self, u: Hashable, v: Hashable) -> None:
+    def add_edge(
+        self,
+        u: Hashable,
+        v: Hashable,
+        start_port: str | None = None,
+        end_port: str | None = None,
+    ) -> None:
         g = self.query_one(GraphView)
         g.add_edge(
             u,
@@ -544,6 +551,8 @@ class GraphArea(Widget):
                 "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
                 "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
                 "$end-arrow-tip": ArrowTip.ARROW,
+                "$start-port": start_port,
+                "$end-port": end_port,
             },
         )
 
@@ -572,7 +581,26 @@ class GraphArea(Widget):
         self.end_node_editing(control, node)
 
     def on_graph_view_element_click(self, event: GraphView.ElementClick) -> None:
-        if event.element_reference.type == "node":
+        if event.element_reference.type == "port":
+            g = self.query_one(GraphView)
+            if self.current_tool == "add-edge-tool":
+                if self.edge_first_click is None:
+                    self.port_first_click = event.element_reference.ref[1]
+                    self.edge_first_click = event.element_reference.ref[0]
+                    g.update_node(
+                        self.edge_first_click, data={"$style": Style(color="red")}
+                    )
+                else:
+                    g.update_node(self.edge_first_click, data={"$style": None})
+                    self.add_edge(
+                        self.edge_first_click,
+                        event.element_reference.ref[0],
+                        self.port_first_click,
+                        event.element_reference.ref[1],
+                    )
+                    self.edge_first_click = None
+                    self.port_first_click = None
+        elif event.element_reference.type == "node":
             if self.move_selected:
                 self.move_selected = False
 
@@ -580,13 +608,20 @@ class GraphArea(Widget):
             if self.current_tool == "add-edge-tool":
                 if self.edge_first_click is None:
                     self.edge_first_click = event.element_reference.ref
+                    self.port_first_click = None
                     g.update_node(
                         self.edge_first_click, data={"$style": Style(color="red")}
                     )
                 else:
                     g.update_node(self.edge_first_click, data={"$style": None})
-                    self.add_edge(self.edge_first_click, event.element_reference.ref)
+                    self.add_edge(
+                        self.edge_first_click,
+                        event.element_reference.ref,
+                        self.port_first_click,
+                        None,
+                    )
                     self.edge_first_click = None
+                    self.port_first_click = None
             else:
                 if self.selected_element == event.element_reference:
                     self.selected_element = None
