@@ -1,0 +1,103 @@
+GraphView {
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+.selected-tool {
+    background: red;
+}
+
+Statusbar {
+    height: 1;
+    dock: bottom;
+    layer: above
+}
+
+Toolbar {
+    dock: left;
+    width: 7;
+}
+
+#sidebar {
+    width: 80;
+}
+
+GraphInspector {
+    width: 100%;
+    height: 100%;
+}
+
+NodeInspector TabbedContent {
+    height: 100%;
+    overflow-y: auto;
+}
+
+NodeInspector Input {
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+NodeInspector Vertical {
+    height: auto;
+}
+
+NodeInspector StyleEditor {
+    height: auto;
+}
+
+NodeInspector PortEditor {
+    height: auto;
+}
+
+Port {
+    height: 5;
+    width: 100%;
+    margin-top: 1
+}
+
+#port-row {
+    width: 100%;
+    margin: 0;
+}
+
+#port-row Input {
+    width: 50%;
+    margin: 0;
+}
+
+#port-row #magnet-buttons {
+    width: auto;
+    margin-right: 2;
+}
+
+#port-row #delete-button {
+    width: auto;
+}
+
+#magnet-buttons .magnet-button {
+    width: 3;
+    min-width: 3;
+}
+
+RadioSet {
+    margin-bottom: 1;
+    width: 100%;
+}
+
+Toolbar > Button {
+    width: 7;
+    min-width: 7;
+}
+
+.section-title {
+    background: gray;
+    width: 100%;
+    text-align: center;
+}
+
+Pretty {
+    padding: 1
+}
+.invisible {
+    display: none
+}
