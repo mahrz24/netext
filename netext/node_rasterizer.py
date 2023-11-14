@@ -10,10 +10,11 @@ from rich.panel import Panel
 from rich.padding import Padding, PaddingDimensions
 from rich.segment import Segment
 from rich.style import Style
-from rich.text import Text
+
 from netext.geometry import Magnet, Point
 from shapely import LineString, Polygon
 from netext.geometry.magnet import ShapeSide
+from netext.properties.node import _default_content_renderer
 
 from netext.rendering.segment_buffer import Reference, Strip, StripBuffer, Spacer
 
