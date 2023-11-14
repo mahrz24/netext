@@ -23,3 +23,8 @@ class NodeProperties:
     content_renderer: Callable[
         [str, dict[str, Any], Style], RenderableType
     ] = _default_content_renderer
+    lod_properties: dict[int, "NodeProperties"] = dict()
+
+    @classmethod
+    def from_attribute_dict(cls, data: dict[str, Any]):
+        pass
