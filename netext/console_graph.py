@@ -6,7 +6,7 @@ from itertools import chain
 import itertools
 from typing import Any, Generic, Iterable, cast
 
-import networkx as nx
+import networkx as nx  # type: ignore
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.measure import Measurement
 
@@ -154,17 +154,11 @@ class ConsoleGraph(Generic[G]):
         self.edge_buffers: dict[tuple[Hashable, Hashable], EdgeBuffer] = dict()
         self.edge_layouts: dict[tuple[Hashable, Hashable], EdgeLayout] = dict()
 
-        self.edge_label_buffers: dict[
-            tuple[Hashable, Hashable], list[StripBuffer]
-        ] = dict()
+        self.edge_label_buffers: dict[tuple[Hashable, Hashable], list[StripBuffer]] = dict()
 
-        self.port_side_assignments: dict[
-            Hashable, dict[ShapeSide, list[str]]
-        ] = defaultdict(lambda: defaultdict(list))
+        self.port_side_assignments: dict[Hashable, dict[ShapeSide, list[str]]] = defaultdict(lambda: defaultdict(list))
         self.port_sides: dict[Hashable, dict[str, ShapeSide]] = defaultdict(dict)
-        self.port_positions: dict[
-            Hashable, dict[str, tuple[Point, Point | None]]
-        ] = defaultdict(dict)
+        self.port_positions: dict[Hashable, dict[str, tuple[Point, Point | None]]] = defaultdict(dict)
 
         self.node_idx: BufferIndex[NodeBuffer, None] = BufferIndex()
         self.edge_idx: BufferIndex[EdgeBuffer, EdgeLayout] = BufferIndex()
@@ -208,8 +202,7 @@ class ConsoleGraph(Generic[G]):
 
     @property
     def max_width(self) -> int | None:
-        """The maximum width of the graph in characters or None if no maximum width is set.
-        """
+        """The maximum width of the graph in characters or None if no maximum width is set."""
         return self._max_width
 
     @max_width.setter
@@ -221,8 +214,7 @@ class ConsoleGraph(Generic[G]):
 
     @property
     def max_height(self) -> int | None:
-        """The maximum height of the graph in characters as integer or None if no maximum height is set.
-        """
+        """The maximum height of the graph in characters as integer or None if no maximum height is set."""
         return self._max_height
 
     @max_height.setter
@@ -239,8 +231,7 @@ class ConsoleGraph(Generic[G]):
 
     @property
     def viewport(self) -> Region:
-        """The viewport that is set by the user (or the full viewport if none is set).
-        """
+        """The viewport that is set by the user (or the full viewport if none is set)."""
         if self._viewport is not None:
             return self._viewport
         return self._unconstrained_viewport()
@@ -275,9 +266,7 @@ class ConsoleGraph(Generic[G]):
         self._nx_graph.add_node(node, **data)
 
         # Add to node buffers for layout
-        self.node_buffers_for_layout[node] = rasterize_node(
-            self.console, node, cast(dict[str, Any], data)
-        )
+        self.node_buffers_for_layout[node] = rasterize_node(self.console, node, cast(dict[str, Any], data))
 
         # Determine port side assignment
         for current_port_name, port_settings in sorted(
@@ -309,11 +298,7 @@ class ConsoleGraph(Generic[G]):
 
             # Then we recompute zoom (in case we have a zoom to fit)
             zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
-            if (
-                self._zoom is AutoZoom.FIT
-                or self._zoom is AutoZoom.FIT_PROPORTIONAL
-                or self._zoom_factor is None
-            ):
+            if self._zoom is AutoZoom.FIT or self._zoom is AutoZoom.FIT_PROPORTIONAL or self._zoom_factor is None:
                 zoom_x, zoom_y = self._compute_current_zoom()
                 zoom_factor = min([zoom_x, zoom_y])
 
@@ -337,9 +322,7 @@ class ConsoleGraph(Generic[G]):
         else:
             self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_FOR_LAYOUT)
 
-    def add_edge(
-        self, u: Hashable, v: Hashable, data: dict[str, Any] | None = None
-    ) -> None:
+    def add_edge(self, u: Hashable, v: Hashable, data: dict[str, Any] | None = None) -> None:
         """Add an edge between existing nodes in the graph.
 
         Args:
@@ -358,9 +341,7 @@ class ConsoleGraph(Generic[G]):
         label_nodes: list[StripBuffer] | None = None
 
         if self._zoom_factor is None:
-            raise RuntimeError(
-                "You can only add edges once the zoom factor has been computed"
-            )
+            raise RuntimeError("You can only add edges once the zoom factor has been computed")
 
         if u not in self._nx_graph.nodes:
             raise ValueError(f"Node {u} does not exist in graph")
@@ -501,9 +482,7 @@ class ConsoleGraph(Generic[G]):
             old_position = self.node_buffers[node].center
 
             # Update node buffers for layout
-            self.node_buffers_for_layout[node] = rasterize_node(
-                self.console, node, cast(dict[str, Any], new_data)
-            )
+            self.node_buffers_for_layout[node] = rasterize_node(self.console, node, cast(dict[str, Any], new_data))
 
             # Update port side assignment
 
@@ -539,9 +518,7 @@ class ConsoleGraph(Generic[G]):
 
         data = cast(dict[str, Any], self._nx_graph.nodes(data=True)[node])
 
-        force_edge_rerender = (
-            force_edge_rerender or (position is not None) or "$ports" in data
-        )
+        force_edge_rerender = force_edge_rerender or (position is not None) or "$ports" in data
 
         if position is None:
             node_position = self.node_positions[node]
@@ -558,11 +535,7 @@ class ConsoleGraph(Generic[G]):
 
             # Then we recompute zoom (in case we have a zoom to fit)
             zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
-            if (
-                self._zoom is AutoZoom.FIT
-                or self._zoom is AutoZoom.FIT_PROPORTIONAL
-                or self._zoom_factor is None
-            ):
+            if self._zoom is AutoZoom.FIT or self._zoom is AutoZoom.FIT_PROPORTIONAL or self._zoom_factor is None:
                 zoom_x, zoom_y = self._compute_current_zoom()
                 zoom_factor = min([zoom_x, zoom_y])
 
@@ -591,9 +564,7 @@ class ConsoleGraph(Generic[G]):
 
         affected_edges: list[tuple[Hashable, Hashable]] = []
 
-        position_view_space = Point(
-            round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y)
-        )
+        position_view_space = Point(round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y))
         self.node_buffers[node].center = position_view_space
 
         for v in nx.all_neighbors(self._nx_graph, node):
@@ -621,9 +592,7 @@ class ConsoleGraph(Generic[G]):
         Returns:
             FloatPoint: The converted point in graph coordinates.
         """
-        return FloatPoint(
-            p.x / self.zoom_x - self.offset.x, p.y / self.zoom_y - self.offset.y
-        )
+        return FloatPoint(p.x / self.zoom_x - self.offset.x, p.y / self.zoom_y - self.offset.y)
 
     def to_view_coordinates(self, p: FloatPoint) -> Point:
         """Converts a point from graph coordinates to view coordinates.
@@ -669,9 +638,7 @@ class ConsoleGraph(Generic[G]):
 
         # This should not happen as we require the render state to have zoomed positions computed.
         if self._zoom_factor is None:
-            raise RuntimeError(
-                "You can only update edges once the zoom factor has been computed"
-            )
+            raise RuntimeError("You can only update edges once the zoom factor has been computed")
 
         old_data = self._nx_graph.edges[u, v]
         data = dict(old_data, **data) if update_data else data
@@ -732,9 +699,7 @@ class ConsoleGraph(Generic[G]):
 
     def _transition_compute_node_layout(self) -> None:
         # Store the node buffers in the graph itself
-        nx.set_node_attributes(
-            self._nx_graph, self.node_buffers_for_layout, "_netext_node_buffer"
-        )
+        nx.set_node_attributes(self._nx_graph, self.node_buffers_for_layout, "_netext_node_buffer")
 
         # Position the nodes and store these original positions
         self.node_positions = self.layout_engine(self._nx_graph)
@@ -752,18 +717,12 @@ class ConsoleGraph(Generic[G]):
             # We add 0.25 to the offset to make sure we do not get rounding errors
             # Otherwise nodes that have different coordinates originally end up in
             # the same position after rounding.
-            self.offset = FloatPoint(
-                -min_x - (max_x - min_x) / 2 + 0.25, -min_y - (max_y - min_y) / 2 + 0.25
-            )
+            self.offset = FloatPoint(-min_x - (max_x - min_x) / 2 + 0.25, -min_y - (max_y - min_y) / 2 + 0.25)
 
-            self.node_positions = {
-                node: pos + self.offset for node, pos in self.node_positions.items()
-            }
+            self.node_positions = {node: pos + self.offset for node, pos in self.node_positions.items()}
 
         for node, position in self.node_positions.items():
-            self.node_buffers_for_layout[node].center = Point(
-                x=round(position.x), y=round(position.y)
-            )
+            self.node_buffers_for_layout[node].center = Point(x=round(position.x), y=round(position.y))
 
         # TODO Split off into own step
         for node, data in self._nx_graph.nodes(data=True):
@@ -779,30 +738,16 @@ class ConsoleGraph(Generic[G]):
                         neighbours = self._nx_graph.neighbors(node)
                         for v_node in neighbours:
                             if (node, v_node) in self._nx_graph.edges:
-                                if (
-                                    self._nx_graph.edges[(node, v_node)].get(
-                                        "$start-port"
-                                    )
-                                    == current_port_name
-                                ):
+                                if self._nx_graph.edges[(node, v_node)].get("$start-port") == current_port_name:
                                     port_side = ShapeSide(
                                         self.node_buffers_for_layout[node]
-                                        .get_closest_magnet(
-                                            self.node_buffers_for_layout[v_node].center
-                                        )
+                                        .get_closest_magnet(self.node_buffers_for_layout[v_node].center)
                                         .value
                                     )
-                                elif (
-                                    self._nx_graph.edges[(v_node, node)].get(
-                                        "$end-port"
-                                    )
-                                    == current_port_name
-                                ):
+                                elif self._nx_graph.edges[(v_node, node)].get("$end-port") == current_port_name:
                                     port_side = ShapeSide(
                                         self.node_buffers_for_layout[node]
-                                        .get_closest_magnet(
-                                            self.node_buffers_for_layout[v_node].center
-                                        )
+                                        .get_closest_magnet(self.node_buffers_for_layout[v_node].center)
                                         .value
                                     )
 
@@ -810,9 +755,7 @@ class ConsoleGraph(Generic[G]):
                         port_side = ShapeSide(port_magnet.value)
 
                     self.port_sides[node][current_port_name] = port_side
-                    self.port_side_assignments[node][port_side].append(
-                        current_port_name
-                    )
+                    self.port_side_assignments[node][port_side].append(current_port_name)
 
     def _transition_compute_zoomed_positions(self) -> None:
         zoom_x, zoom_y = self._compute_current_zoom()
@@ -828,12 +771,8 @@ class ConsoleGraph(Generic[G]):
             min_node_y = min([pos.y for pos in self.node_positions.values()])
 
             # Compute the zoom value for both axes
-            max_buffer_width = max(
-                [buffer.width for buffer in self.node_buffers_for_layout.values()]
-            )
-            max_buffer_height = max(
-                [buffer.height for buffer in self.node_buffers_for_layout.values()]
-            )
+            max_buffer_width = max([buffer.width for buffer in self.node_buffers_for_layout.values()])
+            max_buffer_height = max([buffer.height for buffer in self.node_buffers_for_layout.values()])
 
             max_width = (max_node_x - min_node_x) + max_buffer_width + 2
             max_height = (max_node_y - min_node_y) + max_buffer_height + 2
@@ -842,16 +781,14 @@ class ConsoleGraph(Generic[G]):
                 case AutoZoom.FIT:
                     if self.max_width is None or self.max_height is None:
                         raise ValueError(
-                            "AutoZoom.FIT is onlye allowed if the maximum renderable"
-                            " width and height is known."
+                            "AutoZoom.FIT is onlye allowed if the maximum renderable" " width and height is known."
                         )
                     zoom_x = self.max_width / max_width
                     zoom_y = self.max_height / max_height
                 case AutoZoom.FIT_PROPORTIONAL:
                     if self.max_width is None or self.max_height is None:
                         raise ValueError(
-                            "AutoZoom.FIT is only allowed if the maximum renderable"
-                            " width and height is known."
+                            "AutoZoom.FIT is only allowed if the maximum renderable" " width and height is known."
                         )
                     zoom_x = self.max_width / max_width
                     zoom_y = self.max_height / max_height
@@ -868,18 +805,13 @@ class ConsoleGraph(Generic[G]):
 
     def _transition_render_node_buffers(self) -> None:
         if self._zoom_factor is None:
-            raise RuntimeError(
-                "Invalid transition, lod buffers can only be rendered once zoom is"
-                " computed."
-            )
+            raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
 
         for node, data in self._nx_graph.nodes(data=True):
             lod = determine_lod(data, self._zoom_factor)
             # Get the zoomed position of the node
             position = self.node_positions[node]
-            position_view_space = Point(
-                round(position.x * self.zoom_x), round(position.y * self.zoom_y)
-            )
+            position_view_space = Point(round(position.x * self.zoom_x), round(position.y * self.zoom_y))
 
             node_buffer = rasterize_node(
                 self.console,
@@ -896,9 +828,7 @@ class ConsoleGraph(Generic[G]):
     def _determine_port_positions(self, node: Hashable, lod: int, data: dict[str, Any]):
         # Determine the port positions as this is now possible
         if "$ports" in data:
-            for current_port_name, _ in sorted(
-                data.get("$ports", {}).items(), key=lambda x: x[1].get("key", 0)
-            ):
+            for current_port_name, _ in sorted(data.get("$ports", {}).items(), key=lambda x: x[1].get("key", 0)):
                 port_side = self.port_sides[node][current_port_name]
                 pos, pos_helper = self.node_buffers[node].get_port_position(
                     port_name=current_port_name,
@@ -910,10 +840,7 @@ class ConsoleGraph(Generic[G]):
 
     def _transition_render_edges(self) -> None:
         if self._zoom_factor is None:
-            raise RuntimeError(
-                "Invalid transition, lod buffers can only be rendered once zoom is"
-                " computed."
-            )
+            raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
 
         # Now we rasterize the edges
 
@@ -964,20 +891,14 @@ class ConsoleGraph(Generic[G]):
 
     def _render_port_buffers(self) -> None:
         if self._zoom_factor is None:
-            raise RuntimeError(
-                "Invalid transition, lod buffers can only be rendered once zoom is"
-                " computed."
-            )
+            raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
 
         for node in self._nx_graph.nodes:
             self._render_port_buffer_for_node(node)
 
     def _render_port_buffer_for_node(self, node):
         if self._zoom_factor is None:
-            raise RuntimeError(
-                "Invalid transition, lod buffers can only be rendered once zoom is"
-                " computed."
-            )
+            raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
 
         node_buffer = self.node_buffers[node]
         lod = determine_lod(self._nx_graph.nodes[node], self._zoom_factor)
@@ -996,17 +917,9 @@ class ConsoleGraph(Generic[G]):
             filter_node=lambda n: self._nx_graph.nodes[n].get("$show", True),
         )
 
-        node_buffers = [
-            node_buffer
-            for node, node_buffer in self.node_buffers.items()
-            if node in visible_nodes
-        ]
+        node_buffers = [node_buffer for node, node_buffer in self.node_buffers.items() if node in visible_nodes]
 
-        port_buffers = [
-            port_buffers
-            for node, port_buffers in self.port_buffers.items()
-            if node in visible_nodes
-        ]
+        port_buffers = [port_buffers for node, port_buffers in self.port_buffers.items() if node in visible_nodes]
         return chain(
             node_buffers,
             self.edge_buffers.values(),
@@ -1022,9 +935,7 @@ class ConsoleGraph(Generic[G]):
 
         return Region.union(regions)
 
-    def __rich_console__(
-        self, console: Console, options: ConsoleOptions
-    ) -> RenderResult:
+    def __rich_console__(self, console: Console, options: ConsoleOptions) -> RenderResult:
         self.max_width = options.max_width
         self.max_height = options.max_height
 
@@ -1037,9 +948,7 @@ class ConsoleGraph(Generic[G]):
 
         yield from itertools.chain(*[strip + [""] for strip in strips])
 
-    def __rich_measure__(
-        self, console: Console, options: ConsoleOptions
-    ) -> Measurement:
+    def __rich_measure__(self, console: Console, options: ConsoleOptions) -> Measurement:
         self.max_width = options.max_width
         self.max_height = options.max_height
 

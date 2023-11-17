@@ -10,5 +10,5 @@ class MultiLineString(BaseMultipartGeometry):
         scale_factor: float = ...,
         color: Incomplete | None = ...,
         opacity: Incomplete | None = ...,
-        **kwargs
+        **kwargs,
     ): ...

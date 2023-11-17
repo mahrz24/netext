@@ -6,7 +6,7 @@ def points(
     z: Incomplete | None = ...,
     indices: Incomplete | None = ...,
     out: Incomplete | None = ...,
-    **kwargs
+    **kwargs,
 ): ...
 def linestrings(
     coords,
@@ -14,7 +14,7 @@ def linestrings(
     z: Incomplete | None = ...,
     indices: Incomplete | None = ...,
     out: Incomplete | None = ...,
-    **kwargs
+    **kwargs,
 ): ...
 def linearrings(
     coords,
@@ -22,14 +22,14 @@ def linearrings(
     z: Incomplete | None = ...,
     indices: Incomplete | None = ...,
     out: Incomplete | None = ...,
-    **kwargs
+    **kwargs,
 ): ...
 def polygons(
     geometries,
     holes: Incomplete | None = ...,
     indices: Incomplete | None = ...,
     out: Incomplete | None = ...,
-    **kwargs
+    **kwargs,
 ): ...
 def box(xmin, ymin, xmax, ymax, ccw: bool = ..., **kwargs): ...
 def multipoints(

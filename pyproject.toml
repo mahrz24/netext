@@ -52,12 +52,12 @@ version-file = "_version.py"
 
 [tool.hatch.envs.tools]
 detached = true
-python = "3.11"
+python = "3.12"
 dependencies = ["scriv>=1.3.1", "pre-commit>=2.20.0"]
 
 
 [tool.hatch.envs.docs]
-python = "3.11"
+python = "3.12"
 dependencies = [
     "mkdocstrings[python]>=0.20.0",
     "mkdocs-material>=9.0.5",
@@ -67,11 +67,10 @@ dependencies = [
 
 [tool.hatch.envs.lint]
 detached = true
-python = "3.11"
-dependencies = ["black>=22.6.0", "ruff>=0.0.254"]
+python = "3.12"
+dependencies = ["ruff>=0.1.5"]
 
-[tool.hatch.envs.test]
-python = "3.11"
+[tool.hatch.envs.test_base]
 dependencies = [
     "syrupy>=4.0.1",
     "jinja2>=3.1.2",
@@ -81,15 +80,21 @@ dependencies = [
     "asv>=0.5.1",
     "mypy>=1.3",
     "pytest-asyncio>=0.21.1",
+    "aiohttp>=3.9.0b6",
 ]
 features = ["textual"]
 
+[tool.hatch.envs.test]
+template = "test_base"
+
+[[tool.hatch.envs.test.matrix]]
+python = ["3.10", "3.11", "3.12"]
+
 [tool.hatch.envs.dev]
-python = "3.11"
-template = "test"
+python = "3.12"
+template = "test_base"
 extra-dependencies = [
-    "textual-dev>1.0",
-    "pyinstrument>=4.4.0",
+    "textual-dev<=1.1",
     "rich-pixels>=2.1.1",
     "aiohttp>=3.9.0b6",
 ]

@@ -10,7 +10,7 @@ def union_all(
     geometries,
     grid_size: Incomplete | None = ...,
     axis: Incomplete | None = ...,
-    **kwargs
+    **kwargs,
 ): ...
 
 unary_union = union_all

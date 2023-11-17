@@ -19,7 +19,7 @@ g.add_edge(
         "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
         "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
         "$style": Style(color="green"),
-    }
+    },
 )
 
 print(ConsoleGraph(g, layout_engine=StaticLayout()))

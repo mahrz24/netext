@@ -5,9 +5,7 @@ from netext.geometry.line_segment import LineSegment
 from netext.rendering.bitmap_buffer import BitmapBuffer
 
 
-def _bresenham_line_drawing(
-    line_segment: LineSegment, bitmap_buffer: BitmapBuffer
-) -> None:
+def _bresenham_line_drawing(line_segment: LineSegment, bitmap_buffer: BitmapBuffer) -> None:
     x0 = line_segment.start.x - bitmap_buffer.x
     x1 = line_segment.end.x - bitmap_buffer.x
 
@@ -26,9 +24,7 @@ def _bresenham_line_drawing(
         _bresenham_steep(x0, y0, x1, y1, bitmap_buffer)
 
 
-def _bresenham_flat(
-    x0: int, y0: int, x1: int, y1: int, bitmap_buffer: BitmapBuffer
-) -> None:
+def _bresenham_flat(x0: int, y0: int, x1: int, y1: int, bitmap_buffer: BitmapBuffer) -> None:
     dx = x1 - x0
     dy = y1 - y0
     yi = 1
@@ -53,9 +49,7 @@ def _put_pixel(x: int, y: int, bitmap_buffer: BitmapBuffer) -> None:
     bitmap_buffer.buffer[x + y * bitmap_buffer.width] = True
 
 
-def _bresenham_steep(
-    x0: int, y0: int, x1: int, y1: int, bitmap_buffer: BitmapBuffer
-) -> None:
+def _bresenham_steep(x0: int, y0: int, x1: int, y1: int, bitmap_buffer: BitmapBuffer) -> None:
     dx = x1 - x0
     dy = y1 - y0
     xi = 1
@@ -75,9 +69,7 @@ def _bresenham_steep(
             D = D + 2 * dx
 
 
-def rasterize_edge_segments(
-    edge_segments: list[EdgeSegment], x_scaling: int, y_scaling: int
-) -> BitmapBuffer:
+def rasterize_edge_segments(edge_segments: list[EdgeSegment], x_scaling: int, y_scaling: int) -> BitmapBuffer:
     min_point = Point(
         x=min([min([seg.start.x, seg.end.x]) for seg in edge_segments]),
         y=min([min([seg.start.y, seg.end.y]) for seg in edge_segments]),
@@ -100,9 +92,7 @@ def rasterize_edge_segments(
 
     for edge_segment in edge_segments:
         scaled_segment = EdgeSegment(
-            start=Point(
-                edge_segment.start.x * x_scaling, edge_segment.start.y * y_scaling
-            ),
+            start=Point(edge_segment.start.x * x_scaling, edge_segment.start.y * y_scaling),
             end=Point(edge_segment.end.x * x_scaling, edge_segment.end.y * y_scaling),
         )
         _bresenham_line_drawing(scaled_segment, bitmap_buffer=bitmap_buffer)

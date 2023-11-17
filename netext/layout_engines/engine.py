@@ -1,7 +1,7 @@
 from collections.abc import Hashable
 from typing import Generic, TypeVar
 
-from networkx import Graph, DiGraph
+from networkx import Graph, DiGraph  # type: ignore
 
 from netext.geometry.point import FloatPoint
 

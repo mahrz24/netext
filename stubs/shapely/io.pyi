@@ -10,7 +10,7 @@ def to_wkt(
     trim: bool = ...,
     output_dimension: int = ...,
     old_3d: bool = ...,
-    **kwargs
+    **kwargs,
 ): ...
 def to_wkb(
     geometry,
@@ -19,7 +19,7 @@ def to_wkb(
     byte_order: int = ...,
     include_srid: bool = ...,
     flavor: str = ...,
-    **kwargs
+    **kwargs,
 ): ...
 def to_geojson(geometry, indent: Incomplete | None = ..., **kwargs): ...
 def from_wkt(geometry, on_invalid: str = ..., **kwargs): ...

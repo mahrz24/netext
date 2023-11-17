@@ -37,9 +37,7 @@ class BufferIndex(Generic[T, AnnotationT]):
         del self._coordinate_map[buffer_key]
         del self._annotations[buffer_key]
 
-    def intersection(
-        self, bounding_box: tuple[float, float, float, float], restrict: list[T]
-    ) -> list[T]:
+    def intersection(self, bounding_box: tuple[float, float, float, float], restrict: list[T]) -> list[T]:
         restrict_refs = [buffer.reference for buffer in restrict]
         return [
             self._buffer_map[item.id]
@@ -58,8 +56,7 @@ class BufferIndex(Generic[T, AnnotationT]):
             [
                 self._annotations[item.id]
                 for item in self._index.intersection(bounding_box, objects=True)
-                if self._annotations.get(item.id) is not None
-                and hash(self._annotations[item.id]) in restrict_hashes
+                if self._annotations.get(item.id) is not None and hash(self._annotations[item.id]) in restrict_hashes
             ],
         )
 

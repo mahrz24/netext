@@ -140,9 +140,7 @@ def create_graph() -> nx.DiGraph:
 
 def add_frame(node, frame, total_time) -> None:
     if not frame.group or (
-        frame.group.root == frame
-        or frame.total_self_time > 0.2 * total_time
-        or frame in frame.group.exit_frames
+        frame.group.root == frame or frame.total_self_time > 0.2 * total_time or frame in frame.group.exit_frames
     ):
         percent = frame.time / total_time * 100
         time_percent_str = f"{percent:.0f}%"
@@ -171,11 +169,7 @@ def add_profiler_node(node, profiler: Profiler) -> None:
 
     if session is not None:
         stats.add_leaf(f"Program: {session.program}")
-        stats.add_leaf(
-            "Recorded: {:<9}".format(
-                time.strftime("%X", time.localtime(session.start_time))
-            )
-        )
+        stats.add_leaf("Recorded: {:<9}".format(time.strftime("%X", time.localtime(session.start_time))))
         stats.add_leaf(f"Samples:  {session.sample_count}")
         stats.add_leaf(f"Duration: {session.duration:<9.3f}")
         stats.add_leaf(f"CPU time: {session.cpu_time:.3f}")
@@ -362,9 +356,7 @@ class MainScreen(Screen):
         """An action to toggle nodes."""
         graph_widget = self.query_one(Graph)
         for node in graph_widget.graph.nodes:
-            graph_widget.graph.nodes[node]["$show"] = not graph_widget.graph.nodes[
-                node
-            ]["$show"]
+            graph_widget.graph.nodes[node]["$show"] = not graph_widget.graph.nodes[node]["$show"]
 
         graph_widget.graph_mutated()
 
@@ -372,9 +364,7 @@ class MainScreen(Screen):
         """An action to toggle edges."""
         graph_widget = self.query_one(Graph)
         for u, v in graph_widget.graph.edges:
-            graph_widget.graph.edges[u, v]["$show"] = not graph_widget.graph.edges[
-                u, v
-            ]["$show"]
+            graph_widget.graph.edges[u, v]["$show"] = not graph_widget.graph.edges[u, v]["$show"]
 
         graph_widget.graph_mutated()
 
@@ -389,9 +379,7 @@ class MainScreen(Screen):
                 graph_widget.graph.nodes[node]["$style"] = Style(color="red")
                 graph_widget.graph_mutated()
 
-            self.app.push_screen(
-                SelectDialog(list(graph_widget.graph.nodes(data=False)), _select_node)
-            )
+            self.app.push_screen(SelectDialog(list(graph_widget.graph.nodes(data=False)), _select_node))
 
     def action_layout(self) -> None:
         """An action to add a node."""
@@ -413,9 +401,7 @@ class MainScreen(Screen):
                     graph_widget.graph = nx.DiGraph()
                 graph_widget.graph_mutated()
 
-            self.app.push_screen(
-                SelectDialog(["Binomial Graph n=5", "Empty Graph"], _load_graph)
-            )
+            self.app.push_screen(SelectDialog(["Binomial Graph n=5", "Empty Graph"], _load_graph))
 
     def on_key(self, event: Key) -> None:
         if self.selected_node:

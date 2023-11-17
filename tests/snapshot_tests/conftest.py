@@ -49,9 +49,7 @@ def import_graph(path: str) -> ConsoleGraph:
     source_code = spec.loader.get_source(script_name)
 
     # Replace the original function with the new one
-    source_code = source_code.replace("console.print(", "_print_intercept(").replace(
-        "print(", "_print_intercept("
-    )
+    source_code = source_code.replace("console.print(", "_print_intercept(").replace("print(", "_print_intercept(")
 
     module = types.ModuleType(script_name)
 
@@ -70,9 +68,7 @@ def _print_intercept(*args, **kwargs):
 
 
 @pytest.fixture
-def snap_compare(
-    snapshot: SnapshotAssertion, request: FixtureRequest
-) -> Callable[[str | PurePath], bool]:
+def snap_compare(snapshot: SnapshotAssertion, request: FixtureRequest) -> Callable[[str | PurePath], bool]:
     """
     This fixture returns a function which can be used to compare the output of a Textual
     app with the output of the same app in the past. This is snapshot testing, and it
@@ -117,9 +113,7 @@ def snap_compare(
 
         if result is False:
             # The split and join below is a mad hack, sorry...
-            node.stash[NETEXT_SNAPSHOT_SVG_KEY] = "\n".join(
-                str(snapshot).splitlines()[1:-1]
-            )
+            node.stash[NETEXT_SNAPSHOT_SVG_KEY] = "\n".join(str(snapshot).splitlines()[1:-1])
             node.stash[NETEXT_ACTUAL_SVG_KEY] = actual_screenshot
             node.stash[NETEXT_GRAPH_KEY] = graph
         else:
@@ -164,12 +158,7 @@ def pytest_sessionfinish(
 
         if graph:
             path, line_index, name = item.reportinfo()
-            similarity = (
-                100
-                * difflib.SequenceMatcher(
-                    a=str(snapshot_svg), b=str(actual_svg)
-                ).ratio()
-            )
+            similarity = 100 * difflib.SequenceMatcher(a=str(snapshot_svg), b=str(actual_svg)).ratio()
             diffs.append(
                 SvgSnapshotDiff(
                     snapshot=str(snapshot_svg),
@@ -188,9 +177,7 @@ def pytest_sessionfinish(
         diffs = sorted(diffs, key=diff_sort_key)
 
         conftest_path = Path(__file__)
-        snapshot_template_path = (
-            conftest_path.parent / "snapshot_report_template.jinja2"
-        )
+        snapshot_template_path = conftest_path.parent / "snapshot_report_template.jinja2"
         snapshot_report_path_dir = conftest_path.parent / "output"
         snapshot_report_path_dir.mkdir(parents=True, exist_ok=True)
         snapshot_report_path = snapshot_report_path_dir / "snapshot_report.html"

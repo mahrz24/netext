@@ -20,7 +20,7 @@ def buffer(
     join_style: str = ...,
     mitre_limit: float = ...,
     single_sided: bool = ...,
-    **kwargs
+    **kwargs,
 ): ...
 def offset_curve(
     geometry,
@@ -28,7 +28,7 @@ def offset_curve(
     quad_segs: int = ...,
     join_style: str = ...,
     mitre_limit: float = ...,
-    **kwargs
+    **kwargs,
 ): ...
 def centroid(geometry, **kwargs): ...
 def clip_by_rect(geometry, xmin, ymin, xmax, ymax, **kwargs): ...
@@ -56,7 +56,7 @@ def voronoi_polygons(
     tolerance: float = ...,
     extend_to: Incomplete | None = ...,
     only_edges: bool = ...,
-    **kwargs
+    **kwargs,
 ): ...
 def oriented_envelope(geometry, **kwargs): ...
 
