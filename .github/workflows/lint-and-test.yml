@@ -54,7 +54,7 @@ jobs:
     #   if: steps.cache.outputs.cache-hit != 'true'
     - uses: pre-commit/action@v3.0.0
     - name: Run mypy
-      run: hatch run test:mypy
+      run: hatch run test:mypy netext
     - name: Test with pytest
       run: |
         hatch run test:pytest --cov=netext --cov-report=xml:coverage.xml
