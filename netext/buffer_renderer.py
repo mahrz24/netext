@@ -31,9 +31,7 @@ def render_buffers(
     buffers_by_row: dict[int, list[StripBuffer]] = defaultdict(list)
     for buffer in buffers:
         if buffer.bottom_y >= viewport.y and buffer.top_y < full_height:
-            buffers_by_row[buffer.top_y] = sorted(
-                buffers_by_row[buffer.top_y] + [buffer]
-            )
+            buffers_by_row[buffer.top_y] = sorted(buffers_by_row[buffer.top_y] + [buffer])
 
     result_strips = []
 
@@ -72,9 +70,7 @@ def render_buffers(
             key=lambda buffer: buffer[0],
         )
 
-        active_buffers = list(
-            merge(active_buffers, new_active_buffers, key=lambda buffer: buffer[0])
-        )
+        active_buffers = list(merge(active_buffers, new_active_buffers, key=lambda buffer: buffer[0]))
 
         if row < viewport.y:
             continue
@@ -92,9 +88,7 @@ def render_buffers(
             line_left_x, segments, buffer_row, buffer = working_buffers.pop(0)
             full_segments_cell_length = sum(segment.cell_length for segment in segments)
 
-            assert (
-                line_left_x + full_segments_cell_length <= buffer.right_x + 1
-            ), "Segment overflow."
+            assert line_left_x + full_segments_cell_length <= buffer.right_x + 1, "Segment overflow."
 
             segment_left_x = line_left_x
             skip_remaining_segments = False
@@ -126,37 +120,26 @@ def render_buffers(
                 # intersects with the current buffer & length (and has a smaller z-index), we split the
                 # current buffer segment at that place and add the remaining part after the intersecting
                 # segment.
-                for i, (line_left_x_next, _, br, buffer_next) in enumerate(
-                    working_buffers
-                ):
+                for i, (line_left_x_next, _, br, buffer_next) in enumerate(working_buffers):
                     if (
                         line_left_x_next < segment_left_x + full_segment_cell_length
-                        and (
-                            buffer_next.z_index < buffer.z_index
-                            or isinstance(segment, Spacer)
-                        )
+                        and (buffer_next.z_index < buffer.z_index or isinstance(segment, Spacer))
                         and segment.cell_length > 0
                     ):
                         # We have to account for the case where we are already past
                         # the left of the next buffer due to already previously
                         # yielded segments (hence the max)
-                        segment, overflow_segment = segment.split_cells(
-                            max(0, line_left_x_next - current_x)
-                        )
+                        segment, overflow_segment = segment.split_cells(max(0, line_left_x_next - current_x))
 
                         # In case we already are past the new left x we have
                         # to adjust the new buffer, but only in case it's not a spacer
                         if isinstance(segment, Spacer):
                             new_left_x = (
-                                line_left_x_next
-                                - min(0, line_left_x_next - current_x)
-                                + overflow_segment.cell_length
+                                line_left_x_next - min(0, line_left_x_next - current_x) + overflow_segment.cell_length
                             )
                             new_segments = segments[j + 1 :]
                         else:
-                            new_left_x = line_left_x_next - min(
-                                0, line_left_x_next - current_x
-                            )
+                            new_left_x = line_left_x_next - min(0, line_left_x_next - current_x)
                             new_segments = [overflow_segment] + segments[j + 1 :]
 
                         new_buffers.append(
@@ -174,9 +157,7 @@ def render_buffers(
                         break
 
                 # Use merge
-                working_buffers = list(
-                    merge(working_buffers, new_buffers, key=lambda buffer: buffer[0])
-                )
+                working_buffers = list(merge(working_buffers, new_buffers, key=lambda buffer: buffer[0]))
 
                 # Do not render over the right boundary of the canvas
                 if current_x > full_width:

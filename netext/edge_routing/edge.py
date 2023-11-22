@@ -34,12 +34,7 @@ class EdgeSegment(LineSegment):
             return [self]
         else:
             return list(
-                itertools.chain(
-                    *[
-                        edge_segment.cut_multiple(node_buffers)
-                        for edge_segment in self.cut(node_buffer)
-                    ]
-                )
+                itertools.chain(*[edge_segment.cut_multiple(node_buffers) for edge_segment in self.cut(node_buffer)])
             )
 
     def cut(self, node_buffer: NodeBuffer) -> list["EdgeSegment"]:
@@ -53,24 +48,16 @@ class EdgeSegment(LineSegment):
                 for line in remaining.geoms:
                     result.append(
                         EdgeSegment(
-                            start=Point.from_shapely(
-                                line.interpolate(0, normalized=True)
-                            ),
-                            end=Point.from_shapely(
-                                line.interpolate(1, normalized=True)
-                            ),
+                            start=Point.from_shapely(line.interpolate(0, normalized=True)),
+                            end=Point.from_shapely(line.interpolate(1, normalized=True)),
                             _parent=self.parent,
                         )
                     )
             else:
                 result.append(
                     EdgeSegment(
-                        start=Point.from_shapely(
-                            remaining.interpolate(0, normalized=True)
-                        ),
-                        end=Point.from_shapely(
-                            remaining.interpolate(1, normalized=True)
-                        ),
+                        start=Point.from_shapely(remaining.interpolate(0, normalized=True)),
+                        end=Point.from_shapely(remaining.interpolate(1, normalized=True)),
                         _parent=self.parent,
                     )
                 )
@@ -78,16 +65,10 @@ class EdgeSegment(LineSegment):
         return [self]
 
     def count_node_intersections(self, node_buffers: Iterable[NodeBuffer]) -> int:
-        return sum(
-            1 for node_buffer in node_buffers if self.intersects_with_node(node_buffer)
-        )
+        return sum(1 for node_buffer in node_buffers if self.intersects_with_node(node_buffer))
 
     def count_edge_intersections(self, edges: Iterable["EdgeLayout"]) -> int:
-        return sum(
-            self.intersects_with_edge_segment(segment)
-            for edge in edges
-            for segment in edge.segments
-        )
+        return sum(self.intersects_with_edge_segment(segment) for edge in edges for segment in edge.segments)
 
     def ortho_split_x(self) -> list["EdgeSegment"]:
         if self.start.x == self.end.x or self.start.y == self.end.y:
@@ -164,9 +145,7 @@ class RoutedEdgeSegments:
     ) -> "RoutedEdgeSegments":
         return cls(
             segments=segments,
-            intersections=sum(
-                segment.count_node_intersections(node_buffers) for segment in segments
-            )
+            intersections=sum(segment.count_node_intersections(node_buffers) for segment in segments)
             + sum(segment.count_edge_intersections(edges) for segment in segments),
         )
 
@@ -176,33 +155,20 @@ class RoutedEdgeSegments:
             intersections=self.intersections + other.intersections,
         )
 
-    def cut_with_nodes(
-        self, node_buffers: Iterable[NodeBuffer]
-    ) -> "RoutedEdgeSegments":
+    def cut_with_nodes(self, node_buffers: Iterable[NodeBuffer]) -> "RoutedEdgeSegments":
         # We remove any edge segments that were cut to a single point.
         return RoutedEdgeSegments(
-            segments=list(
-                itertools.chain(
-                    *[
-                        segment.cut_multiple(iter(node_buffers))
-                        for segment in self.segments
-                    ]
-                )
-            ),
+            segments=list(itertools.chain(*[segment.cut_multiple(iter(node_buffers)) for segment in self.segments])),
             intersections=self.intersections,
         )
 
     @property
     def min_bound(self) -> Point:
-        return Point.min_point(
-            [edge_segment.min_bound for edge_segment in self.segments]
-        )
+        return Point.min_point([edge_segment.min_bound for edge_segment in self.segments])
 
     @property
     def max_bound(self) -> Point:
-        return Point.max_point(
-            [edge_segment.max_bound for edge_segment in self.segments]
-        )
+        return Point.max_point([edge_segment.max_bound for edge_segment in self.segments])
 
     @property
     def length(self) -> int:

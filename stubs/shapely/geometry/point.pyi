@@ -17,7 +17,7 @@ class Point(BaseGeometry):
         scale_factor: float = ...,
         fill_color: Incomplete | None = ...,
         opacity: Incomplete | None = ...,
-        **kwargs
+        **kwargs,
     ): ...
     @property
     def xy(self): ...

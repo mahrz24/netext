@@ -1,4 +1,4 @@
-from typing import Any, Generic, Hashable, Self, TypeGuard, cast
+from typing import Any, Generic, Hashable, TypeGuard, cast
 
 from textual.events import Resize
 from textual import events
@@ -20,11 +20,7 @@ from netext.rendering.segment_buffer import Reference
 
 
 def _setup_console_graph(graph: "GraphView[G]") -> TypeGuard["InitializedGraphView[G]"]:
-    if (
-        graph._console_graph is None
-        and graph.size.width != 0
-        and graph.size.height != 0
-    ):
+    if graph._console_graph is None and graph.size.width != 0 and graph.size.height != 0:
         graph._console_graph = ConsoleGraph(
             graph.graph,
             console=graph.app.console,
@@ -106,9 +102,7 @@ class GraphView(ScrollView, Generic[G]):
         self._attached_widgets: dict[Hashable, tuple[Widget, bool]] = dict()
         self._attached_widgets_lookup: dict[Widget, Hashable] = dict()
         if scroll_via_viewport and viewport is not None:
-            raise ValueError(
-                "Cannot specify both viewport and scroll_via_viewport=True"
-            )
+            raise ValueError("Cannot specify both viewport and scroll_via_viewport=True")
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
         self._graph: G = graph
         self._strip_segments: list[list[Segment]] = list()
@@ -133,9 +127,7 @@ class GraphView(ScrollView, Generic[G]):
     def on_resize(self, message: Resize):
         self._resized()
 
-    def attach_widget_to_node(
-        self, widget: Widget, node: Hashable, size: Size | None = None
-    ) -> None:
+    def attach_widget_to_node(self, widget: Widget, node: Hashable, size: Size | None = None) -> None:
         """
         Attaches a widget to a node in the console graph.
 
@@ -162,9 +154,7 @@ class GraphView(ScrollView, Generic[G]):
                 widget.styles.height = size.height
 
             widget.styles.dock = "left"
-            widget.styles.offset = self.view_to_widget_coordinates(
-                Point(node_buffer.left_x, node_buffer.top_y)
-            )
+            widget.styles.offset = self.view_to_widget_coordinates(Point(node_buffer.left_x, node_buffer.top_y))
 
     def detach_widget_from_node(self, node: Hashable) -> None:
         """Detach a widget from a node.
@@ -283,9 +273,7 @@ class GraphView(ScrollView, Generic[G]):
                 node_position: FloatPoint | None = self.to_graph_coordinates(position)
             else:
                 node_position = None
-            self._console_graph.update_node(
-                node, node_position, data, update_data=update_data
-            )
+            self._console_graph.update_node(node, node_position, data, update_data=update_data)
             # External graph should reflect the internal one
             # TODO: In the future we might keep the graph only once in memory
             # right now the console graph copies the graph passed to it and hence
@@ -318,9 +306,7 @@ class GraphView(ScrollView, Generic[G]):
         """
 
         if self._console_graph is not None:
-            self._console_graph.update_edge(
-                u, v, data, update_data=update_data, update_layout=update_layout
-            )
+            self._console_graph.update_edge(u, v, data, update_data=update_data, update_layout=update_layout)
             self._graph = self._console_graph._nx_graph.copy()
             self._graph_was_updated()
 
@@ -383,9 +369,7 @@ class GraphView(ScrollView, Generic[G]):
             Offset: The point in widget coordinates.
         """
         if self._console_graph is not None:
-            return self.view_to_widget_coordinates(
-                self._console_graph.to_view_coordinates(p)
-            )
+            return self.view_to_widget_coordinates(self._console_graph.to_view_coordinates(p))
         return Offset(0, 0)
 
     def view_to_widget_coordinates(self, p: Point) -> Offset:
@@ -414,9 +398,7 @@ class GraphView(ScrollView, Generic[G]):
                 self._console_graph.reset_viewport()
             else:
                 if self._scroll_via_viewport:
-                    raise ValueError(
-                        "Cannot specify both viewport and scroll_via_viewport=True"
-                    )
+                    raise ValueError("Cannot specify both viewport and scroll_via_viewport=True")
 
                 full_viewport = self._console_graph.full_viewport
                 self._console_graph.viewport = NetextRegion(
@@ -435,9 +417,7 @@ class GraphView(ScrollView, Generic[G]):
             self._console_graph = None
             self._strip_segments = []
 
-    def refresh(
-        self, *regions: Region, repaint: bool = True, layout: bool = False
-    ) -> Self:
+    def refresh(self, *regions: Region, repaint: bool = True, layout: bool = False) -> "GraphView":
         if self._console_graph is not None:
             if not self._scroll_via_viewport:
                 new_size = Size(*self._console_graph.viewport.size.as_tuple())
@@ -453,17 +433,13 @@ class GraphView(ScrollView, Generic[G]):
                     widget.styles.width = node_buffer.width
                     widget.styles.height = node_buffer.height
                 # TODO node buffer top left should be point
-                widget.styles.offset = self.view_to_widget_coordinates(
-                    Point(node_buffer.left_x, node_buffer.top_y)
-                )
+                widget.styles.offset = self.view_to_widget_coordinates(Point(node_buffer.left_x, node_buffer.top_y))
         return super().refresh(*regions, repaint=repaint, layout=layout)
 
     def pre_render_strips(self) -> list[list[Segment]]:
         if self._console_graph is not None:
             all_buffers = list(self._console_graph._all_buffers())
-            strips, self._reverse_click_map = render_buffers(
-                all_buffers, self._console_graph.viewport
-            )
+            strips, self._reverse_click_map = render_buffers(all_buffers, self._console_graph.viewport)
             return strips
         else:
             return []
@@ -509,9 +485,7 @@ class GraphView(ScrollView, Generic[G]):
 
     def on_mouse_move(self, event: events.MouseMove) -> None:
         if self._console_graph is not None:
-            ref = self._reverse_click_map.get(
-                self.widget_to_view_coordinates(Offset(event.x, event.y)).as_tuple()
-            )
+            ref = self._reverse_click_map.get(self.widget_to_view_coordinates(Offset(event.x, event.y)).as_tuple())
 
             if ref != self._last_hover and self._last_hover is not None:
                 event.stop()
@@ -529,9 +503,7 @@ class GraphView(ScrollView, Generic[G]):
 
     def on_click(self, event: events.Click) -> None:
         if self._console_graph is not None:
-            ref = self._reverse_click_map.get(
-                self.widget_to_view_coordinates(Offset(event.x, event.y)).as_tuple()
-            )
+            ref = self._reverse_click_map.get(self.widget_to_view_coordinates(Offset(event.x, event.y)).as_tuple())
 
             if ref is not None:
                 event.stop()
@@ -539,9 +511,7 @@ class GraphView(ScrollView, Generic[G]):
 
     def on_mouse_down(self, event: events.MouseDown) -> None:
         if self._console_graph is not None:
-            ref = self._reverse_click_map.get(
-                self.widget_to_view_coordinates(Offset(event.x, event.y)).as_tuple()
-            )
+            ref = self._reverse_click_map.get(self.widget_to_view_coordinates(Offset(event.x, event.y)).as_tuple())
 
             if ref is not None:
                 event.stop()
@@ -549,9 +519,7 @@ class GraphView(ScrollView, Generic[G]):
 
     def on_mouse_up(self, event: events.MouseDown) -> None:
         if self._console_graph is not None:
-            ref = self._reverse_click_map.get(
-                self.widget_to_view_coordinates(Offset(event.x, event.y)).as_tuple()
-            )
+            ref = self._reverse_click_map.get(self.widget_to_view_coordinates(Offset(event.x, event.y)).as_tuple())
 
             if ref is not None:
                 event.stop()

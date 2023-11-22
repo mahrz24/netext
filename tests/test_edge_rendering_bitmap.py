@@ -5,6 +5,7 @@ from netext.edge_rendering.bitmap import _slice_to_strip
 from rich.segment import Segment
 from rich.style import Style
 
+
 # Tests that the function correctly converts a slice of all zeros to a Strip object
 def test_all_zeros():
     slice = bitarray("0" * 10)

@@ -31,9 +31,7 @@ def _infinite_canvas_access(slice: bitarray, x: int, y: int, width: int) -> int:
         return slice[index]
 
 
-def _slice_to_braille_strip(
-    slice: bitarray, width: int, style: Style | None = None
-) -> Strip:
+def _slice_to_braille_strip(slice: bitarray, width: int, style: Style | None = None) -> Strip:
     current_segment: list[Segment | Spacer] = []
     for x in range(0, width, 2):
         lookup = (
@@ -59,9 +57,7 @@ def _slice_to_braille_strip(
     return Strip(segments=current_segment)
 
 
-def _slice_to_block_strip(
-    slice: bitarray, width: int, style: Style | None = None
-) -> Strip:
+def _slice_to_block_strip(slice: bitarray, width: int, style: Style | None = None) -> Strip:
     current_segment: list[Segment | Spacer] = []
     for x in range(0, width, 2):
         lookup = (
@@ -119,9 +115,7 @@ def bitmap_to_strips(
         case EdgeSegmentDrawingMode.SINGLE_CHARACTER:
             lines = [
                 _slice_to_strip(
-                    bitmap_buffer.buffer[
-                        y * bitmap_buffer.width : (y + 1) * bitmap_buffer.width
-                    ],
+                    bitmap_buffer.buffer[y * bitmap_buffer.width : (y + 1) * bitmap_buffer.width],
                     style=style,
                 )
                 for y in range(bitmap_buffer.height)
@@ -129,9 +123,7 @@ def bitmap_to_strips(
         case EdgeSegmentDrawingMode.BRAILLE:
             lines = [
                 _slice_to_braille_strip(
-                    bitmap_buffer.buffer[
-                        y * bitmap_buffer.width : (y + 4) * bitmap_buffer.width
-                    ],
+                    bitmap_buffer.buffer[y * bitmap_buffer.width : (y + 4) * bitmap_buffer.width],
                     bitmap_buffer.width,
                     style=style,
                 )
@@ -140,17 +132,13 @@ def bitmap_to_strips(
         case EdgeSegmentDrawingMode.BLOCK:
             lines = [
                 _slice_to_block_strip(
-                    bitmap_buffer.buffer[
-                        y * bitmap_buffer.width : (y + 2) * bitmap_buffer.width
-                    ],
+                    bitmap_buffer.buffer[y * bitmap_buffer.width : (y + 2) * bitmap_buffer.width],
                     bitmap_buffer.width,
                     style=style,
                 )
                 for y in range(0, bitmap_buffer.height, 2)
             ]
         case _:
-            raise NotImplementedError(
-                "The edge segement drawing mode has not yet been implemented"
-            )
+            raise NotImplementedError("The edge segement drawing mode has not yet been implemented")
 
     return lines

@@ -85,16 +85,10 @@ def orthogonal_segments_to_strips_with_box_characters(
         char_buffer.append(list([None] * width))
     offset_edge_segments = [
         EdgeSegment(
-            start=Point(
-                edge_segment.start.x - min_point.x, edge_segment.start.y - min_point.y
-            ),
-            end=Point(
-                edge_segment.end.x - min_point.x, edge_segment.end.y - min_point.y
-            ),
+            start=Point(edge_segment.start.x - min_point.x, edge_segment.start.y - min_point.y),
+            end=Point(edge_segment.end.x - min_point.x, edge_segment.end.y - min_point.y),
             # We keep the parent segments in the original coordinate space
-            _parent=edge_segment._parent
-            if edge_segment._parent is not None
-            else edge_segment,
+            _parent=(edge_segment._parent if edge_segment._parent is not None else edge_segment),
         )
         for edge_segment in edge_segments
     ]
@@ -105,75 +99,42 @@ def orthogonal_segments_to_strips_with_box_characters(
         first_character = True
         if edge_segment.parent.vertical:
             for y in edge_segment.vertical_range():
-                if (
-                    first_character
-                    and last_segment is not None
-                    and last_segment.parent.horizontal
-                ):
+                if first_character and last_segment is not None and last_segment.parent.horizontal:
                     if last_segment.parent.start.x < edge_segment.parent.start.x:
                         if edge_segment.parent.end.y > last_segment.parent.end.y:
-                            char_buffer[y][start.x] = edge_characters[drawing_mode][
-                                EdgeCharacters.CORNER_UPPER_RIGHT
-                            ]
+                            char_buffer[y][start.x] = edge_characters[drawing_mode][EdgeCharacters.CORNER_UPPER_RIGHT]
                         elif edge_segment.parent.end.y < last_segment.parent.end.y:
-                            char_buffer[y][start.x] = edge_characters[drawing_mode][
-                                EdgeCharacters.CORNER_LOWER_RIGHT
-                            ]
+                            char_buffer[y][start.x] = edge_characters[drawing_mode][EdgeCharacters.CORNER_LOWER_RIGHT]
                     else:
                         if edge_segment.parent.end.y > last_segment.parent.end.y:
-                            char_buffer[y][start.x] = edge_characters[drawing_mode][
-                                EdgeCharacters.CORNER_UPPER_LEFT
-                            ]
+                            char_buffer[y][start.x] = edge_characters[drawing_mode][EdgeCharacters.CORNER_UPPER_LEFT]
                         elif edge_segment.parent.end.y < last_segment.parent.end.y:
-                            char_buffer[y][start.x] = edge_characters[drawing_mode][
-                                EdgeCharacters.CORNER_LOWER_LEFT
-                            ]
+                            char_buffer[y][start.x] = edge_characters[drawing_mode][EdgeCharacters.CORNER_LOWER_LEFT]
                 else:
-                    char_buffer[y][start.x] = edge_characters[drawing_mode][
-                        EdgeCharacters.VERTICAL
-                    ]
+                    char_buffer[y][start.x] = edge_characters[drawing_mode][EdgeCharacters.VERTICAL]
                 first_character = False
         elif edge_segment.parent.horizontal:
             for x in edge_segment.horizontal_range():
-                if (
-                    first_character
-                    and last_segment is not None
-                    and last_segment.parent.vertical
-                ):
+                if first_character and last_segment is not None and last_segment.parent.vertical:
                     if last_segment.parent.start.y > edge_segment.parent.start.y:
                         if edge_segment.parent.end.x < last_segment.parent.end.x:
-                            char_buffer[start.y][x] = edge_characters[drawing_mode][
-                                EdgeCharacters.CORNER_UPPER_RIGHT
-                            ]
+                            char_buffer[start.y][x] = edge_characters[drawing_mode][EdgeCharacters.CORNER_UPPER_RIGHT]
                         elif edge_segment.parent.end.x > last_segment.parent.end.x:
-                            char_buffer[start.y][x] = edge_characters[drawing_mode][
-                                EdgeCharacters.CORNER_UPPER_LEFT
-                            ]
+                            char_buffer[start.y][x] = edge_characters[drawing_mode][EdgeCharacters.CORNER_UPPER_LEFT]
                     else:
                         if edge_segment.parent.end.x < last_segment.parent.end.x:
-                            char_buffer[start.y][x] = edge_characters[drawing_mode][
-                                EdgeCharacters.CORNER_LOWER_RIGHT
-                            ]
+                            char_buffer[start.y][x] = edge_characters[drawing_mode][EdgeCharacters.CORNER_LOWER_RIGHT]
                         elif edge_segment.parent.end.x > last_segment.parent.end.x:
-                            char_buffer[start.y][x] = edge_characters[drawing_mode][
-                                EdgeCharacters.CORNER_LOWER_LEFT
-                            ]
+                            char_buffer[start.y][x] = edge_characters[drawing_mode][EdgeCharacters.CORNER_LOWER_LEFT]
                 else:
-                    char_buffer[start.y][x] = edge_characters[drawing_mode][
-                        EdgeCharacters.HORIZONTAL
-                    ]
+                    char_buffer[start.y][x] = edge_characters[drawing_mode][EdgeCharacters.HORIZONTAL]
                 first_character = False
 
         last_segment = edge_segment
 
     return [
         Strip(
-            [
-                Segment(text=character, style=style)
-                if character is not None
-                else Spacer(width=1)
-                for character in line
-            ]
+            [(Segment(text=character, style=style) if character is not None else Spacer(width=1)) for character in line]
         )
         for line in char_buffer
     ]

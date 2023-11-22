@@ -9,7 +9,7 @@ def plot_polygon(
     facecolor: Incomplete | None = ...,
     edgecolor: Incomplete | None = ...,
     linewidth: Incomplete | None = ...,
-    **kwargs
+    **kwargs,
 ): ...
 def plot_line(
     line,
@@ -17,12 +17,12 @@ def plot_line(
     add_points: bool = ...,
     color: Incomplete | None = ...,
     linewidth: int = ...,
-    **kwargs
+    **kwargs,
 ): ...
 def plot_points(
     geom,
     ax: Incomplete | None = ...,
     color: Incomplete | None = ...,
     marker: str = ...,
-    **kwargs
+    **kwargs,
 ): ...

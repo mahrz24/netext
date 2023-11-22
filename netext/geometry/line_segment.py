@@ -17,9 +17,7 @@ class LineSegment:
     @property
     def shapely(self) -> sp.LineString:
         if self._shapely is None:
-            object.__setattr__(
-                self, "_shapely", sp.LineString([self.start.shapely, self.end.shapely])
-            )
+            object.__setattr__(self, "_shapely", sp.LineString([self.start.shapely, self.end.shapely]))
         return self._shapely
 
     @property
@@ -45,9 +43,7 @@ class LineSegment:
         fraction = distance / float(self.length)
         if reversed:
             fraction = 1 - fraction
-        return Point.from_shapely(
-            direct_line.interpolate(distance=fraction, normalized=True)
-        )
+        return Point.from_shapely(direct_line.interpolate(distance=fraction, normalized=True))
 
     @property
     def midpoint(self) -> Point:

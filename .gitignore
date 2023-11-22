@@ -144,3 +144,5 @@ typings
 
 # snapshot test report
 tests/snapshot_tests/output/
+
+_version.py

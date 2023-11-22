@@ -32,9 +32,7 @@ class GrandalfSugiyamaLayout(LayoutEngine[G]):
     """
 
     def __call__(self, g: G) -> dict[Hashable, FloatPoint]:
-        vertices = {
-            node: _create_vertex(node, data) for node, data in g.nodes(data=True)
-        }
+        vertices = {node: _create_vertex(node, data) for node, data in g.nodes(data=True)}
         edges = [Edge(vertices[u], vertices[v]) for u, v in g.edges]
         graph = Graph(vertices.values(), edges)
 
@@ -48,10 +46,7 @@ class GrandalfSugiyamaLayout(LayoutEngine[G]):
         result = dict()
         x_offset = 0
         for c in graph.components():
-            component = {
-                v.data: FloatPoint(x=v.view.xy[0] / 4 + x_offset, y=v.view.xy[1] / 6)
-                for v in c.sV
-            }
+            component = {v.data: FloatPoint(x=v.view.xy[0] / 4 + x_offset, y=v.view.xy[1] / 6) for v in c.sV}
             x_offset = max([v.view.xy[0] / 4 + x_offset + v.view.w + 2 for v in c.sV])
             result.update(component)
         return result

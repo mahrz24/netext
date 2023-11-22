@@ -54,14 +54,9 @@ class Shape(Protocol):
 
 
 class RectangularShapeMixin:
-    def _renderable_type_to_strips(
-        self, console: Console, node_renderable: RenderableType
-    ) -> list[Strip]:
+    def _renderable_type_to_strips(self, console: Console, node_renderable: RenderableType) -> list[Strip]:
         segment_lists = list(console.render_lines(node_renderable, pad=False))
-        return [
-            Strip(segments=cast(list[Segment | Spacer], segments))
-            for segments in segment_lists
-        ]
+        return [Strip(segments=cast(list[Segment | Spacer], segments)) for segments in segment_lists]
 
     def polygon(self, node_buffer: "NodeBuffer", margin: float = 0) -> Polygon:
         return Polygon(
@@ -160,14 +155,10 @@ class RectangularShapeMixin:
             case Magnet.CENTER:
                 return node_buffer.center - Point(x=offset, y=0), None
             case Magnet.CLOSEST:
-                direct_line = LineString(
-                    [node_buffer.center.shapely, target_point.shapely]
-                )
+                direct_line = LineString([node_buffer.center.shapely, target_point.shapely])
                 node_polygon = self.polygon(node_buffer)
                 intersection = direct_line.intersection(node_polygon)
-                intersection_point = intersection.line_interpolate_point(
-                    1.0, normalized=True
-                )
+                intersection_point = intersection.line_interpolate_point(1.0, normalized=True)
 
                 closest_magnet = Magnet.TOP
                 closest_point, closest_extruded_point = self.get_magnet_position(
@@ -239,9 +230,7 @@ class Box(RectangularShapeMixin):
         )
 
         height = len(result)
-        width = max(
-            sum([segment.cell_length for segment in strip.segments]) for strip in result
-        )
+        width = max(sum([segment.cell_length for segment in strip.segments]) for strip in result)
         rerender = False
 
         if port_side_assignments:
@@ -346,9 +335,7 @@ class PortBuffer(ShapeBuffer):
         shape: Shape,
         z_index: int = 0,
     ) -> "PortBuffer":
-        width = max(
-            sum(segment.cell_length for segment in strip.segments) for strip in strips
-        )
+        width = max(sum(segment.cell_length for segment in strip.segments) for strip in strips)
 
         return cls(
             port_name=port_name,
@@ -375,16 +362,10 @@ class NodeBuffer(ShapeBuffer):
     margin: int = 0
     lod: int = 1
 
-    port_positions: dict[int, dict[str, tuple[Point, Point | None]]] = field(
-        default_factory=lambda: defaultdict(dict)
-    )
-    ports_per_side: dict[Magnet, list[str]] = field(
-        default_factory=lambda: defaultdict(list)
-    )
+    port_positions: dict[int, dict[str, tuple[Point, Point | None]]] = field(default_factory=lambda: defaultdict(dict))
+    ports_per_side: dict[Magnet, list[str]] = field(default_factory=lambda: defaultdict(list))
 
-    connected_ports: dict[str, list[Hashable]] = field(
-        default_factory=lambda: defaultdict(list)
-    )
+    connected_ports: dict[str, list[Hashable]] = field(default_factory=lambda: defaultdict(list))
 
     @property
     def reference(self) -> Reference | None:
@@ -402,9 +383,7 @@ class NodeBuffer(ShapeBuffer):
         margin: int = 0,
         lod: int = 1,
     ) -> "NodeBuffer":
-        width = max(
-            sum(segment.cell_length for segment in strip.segments) for strip in strips
-        )
+        width = max(sum(segment.cell_length for segment in strip.segments) for strip in strips)
 
         return cls(
             node=node,
@@ -475,9 +454,9 @@ class NodeBuffer(ShapeBuffer):
         else:
             # TODO Looks a bit weird for odd port numbers as the space is not centered
             if port_side == ShapeSide.TOP or port_side == ShapeSide.BOTTOM:
-                port_offset = math.ceil(
-                    (float(port_index) / (len(ports_on_side) - 1)) * (self.width - 3)
-                ) - math.floor((self.width - 2) / 2)
+                port_offset = math.ceil((float(port_index) / (len(ports_on_side) - 1)) * (self.width - 3)) - math.floor(
+                    (self.width - 2) / 2
+                )
             else:
                 port_offset = math.ceil(
                     (float(port_index) / (len(ports_on_side) - 1)) * (self.height - 3)
@@ -520,9 +499,7 @@ class NodeBuffer(ShapeBuffer):
             port_symbol = port_settings.get("symbol", "○")
             if port_name in self.connected_ports:
                 port_symbol = port_settings.get("symbol-connected", "●")
-            port_strips = shape.render_shape(
-                console, port_symbol, style=Style(), padding=0, data={}
-            )
+            port_strips = shape.render_shape(console, port_symbol, style=Style(), padding=0, data={})
 
             port_position, port_helper = self.get_port_position(
                 port_name=port_name,
@@ -543,16 +520,12 @@ class NodeBuffer(ShapeBuffer):
             buffers.append(port_buffer)
 
             # The second should always be not None
-            if (
-                port_label := port_settings.get("label", None)
-            ) is not None and port_helper is not None:
+            if (port_label := port_settings.get("label", None)) is not None and port_helper is not None:
                 # This does not work well with unicode chars, use rich methods here instead
                 port_label_length = len(port_label)
                 if port_sides[port_name] in [ShapeSide.TOP, ShapeSide.BOTTOM]:
                     port_label = "\n".join([c for c in port_label])
-                port_label_strips = shape.render_shape(
-                    console, port_label, style=Style(), padding=0, data={}
-                )
+                port_label_strips = shape.render_shape(console, port_label, style=Style(), padding=0, data={})
 
                 normalizer = port_helper.distance_to(port_position)
 
@@ -576,9 +549,7 @@ class NodeBuffer(ShapeBuffer):
         return buffers
 
 
-def _default_content_renderer(
-    node_str: str, data: dict[str, Any], content_style: Style
-) -> RenderableType:
+def _default_content_renderer(node_str: str, data: dict[str, Any], content_style: Style) -> RenderableType:
     return Text(node_str, style=content_style)
 
 
@@ -696,9 +667,7 @@ class EdgeLabelBuffer(ShapeBuffer):
         shape: Shape,
         z_index: int = 0,
     ) -> "EdgeLabelBuffer":
-        width = max(
-            sum(segment.cell_length for segment in strip.segments) for strip in strips
-        )
+        width = max(sum(segment.cell_length for segment in strip.segments) for strip in strips)
 
         return cls(
             edge=edge,

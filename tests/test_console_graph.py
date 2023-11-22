@@ -16,8 +16,7 @@ def console():
 
 
 def test_render_binomial_tree(console):
-    """Test rendering a binomial tree. Simple smoke test that no exceptions are raised.
-    """
+    """Test rendering a binomial tree. Simple smoke test that no exceptions are raised."""
     graph = binomial_tree(4)
     console_graph = ConsoleGraph(graph)
 
@@ -138,9 +137,7 @@ def test_render_graph_with_mutations_update_positions_and_zoom(console, zoom: Au
     graph.add_node(2, **{"$x": 10, "$y": 1})
     graph.add_edge(1, 2)
 
-    console_graph = ConsoleGraph[DiGraph](
-        graph, layout_engine=StaticLayout(), zoom=zoom
-    )
+    console_graph = ConsoleGraph[DiGraph](graph, layout_engine=StaticLayout(), zoom=zoom)
 
     with console.capture() as capture:
         console.print(console_graph)
@@ -165,7 +162,7 @@ def test_render_graph_with_mutations_update_positions_and_data(console):
             "$y": 1,
             "label": "foo",
             "$content-renderer": lambda _, d, __: d["label"],
-        }
+        },
     )
     graph.add_node(
         2,
@@ -174,7 +171,7 @@ def test_render_graph_with_mutations_update_positions_and_data(console):
             "$y": 1,
             "label": "bar",
             "$content-renderer": lambda _, d, __: d["label"],
-        }
+        },
     )
     graph.add_edge(1, 2)
 
@@ -198,7 +195,7 @@ def test_render_graph_with_mutations_update_positions_and_data(console):
             "$y": 2,
             "label": "bar",
             "$content-renderer": lambda _, d, __: d["label"],
-        }
+        },
     )
     graph.add_node(
         2,
@@ -207,7 +204,7 @@ def test_render_graph_with_mutations_update_positions_and_data(console):
             "$y": 1,
             "label": "bar",
             "$content-renderer": lambda _, d, __: d["label"],
-        }
+        },
     )
     graph.add_edge(1, 2)
 

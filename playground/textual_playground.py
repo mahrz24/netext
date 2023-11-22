@@ -92,9 +92,7 @@ class Port(Widget):
     ) -> None:
         self.port = port
         self.port_setting = port_setting
-        super().__init__(
-            *children, name=name, id=id, classes=classes, disabled=disabled
-        )
+        super().__init__(*children, name=name, id=id, classes=classes, disabled=disabled)
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="port-row"):
@@ -115,41 +113,31 @@ class Port(Widget):
     def port_label_changed(self, event: Input.Submitted) -> None:
         self.log("Port Label Changed")
         self.port_setting["label"] = event.control.value
-        self.post_message(
-            self.PortSettingChanged(port=self.port, port_setting=self.port_setting)
-        )
+        self.post_message(self.PortSettingChanged(port=self.port, port_setting=self.port_setting))
 
     @on(Button.Pressed, "#magnet-top")
     def magnet_top(self, event: Button.Pressed) -> None:
         self.log("Magnet Top")
         self.port_setting["magnet"] = Magnet.TOP
-        self.post_message(
-            self.PortSettingChanged(port=self.port, port_setting=self.port_setting)
-        )
+        self.post_message(self.PortSettingChanged(port=self.port, port_setting=self.port_setting))
 
     @on(Button.Pressed, "#magnet-bottom")
     def magnet_bottom(self, event: Button.Pressed) -> None:
         self.log("Magnet Bottom")
         self.port_setting["magnet"] = Magnet.BOTTOM
-        self.post_message(
-            self.PortSettingChanged(port=self.port, port_setting=self.port_setting)
-        )
+        self.post_message(self.PortSettingChanged(port=self.port, port_setting=self.port_setting))
 
     @on(Button.Pressed, "#magnet-left")
     def magnet_left(self, event: Button.Pressed) -> None:
         self.log("Magnet Left")
         self.port_setting["magnet"] = Magnet.LEFT
-        self.post_message(
-            self.PortSettingChanged(port=self.port, port_setting=self.port_setting)
-        )
+        self.post_message(self.PortSettingChanged(port=self.port, port_setting=self.port_setting))
 
     @on(Button.Pressed, "#magnet-right")
     def magnet_right(self, event: Button.Pressed) -> None:
         self.log("Magnet Right")
         self.port_setting["magnet"] = Magnet.RIGHT
-        self.post_message(
-            self.PortSettingChanged(port=self.port, port_setting=self.port_setting)
-        )
+        self.post_message(self.PortSettingChanged(port=self.port, port_setting=self.port_setting))
 
 
 class PortEditor(Widget):
@@ -168,9 +156,7 @@ class PortEditor(Widget):
     ) -> None:
         self.node_data = node_data
         self.node = node
-        super().__init__(
-            *children, name=name, id=id, classes=classes, disabled=disabled
-        )
+        super().__init__(*children, name=name, id=id, classes=classes, disabled=disabled)
 
     @dataclass
     class PortChanged(Message):
@@ -186,9 +172,7 @@ class PortEditor(Widget):
                     yield Label("No Ports")
                 else:
                     for port, port_setting in ports.items():
-                        yield Port(
-                            port=port, port_setting=port_setting, id=f"port-{port}"
-                        )
+                        yield Port(port=port, port_setting=port_setting, id=f"port-{port}")
 
     @on(Button.Pressed, "#add-port")
     def add_port(self, event: Button.Pressed) -> None:
@@ -246,9 +230,7 @@ class StyleEditor(Widget):
     ) -> None:
         self.node_data = node_data
         self.node = node
-        super().__init__(
-            *children, name=name, id=id, classes=classes, disabled=disabled
-        )
+        super().__init__(*children, name=name, id=id, classes=classes, disabled=disabled)
 
     @dataclass
     class StyleChanged(Message):
@@ -275,15 +257,9 @@ class StyleEditor(Widget):
             ):
                 yield RadioButton("ASCII", id="ascii", value=box_type == box.ASCII)
                 yield RadioButton("SQUARE", id="square", value=box_type == box.SQUARE)
-                yield RadioButton(
-                    "MINIMAL", id="minimal", value=box_type == box.MINIMAL
-                )
-                yield RadioButton(
-                    "HORIZONTALS", id="horizontals", value=box_type == box.HORIZONTALS
-                )
-                yield RadioButton(
-                    "ROUNDED", id="rounded", value=box_type == box.ROUNDED
-                )
+                yield RadioButton("MINIMAL", id="minimal", value=box_type == box.MINIMAL)
+                yield RadioButton("HORIZONTALS", id="horizontals", value=box_type == box.HORIZONTALS)
+                yield RadioButton("ROUNDED", id="rounded", value=box_type == box.ROUNDED)
                 yield RadioButton("HEAVY", id="heavy", value=box_type == box.HEAVY)
                 yield RadioButton("DOUBLE", id="double", value=box_type == box.DOUBLE)
 
@@ -361,17 +337,11 @@ class NodeInspector(Widget):
     ) -> None:
         self.node = node
         self.node_data = node_data
-        super().__init__(
-            *children, name=name, id=id, classes=classes, disabled=disabled
-        )
+        super().__init__(*children, name=name, id=id, classes=classes, disabled=disabled)
 
     def compose(self) -> ComposeResult:
         attr_dct = {k: v for k, v in self.node_data.items() if k.startswith("$")}
-        node_dct = {
-            k: v
-            for k, v in self.node_data.items()
-            if not k.startswith("$") and not k.startswith("_")
-        }
+        node_dct = {k: v for k, v in self.node_data.items() if not k.startswith("$") and not k.startswith("_")}
 
         with TabbedContent("Node", "Style", "Ports", "Debug"):
             with Vertical():
@@ -388,9 +358,7 @@ class NodeInspector(Widget):
     @on(Input.Submitted, "#title")
     def title_changed(self, event: Input.Submitted) -> None:
         self.node_data["title"] = event.control.value
-        self.post_message(
-            NodeInspector.NodeChanged(node=self.node, node_data=self.node_data)
-        )
+        self.post_message(NodeInspector.NodeChanged(node=self.node, node_data=self.node_data))
 
 
 class Statusbar(Static):
@@ -402,9 +370,7 @@ class GraphArea(Widget):
     edge_first_click: Hashable | None = None
     port_first_click: str | None = None
     hover_element: Reactive[Reference | None] = reactive(cast(Reference | None, None))
-    selected_element: Reactive[Reference | None] = reactive(
-        cast(Reference | None, None)
-    )
+    selected_element: Reactive[Reference | None] = reactive(cast(Reference | None, None))
     move_selected: bool = False
     current_tool: str = "pointer-tool"
 
@@ -420,9 +386,7 @@ class GraphArea(Widget):
         graph_view = GraphView(g, zoom=1, scroll_via_viewport=False, id="graph")
         yield graph_view
 
-    def watch_selected_element(
-        self, old_value: Reference | None, new_value: Reference | None
-    ) -> None:
+    def watch_selected_element(self, old_value: Reference | None, new_value: Reference | None) -> None:
         g = self.query_one(GraphView)
 
         element_message = self.ElementSelected(element=None, element_data=None)
@@ -490,9 +454,7 @@ class GraphArea(Widget):
 
         g.update_node(node, data={"$style": style})
 
-    def watch_hover_element(
-        self, old_value: Reference | None, new_value: Reference | None
-    ) -> None:
+    def watch_hover_element(self, old_value: Reference | None, new_value: Reference | None) -> None:
         g = self.query_one(GraphView)
         if old_value is not None and old_value.type == "edge":
             self.reset_edge(old_value.ref)
@@ -507,11 +469,7 @@ class GraphArea(Widget):
         if old_value is not None and old_value.type == "node":
             self.reset_node(old_value.ref)
 
-        if (
-            new_value is not None
-            and new_value.type == "node"
-            and not self.move_selected
-        ):
+        if new_value is not None and new_value.type == "node" and not self.move_selected:
             g.update_node(new_value.ref, data={"$style": Style(color="green")})
 
     def on_click(self, event: events.Click) -> None:
@@ -587,9 +545,7 @@ class GraphArea(Widget):
                 if self.edge_first_click is None:
                     self.port_first_click = event.element_reference.ref[1]
                     self.edge_first_click = event.element_reference.ref[0]
-                    g.update_node(
-                        self.edge_first_click, data={"$style": Style(color="red")}
-                    )
+                    g.update_node(self.edge_first_click, data={"$style": Style(color="red")})
                 else:
                     g.update_node(self.edge_first_click, data={"$style": None})
                     self.add_edge(
@@ -609,9 +565,7 @@ class GraphArea(Widget):
                 if self.edge_first_click is None:
                     self.edge_first_click = event.element_reference.ref
                     self.port_first_click = None
-                    g.update_node(
-                        self.edge_first_click, data={"$style": Style(color="red")}
-                    )
+                    g.update_node(self.edge_first_click, data={"$style": Style(color="red")})
                 else:
                     g.update_node(self.edge_first_click, data={"$style": None})
                     self.add_edge(
@@ -636,9 +590,7 @@ class GraphArea(Widget):
     def on_graph_view_element_move(self, event: GraphView.ElementMove) -> None:
         pass
 
-    def on_graph_view_element_mouse_down(
-        self, event: GraphView.ElementMouseDown
-    ) -> None:
+    def on_graph_view_element_mouse_down(self, event: GraphView.ElementMouseDown) -> None:
         self.log(event, event.element_reference)
 
     def on_graph_view_element_mouse_up(self, event: GraphView.ElementMouseUp) -> None:
@@ -655,15 +607,11 @@ class GraphArea(Widget):
     def on_mouse_move(self, event: events.MouseMove) -> None:
         if self.move_selected and self.selected_element is not None:
             g = self.query_one(GraphView)
-            g.update_node(
-                self.selected_element.ref, position=Offset(x=event.x, y=event.y)
-            )
+            g.update_node(self.selected_element.ref, position=Offset(x=event.x, y=event.y))
 
 
 class GraphInspector(Widget):
-    selected_element: Reactive[Reference | None] = reactive(
-        cast(Reference | None, None)
-    )
+    selected_element: Reactive[Reference | None] = reactive(cast(Reference | None, None))
     selected_element_data: dict[str, Any] | None = None
 
     def __init__(
@@ -674,16 +622,12 @@ class GraphInspector(Widget):
         classes: str | None = None,
         disabled: bool = False,
     ) -> None:
-        super().__init__(
-            *children, name=name, id=id, classes=classes, disabled=disabled
-        )
+        super().__init__(*children, name=name, id=id, classes=classes, disabled=disabled)
 
     def compose(self) -> ComposeResult:
         yield Static("Graph Inspector")
 
-    def watch_selected_element(
-        self, old_value: Reference | None, new_value: Reference | None
-    ) -> None:
+    def watch_selected_element(self, old_value: Reference | None, new_value: Reference | None) -> None:
         self.query(Widget).first().remove()
         if new_value is None:
             self.mount(Static("Graph Inspector"))

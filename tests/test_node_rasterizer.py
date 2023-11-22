@@ -21,9 +21,7 @@ def test_trivial_node(console: Console) -> None:
 
 
 def test_trivial_node_with_style(console: Console) -> None:
-    node_buffer = rasterize_node(
-        console, node="foo", data={"$style": Style(color="red")}
-    )
+    node_buffer = rasterize_node(console, node="foo", data={"$style": Style(color="red")})
 
     assert node_buffer.shape_width == 7
     assert node_buffer.shape_height == 3

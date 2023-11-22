@@ -36,7 +36,7 @@ class Polygon(BaseGeometry):
         scale_factor: float = ...,
         fill_color: Incomplete | None = ...,
         opacity: Incomplete | None = ...,
-        **kwargs
+        **kwargs,
     ): ...
     @classmethod
     def from_bounds(cls, xmin, ymin, xmax, ymax): ...

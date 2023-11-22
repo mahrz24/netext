@@ -82,9 +82,7 @@ def _render_composed(n, d, s):
 
             y_val = 0
             if waveform_y == "sine":
-                y_val = round(
-                    (math.sin(y / height * frequency * 2 * math.pi) + 1) * 127
-                )
+                y_val = round((math.sin(y / height * frequency * 2 * math.pi) + 1) * 127)
             elif waveform_y == "square":
                 y_val = (round(y / height * frequency) % 2) * 255
             elif waveform_y == "sawtooth":
@@ -210,17 +208,13 @@ class MainScreen(Screen):
     def waveform_1_changed(self, event: RadioSet.Changed):
         graph_view = self.query_one(GraphView)
         graph_view.update_node("Wave 1", data={"waveform": str(event.pressed.label)})
-        graph_view.update_node(
-            "XY Compose", data={"waveform-x": str(event.pressed.label)}
-        )
+        graph_view.update_node("XY Compose", data={"waveform-x": str(event.pressed.label)})
 
     @on(RadioSet.Changed, "#waveform-2")
     def waveform_2_changed(self, event: RadioSet.Changed):
         graph_view = self.query_one(GraphView)
         graph_view.update_node("Wave 2", data={"waveform": str(event.pressed.label)})
-        graph_view.update_node(
-            "XY Compose", data={"waveform-y": str(event.pressed.label)}
-        )
+        graph_view.update_node("XY Compose", data={"waveform-y": str(event.pressed.label)})
 
 
 class GraphApp(App):

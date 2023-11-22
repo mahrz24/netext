@@ -20,9 +20,7 @@ def route_edge(
     match routing_mode:
         case EdgeRoutingMode.STRAIGHT:
             # We don't need to check for intersections here, because the edge is straight.
-            return RoutedEdgeSegments(
-                segments=[EdgeSegment(start=start, end=end)], intersections=0
-            )
+            return RoutedEdgeSegments(segments=[EdgeSegment(start=start, end=end)], intersections=0)
         case EdgeRoutingMode.ORTHOGONAL:
             return route_orthogonal_edge(
                 start=start,
@@ -35,6 +33,4 @@ def route_edge(
                 end_helper=end_helper,
             )
         case _:
-            raise NotImplementedError(
-                f"The routing mode {routing_mode} has not been implemented yet."
-            )
+            raise NotImplementedError(f"The routing mode {routing_mode} has not been implemented yet.")

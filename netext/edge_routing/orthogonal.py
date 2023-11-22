@@ -26,9 +26,7 @@ def route_orthogonal_edge(
     straight_connection = LineSegment(start=start, end=end)
     relevant_nodes = all_nodes
     if node_idx is not None:
-        relevant_nodes = node_idx.intersection(
-            straight_connection.bounding_box, restrict=relevant_nodes
-        )
+        relevant_nodes = node_idx.intersection(straight_connection.bounding_box, restrict=relevant_nodes)
 
     relevant_edges = routed_edges
     if edge_idx is not None:
@@ -44,11 +42,7 @@ def route_orthogonal_edge(
 
     if recursion_depth == 0:
         node_containing_start = next(
-            (
-                node
-                for node in relevant_nodes
-                if node.shape.polygon(node).covers(start.shapely)
-            ),
+            (node for node in relevant_nodes if node.shape.polygon(node).covers(start.shapely)),
             None,
         )
 
@@ -58,9 +52,7 @@ def route_orthogonal_edge(
 
             def _intersects_to_end(point: Point):
                 direct_line_to_end = LineString([point.shapely, end.shapely])
-                return node_containing_start.shape.polygon(
-                    node_containing_start
-                ).intersects(direct_line_to_end)
+                return node_containing_start.shape.polygon(node_containing_start).intersects(direct_line_to_end)
 
             distance_factor = 1 / 1.5
             new_helper_point = None
@@ -112,19 +104,13 @@ def route_orthogonal_edge(
 
             if new_helper_point is not None and helper_start is not None:
                 new_helper_point
-                helper_segments_start.append(
-                    EdgeSegment(start=helper_start, end=new_helper_point)
-                )
+                helper_segments_start.append(EdgeSegment(start=helper_start, end=new_helper_point))
                 start = new_helper_point
             else:
                 start = helper_point
 
         node_containing_end = next(
-            (
-                node
-                for node in relevant_nodes
-                if node.shape.polygon(node).covers(end.shapely)
-            ),
+            (node for node in relevant_nodes if node.shape.polygon(node).covers(end.shapely)),
             None,
         )
 
@@ -134,9 +120,7 @@ def route_orthogonal_edge(
 
             def _intersects_to_start(point: Point):
                 direct_line_to_end = LineString([start.shapely, point.shapely])
-                return node_containing_end.shape.polygon(
-                    node_containing_end
-                ).intersects(direct_line_to_end)
+                return node_containing_end.shape.polygon(node_containing_end).intersects(direct_line_to_end)
 
             distance_factor = 1 / 1.5
             new_helper_point = None
@@ -144,9 +128,7 @@ def route_orthogonal_edge(
             # TODO: Return a list of candidate segments and then pick the best one
             # later on with the full routing in place.
             if _intersects_to_start(helper_point):
-                while new_helper_point is None or _intersects_to_start(
-                    new_helper_point
-                ):
+                while new_helper_point is None or _intersects_to_start(new_helper_point):
                     # We need to route around the node as our extrusion would still intersect it.
                     helper_end = helper_point
                     last_helper_segment = helper_segments_end[-1].shapely
@@ -191,25 +173,19 @@ def route_orthogonal_edge(
                     distance_factor *= 1.5
 
             if new_helper_point is not None and helper_end is not None:
-                helper_segments_end.insert(
-                    0, EdgeSegment(start=new_helper_point, end=helper_end)
-                )
+                helper_segments_end.insert(0, EdgeSegment(start=new_helper_point, end=helper_end))
                 end = new_helper_point
             else:
                 end = helper_point
 
     candidates = [
         RoutedEdgeSegments.from_segments_compute_intersections(
-            helper_segments_start
-            + EdgeSegment(start=start, end=end).ortho_split_x()
-            + helper_segments_end,
+            helper_segments_start + EdgeSegment(start=start, end=end).ortho_split_x() + helper_segments_end,
             node_buffers=relevant_nodes,
             edges=relevant_edges,
         ),
         RoutedEdgeSegments.from_segments_compute_intersections(
-            helper_segments_start
-            + EdgeSegment(start=start, end=end).ortho_split_y()
-            + helper_segments_end,
+            helper_segments_start + EdgeSegment(start=start, end=end).ortho_split_y() + helper_segments_end,
             node_buffers=relevant_nodes,
             edges=relevant_edges,
         ),
