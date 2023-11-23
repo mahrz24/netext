@@ -69,6 +69,7 @@ dependencies = [
     "importlib-metadata",
     "rich-pixels>=2.1.1",
 ]
+features = ["textual"]
 
 [tool.hatch.envs.lint]
 detached = true
