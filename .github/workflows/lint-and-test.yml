@@ -39,19 +39,16 @@ jobs:
     - name: Install Hatch
       run: |
         pipx install hatch
+        hatch config set dirs.env.virtual .hatch
         hatch env create lint
-    # - name: Cache Poetry virtualenv
-    #   uses: actions/cache@v2
-    #   id: cache
-    #   with:
-    #     path: .venv
-    #     key: ubuntu-latest-3.11-poetry-${{ steps.poetry-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
-    #     restore-keys: |
-    #       ubuntu-latest-3.11-poetry-${{ steps.poetry-version.outputs.version }}-${{ hashFiles('**/poetry.lock') }}
-    # - name: Install dependencies
-    #   run: |
-    #     poetry install --with=dev
-    #   if: steps.cache.outputs.cache-hit != 'true'
+    - name: Cache hatch virtualenvs
+      uses: actions/cache@v2
+      id: cache
+      with:
+        path: .hatch
+        key: ubuntu-latest-hatch-${{ hashFiles('pyproject.toml') }}
+        restore-keys: |
+          ubuntu-latest-hatch-${{ hashFiles('pyproject.toml') }}
     - uses: pre-commit/action@v3.0.0
     - name: Run mypy
       run: hatch run test:mypy netext
