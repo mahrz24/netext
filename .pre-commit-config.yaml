@@ -11,3 +11,8 @@ repos:
       entry: hatch run lint:ruff format
       language: system
       types: [python]
+    - id: mypy
+      name: mypy
+      entry: hatch run dev:mypy netext
+      language: system
+      types: [python]
