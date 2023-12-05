@@ -19,8 +19,6 @@
     options:
       show_source: false
 
-
-
 ## Edges
 
 ::: netext.geometry.magnet.Magnet

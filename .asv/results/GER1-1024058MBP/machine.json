@@ -1,0 +1,9 @@
+{
+    "arch": "x86_64",
+    "cpu": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz",
+    "machine": "GER1-1024058MBP",
+    "num_cpu": "12",
+    "os": "Darwin 21.6.0",
+    "ram": "32GB",
+    "version": 1
+}
