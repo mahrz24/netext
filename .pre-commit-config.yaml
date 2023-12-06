@@ -13,6 +13,7 @@ repos:
       types: [python]
     - id: mypy
       name: mypy
-      entry: hatch run dev:mypy netext
+      entry: hatch run dev:mypy
       language: system
       types: [python]
+      exclude: ^(tests/|playground/|examples/|benchmarks/)
