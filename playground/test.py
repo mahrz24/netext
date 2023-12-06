@@ -12,7 +12,7 @@ from netext import ConsoleGraph
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_rendering.arrow_tips import ArrowTip
-from netext.node_rasterizer import JustContent
+from netext.shapes.shape import JustContent
 
 n = 10  # 10 nodes
 m = 20  # 20 edges

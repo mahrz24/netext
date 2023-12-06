@@ -38,7 +38,7 @@ class EdgeSegment(LineSegment):
             )
 
     def cut(self, node_buffer: NodeBuffer) -> list["EdgeSegment"]:
-        node_shape = node_buffer.shape.polygon(node_buffer=node_buffer, margin=0.75)
+        node_shape = node_buffer.shape.polygon(shape_buffer=node_buffer, margin=0.75)
         result = []
         if self.shapely.intersects(node_shape):
             remaining = self.shapely.difference(node_shape)

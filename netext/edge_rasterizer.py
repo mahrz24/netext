@@ -16,7 +16,8 @@ from netext.geometry import Magnet
 from netext.geometry.index import BufferIndex
 from netext.geometry.point import Point
 
-from netext.node_rasterizer import EdgeLabelBuffer, JustContent, NodeBuffer
+from netext.node_rendering.buffers import EdgeLabelBuffer, NodeBuffer
+from netext.shapes.shape import JustContent
 from netext.rendering.segment_buffer import StripBuffer
 
 
