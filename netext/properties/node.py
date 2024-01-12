@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Any, Callable, Union
+from netext.geometry.magnet import Magnet
 from netext.shapes.shape import Shape
 from netext.shapes.box import Box
 from rich.style import Style
@@ -13,6 +14,14 @@ def _default_content_renderer(node_str: str, data: dict[str, Any], content_style
 
 
 @dataclass
+class Port:
+    label: str
+    magnet: Magnet | None = None
+    symbol: str | None = None
+    symbol_connected: str | None = None
+
+
+@dataclass
 class NodeProperties:
     shape: Shape = Box()
     style: Style = Style()
@@ -21,6 +30,7 @@ class NodeProperties:
     padding: PaddingDimensions = (0, 1)
     content_renderer: Callable[[str, dict[str, Any], Style], RenderableType] = _default_content_renderer
     lod_properties: dict[int, "NodeProperties"] = field(default_factory=dict)
+    ports: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_attribute_dict(
@@ -37,6 +47,7 @@ class NodeProperties:
         padding: PaddingDimensions = data.get(f"$padding{suffix}", fallback.padding)
         content_renderer = data.get(f"$content-renderer{suffix}", fallback.content_renderer)
         lod_properties: dict[int, "NodeProperties"] = dict()
+        # ports: dict[str, Any] = data.get("$ports", dict())
 
         result = cls(
             shape=shape,
