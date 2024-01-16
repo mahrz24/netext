@@ -2,13 +2,13 @@ from collections import defaultdict
 import math
 from collections.abc import Hashable
 from dataclasses import dataclass, field
-from typing import Any
 
 from rich.console import Console
 from rich.style import Style
 
 from netext.geometry import Magnet, Point
 from netext.geometry.magnet import ShapeSide
+from netext.properties.node import NodeProperties, Port
 
 from netext.rendering.segment_buffer import Reference, Strip, StripBuffer
 from netext.shapes.shape import JustContent, Shape, ShapeBuffer
@@ -56,7 +56,7 @@ class PortLabelBuffer(PortBuffer):
 class NodeBuffer(ShapeBuffer):
     node: Hashable
 
-    data: dict[str, Any] = field(default_factory=dict)
+    properties: NodeProperties = field(default_factory=lambda: NodeProperties())
     margin: int = 0
     lod: int = 1
 
@@ -74,25 +74,21 @@ class NodeBuffer(ShapeBuffer):
         cls,
         strips: list[Strip],
         node: Hashable,
+        properties: NodeProperties,
         center: Point,
-        shape: Shape,
-        data: dict[str, Any],
         z_index: int = 0,
-        margin: int = 0,
         lod: int = 1,
     ) -> "NodeBuffer":
         width = max(sum(segment.cell_length for segment in strip.segments) for strip in strips)
 
         return cls(
             node=node,
-            data=data,
-            shape=shape,
+            properties=properties,
             center=center,
             z_index=z_index,
             shape_width=width,
             shape_height=len(strips),
             strips=strips,
-            margin=margin,
             lod=lod,
         )
 
@@ -139,7 +135,7 @@ class NodeBuffer(ShapeBuffer):
         # E.g. the port offset computation makes some assumptions about the border size
         # TODO should we raise on wrong port?
         # TODO more tests for non happy path
-        port = self.data.get("$ports", {}).get(port_name, {})
+        port = self.properties.ports.get(port_name, Port())
 
         if port_name in self.port_positions[lod]:
             return self.port_positions[lod][port_name]
@@ -165,7 +161,7 @@ class NodeBuffer(ShapeBuffer):
         start, start_helper = self.get_magnet_position(
             target_point=Point(0, 0),
             magnet=Magnet(port_side.value),
-            offset=port.get("offset", port_offset),
+            offset=port.offset or port_offset,
         )
         self.port_positions[lod][port_name] = (start, start_helper)
 
@@ -191,18 +187,20 @@ class NodeBuffer(ShapeBuffer):
         port_sides: dict[str, ShapeSide],
     ) -> list[StripBuffer]:
         buffers: list[StripBuffer] = []
-        ports = self.data.get("$ports", {})
-        for port_name, port_settings in ports.items():
+        ports = self.properties.ports
+        for port_name, port in ports.items():
             shape = JustContent()
-            port_symbol = port_settings.get("symbol", "○")
+            # TODO Check if the symbol default should be moved to the property as it is not dynamic
+            # Only dynamic defaults should be nullable.
+            port_symbol = port.symbol or "○"
             if port_name in self.connected_ports:
-                port_symbol = port_settings.get("symbol-connected", "●")
+                port_symbol = port.symbol_connected or "●"
             port_strips = shape.render_shape(console, port_symbol, style=Style(), padding=0, data={})
 
             port_position, port_helper = self.get_port_position(
                 port_name=port_name,
                 lod=lod,
-                ports_on_side=port_side_assignement[port_name],
+                ports_on_side=port_side_assignement[port_sides[port_name]],
                 port_side=port_sides[port_name],
             )
 
@@ -217,12 +215,13 @@ class NodeBuffer(ShapeBuffer):
             )
             buffers.append(port_buffer)
 
-            # The second should always be not None
-            if (port_label := port_settings.get("label", None)) is not None and port_helper is not None:
+            # This should always be not None
+            if port_helper is not None:
+                port_label = port.label
                 # This does not work well with unicode chars, use rich methods here instead
-                port_label_length = len(port_label)
+                port_label_length = len(port.label)
                 if port_sides[port_name] in [ShapeSide.TOP, ShapeSide.BOTTOM]:
-                    port_label = "\n".join([c for c in port_label])
+                    port_label = "\n".join([c for c in port.label])
                 port_label_strips = shape.render_shape(console, port_label, style=Style(), padding=0, data={})
 
                 normalizer = port_helper.distance_to(port_position)

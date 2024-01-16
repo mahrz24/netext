@@ -87,11 +87,9 @@ def rasterize_node(
 
     return NodeBuffer.from_strips(
         strips,
-        data=data,
         node=node,
+        properties=properties,
         center=Point(x=0, y=0),
         z_index=-1,
-        shape=properties.shape,
-        margin=properties.margin,
         lod=lod,
     )

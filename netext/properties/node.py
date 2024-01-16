@@ -15,10 +15,23 @@ def _default_content_renderer(node_str: str, data: dict[str, Any], content_style
 
 @dataclass
 class Port:
-    label: str
+    label: str = ""
     magnet: Magnet | None = None
     symbol: str | None = None
     symbol_connected: str | None = None
+    offset: int | None = None
+
+    @classmethod
+    def parse(cls, value: dict[str, Any] | "Port") -> "Port":
+        if isinstance(value, dict):
+            label = value.get("label", "")
+            magnet = value.get("magnet")
+            symbol = value.get("symbol")
+            symbol_connected = value.get("symbol_connected")
+            offset = value.get("offset")
+            return cls(label=label, magnet=magnet, symbol=symbol, symbol_connected=symbol_connected, offset=offset)
+        else:
+            return value
 
 
 @dataclass
@@ -30,7 +43,7 @@ class NodeProperties:
     padding: PaddingDimensions = (0, 1)
     content_renderer: Callable[[str, dict[str, Any], Style], RenderableType] = _default_content_renderer
     lod_properties: dict[int, "NodeProperties"] = field(default_factory=dict)
-    ports: dict[str, Any] = field(default_factory=dict)
+    ports: dict[str, Port] = field(default_factory=dict)
 
     @classmethod
     def from_attribute_dict(
@@ -47,7 +60,7 @@ class NodeProperties:
         padding: PaddingDimensions = data.get(f"$padding{suffix}", fallback.padding)
         content_renderer = data.get(f"$content-renderer{suffix}", fallback.content_renderer)
         lod_properties: dict[int, "NodeProperties"] = dict()
-        # ports: dict[str, Any] = data.get("$ports", dict())
+        ports: dict[str, dict[str, Any] | Port] = data.get("$ports", dict())
 
         result = cls(
             shape=shape,
@@ -57,6 +70,7 @@ class NodeProperties:
             padding=padding,
             content_renderer=content_renderer,
             lod_properties=lod_properties,
+            ports={k: Port.parse(v) for k, v in ports.items()},
         )
 
         # Load properies for all levels of detail
