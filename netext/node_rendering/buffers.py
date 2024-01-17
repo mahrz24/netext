@@ -192,9 +192,9 @@ class NodeBuffer(ShapeBuffer):
             shape = JustContent()
             # TODO Check if the symbol default should be moved to the property as it is not dynamic
             # Only dynamic defaults should be nullable.
-            port_symbol = port.symbol or "○"
+            port_symbol = port.symbol
             if port_name in self.connected_ports:
-                port_symbol = port.symbol_connected or "●"
+                port_symbol = port.symbol_connected
             port_strips = shape.render_shape(console, port_symbol, style=Style(), padding=0, data={})
 
             port_position, port_helper = self.get_port_position(

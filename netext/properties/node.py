@@ -17,17 +17,17 @@ def _default_content_renderer(node_str: str, data: dict[str, Any], content_style
 class Port:
     label: str = ""
     magnet: Magnet | None = None
-    symbol: str | None = None
-    symbol_connected: str | None = None
+    symbol: str = "○"
+    symbol_connected: str = "●"
     offset: int | None = None
 
     @classmethod
-    def parse(cls, value: dict[str, Any] | "Port") -> "Port":
+    def parse(cls, value: Union[dict[str, Any], "Port"]) -> "Port":
         if isinstance(value, dict):
             label = value.get("label", "")
             magnet = value.get("magnet")
-            symbol = value.get("symbol")
-            symbol_connected = value.get("symbol_connected")
+            symbol = value.get("symbol", "○")
+            symbol_connected = value.get("symbol_connected", "●")
             offset = value.get("offset")
             return cls(label=label, magnet=magnet, symbol=symbol, symbol_connected=symbol_connected, offset=offset)
         else:
