@@ -1,8 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Callable, Union
 from netext.geometry.magnet import Magnet
-from netext.shapes.shape import Shape
-from netext.shapes.box import Box
+from netext.properties.shape import BoxProperties, ShapeProperties
 from rich.style import Style
 from rich.padding import PaddingDimensions
 from rich.text import Text
@@ -36,7 +35,7 @@ class Port:
 
 @dataclass
 class NodeProperties:
-    shape: Shape = Box()
+    shape: ShapeProperties = field(default_factory=BoxProperties)
     style: Style = Style()
     content_style: Style = Style()
     margin: int = 0
@@ -53,7 +52,7 @@ class NodeProperties:
         fallback: Union["NodeProperties", None] = None,
     ) -> "NodeProperties":
         fallback = fallback or cls()
-        shape: Shape = data.get(f"$shape{suffix}", fallback.shape)
+        shape: ShapeProperties = data.get(f"$shape{suffix}", fallback.shape)
         style: Style = data.get(f"$style{suffix}", fallback.style)
         content_style = data.get(f"$content-style{suffix}", fallback.content_style)
         margin: int = data.get(f"$margin{suffix}", fallback.margin)

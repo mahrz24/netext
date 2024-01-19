@@ -1,4 +1,4 @@
-from typing import Any, Protocol, cast
+from typing import Protocol, cast
 
 from rich.console import Console, RenderableType
 from rich.padding import PaddingDimensions
@@ -8,6 +8,7 @@ from rich.style import Style
 from netext.geometry import Magnet, Point
 from shapely import LineString, Polygon
 from netext.geometry.magnet import ShapeSide
+from netext.properties.shape import ShapeProperties
 
 from netext.rendering.segment_buffer import Strip, Spacer
 import math
@@ -44,7 +45,7 @@ class Shape(Protocol):
         content_renderable: RenderableType,
         style: Style,
         padding: PaddingDimensions,
-        data: dict[str, Any],
+        properties: ShapeProperties,
         port_side_assignments: dict[ShapeSide, list[str]] = dict(),
     ) -> list[Strip]:
         return NotImplemented
@@ -193,7 +194,7 @@ class JustContent(RectangularShapeMixin):
         content_renderable: RenderableType,
         style: Style,
         padding: PaddingDimensions,
-        data: dict[str, Any],
+        properties: ShapeProperties,
         port_side_assignments: dict[ShapeSide, list[str]] = dict(),
     ) -> list[Strip]:
         # TODO Add padding and allow for ports

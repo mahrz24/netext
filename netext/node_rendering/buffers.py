@@ -9,6 +9,7 @@ from rich.style import Style
 from netext.geometry import Magnet, Point
 from netext.geometry.magnet import ShapeSide
 from netext.properties.node import NodeProperties, Port
+from netext.properties.shape import JustContentProperties
 
 from netext.rendering.segment_buffer import Reference, Strip, StripBuffer
 from netext.shapes.shape import JustContent, Shape, ShapeBuffer
@@ -195,7 +196,9 @@ class NodeBuffer(ShapeBuffer):
             port_symbol = port.symbol
             if port_name in self.connected_ports:
                 port_symbol = port.symbol_connected
-            port_strips = shape.render_shape(console, port_symbol, style=Style(), padding=0, data={})
+            port_strips = shape.render_shape(
+                console, port_symbol, style=Style(), padding=0, properties=JustContentProperties()
+            )
 
             port_position, port_helper = self.get_port_position(
                 port_name=port_name,
@@ -222,7 +225,9 @@ class NodeBuffer(ShapeBuffer):
                 port_label_length = len(port.label)
                 if port_sides[port_name] in [ShapeSide.TOP, ShapeSide.BOTTOM]:
                     port_label = "\n".join([c for c in port.label])
-                port_label_strips = shape.render_shape(console, port_label, style=Style(), padding=0, data={})
+                port_label_strips = shape.render_shape(
+                    console, port_label, style=Style(), padding=0, properties=JustContentProperties()
+                )
 
                 normalizer = port_helper.distance_to(port_position)
 

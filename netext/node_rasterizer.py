@@ -1,5 +1,6 @@
 from collections.abc import Hashable
 from typing import Any, cast
+import warnings
 
 from rich.console import Console
 from rich.padding import Padding
@@ -7,6 +8,9 @@ from netext.geometry import Point
 from netext.geometry.magnet import ShapeSide
 from netext.node_rendering.buffers import NodeBuffer
 from netext.properties.node import NodeProperties
+from netext.properties.shape import BoxProperties, JustContentProperties, ShapeProperties
+from netext.shapes.box import Box
+from netext.shapes.shape import JustContent, Shape
 
 
 def rasterize_node(
@@ -76,12 +80,34 @@ def rasterize_node(
             padding[3] + additional_left_padding,
         )
 
-    strips = properties.shape.render_shape(
+    match properties.shape:
+        case BoxProperties():
+            shape: Shape = Box()
+            shape_props: ShapeProperties = properties.shape
+        case JustContentProperties():
+            shape = JustContent()
+            shape_props = properties.shape
+        case Box():
+            shape = properties.shape
+            shape_props = BoxProperties()
+            # This path is deprecated, output deprecation warning
+            warnings.warn(
+                "Using the Box shape directly is deprecated, use the BoxProperties instead", DeprecationWarning
+            )
+        case JustContent():
+            shape = properties.shape
+            shape_props = JustContentProperties()
+            warnings.warn(
+                "Using the JustContent shape directly is deprecated, use the JustContentProperties instead",
+                DeprecationWarning,
+            )
+
+    strips = shape.render_shape(
         console,
         content_renderable,
         style=properties.style,
         padding=padding,
-        data=data,
+        properties=shape_props,
         port_side_assignments=port_side_assignments,
     )
 

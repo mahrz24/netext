@@ -1,14 +1,14 @@
 import math
 
-from typing import Any
+from typing import cast
 
-from rich import box
 from rich.console import Console, RenderableType
 from rich.padding import PaddingDimensions, Padding
 from rich.style import Style
 from rich.panel import Panel
 
 from netext.geometry.magnet import ShapeSide
+from netext.properties.shape import BoxProperties, ShapeProperties
 
 from netext.rendering.segment_buffer import Strip
 from netext.shapes.shape import RectangularShapeMixin
@@ -21,12 +21,12 @@ class Box(RectangularShapeMixin):
         content_renderable: RenderableType,
         style: Style,
         padding: PaddingDimensions,
-        data: dict[str, Any],
+        properties: ShapeProperties,
         port_side_assignments: dict[ShapeSide, list[str]] = dict(),
     ) -> list[Strip]:
-        padding = Padding.unpack(padding)
+        properties = cast(BoxProperties, properties)
 
-        box_type = data.get("$box-type", box.ROUNDED)
+        padding = Padding.unpack(padding)
 
         # Measure content
         result = self._renderable_type_to_strips(
@@ -36,7 +36,7 @@ class Box(RectangularShapeMixin):
                 expand=False,
                 style=style,
                 padding=padding,
-                box=box_type,
+                box=properties.box_type,
             ),
         )
 
@@ -87,7 +87,7 @@ class Box(RectangularShapeMixin):
                     expand=False,
                     style=style,
                     padding=padding,
-                    box=box_type,
+                    box=properties.box_type,
                 ),
             )
 

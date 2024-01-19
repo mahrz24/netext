@@ -17,6 +17,7 @@ from netext.geometry.index import BufferIndex
 from netext.geometry.point import Point
 
 from netext.node_rendering.buffers import EdgeLabelBuffer, NodeBuffer
+from netext.properties.shape import JustContentProperties
 from netext.shapes.shape import JustContent
 from netext.rendering.segment_buffer import StripBuffer
 
@@ -149,7 +150,7 @@ def rasterize_edge(
     # and link it to the creating shape?
     if label is not None:
         shape = JustContent()
-        label_strips = shape.render_shape(console, label, style=Style(), data={}, padding=0)
+        label_strips = shape.render_shape(console, label, style=Style(), properties=JustContentProperties(), padding=0)
 
         label_position = edge_segments.edge_iter_point(round(edge_segments.length / 2))
 
