@@ -20,14 +20,7 @@ def rasterize_node(
     lod: int = 1,
     port_side_assignments: dict[ShapeSide, list[str]] = dict(),
 ) -> NodeBuffer:
-    # TODO make helper function to get node from data
-    to_be_ignored = []
-    for key, val in data.items():
-        if val is None:
-            to_be_ignored.append(key)
-    for key in to_be_ignored:
-        del data[key]
-
+    remove_none_values(data)
     properties: NodeProperties = cast(NodeProperties, data.get("$properties", NodeProperties.from_attribute_dict(data)))
 
     if lod != 1:
@@ -36,39 +29,39 @@ def rasterize_node(
     content_renderable = properties.content_renderer(str(node), data, properties.content_style)
 
     padding = properties.padding
-    if "$ports" in data:
+    if properties.ports:
         # Determine longest padding label length
         # TODO: This can be shape specific and might be moved into the shape like
         # the additional padding on the number of ports
         padding = Padding.unpack(properties.padding)
         additional_top_padding = max(
             [
-                len(port["label"]) + 1
-                for port_name, port in data["$ports"].items()
+                len(port.label) + 1
+                for port_name, port in properties.ports.items()
                 if port_name in port_side_assignments.get(ShapeSide.TOP, [])
             ]
             + [0]
         )
         additional_left_padding = max(
             [
-                len(port["label"]) + 1
-                for port_name, port in data["$ports"].items()
+                len(port.label) + 1
+                for port_name, port in properties.ports.items()
                 if port_name in port_side_assignments.get(ShapeSide.LEFT, [])
             ]
             + [0]
         )
         additional_bottom_padding = max(
             [
-                len(port["label"]) + 1
-                for port_name, port in data["$ports"].items()
+                len(port.label) + 1
+                for port_name, port in properties.ports.items()
                 if port_name in port_side_assignments.get(ShapeSide.BOTTOM, [])
             ]
             + [0]
         )
         additional_right_padding = max(
             [
-                len(port["label"]) + 1
-                for port_name, port in data["$ports"].items()
+                len(port.label) + 1
+                for port_name, port in properties.ports.items()
                 if port_name in port_side_assignments.get(ShapeSide.RIGHT, [])
             ]
             + [0]
@@ -119,3 +112,12 @@ def rasterize_node(
         z_index=-1,
         lod=lod,
     )
+
+
+def remove_none_values(data):
+    to_be_ignored = []
+    for key, val in data.items():
+        if val is None:
+            to_be_ignored.append(key)
+    for key in to_be_ignored:
+        del data[key]

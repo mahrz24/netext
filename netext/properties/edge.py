@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Union
 from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
@@ -21,7 +21,7 @@ class EdgeProperties:
     start_port: str | None = None
     end_port: str | None = None
 
-    lod_properties: dict[int, "EdgeProperties"] = dict()
+    lod_properties: dict[int, "EdgeProperties"] = field(default_factory=dict)
 
     @classmethod
     def from_attribute_dict(
