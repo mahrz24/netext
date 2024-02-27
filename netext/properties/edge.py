@@ -5,6 +5,8 @@ from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
 from rich.style import Style
 
+from netext.properties.node import _get_allow_none_if_exists
+
 
 @dataclass
 class EdgeProperties:
@@ -31,17 +33,23 @@ class EdgeProperties:
         fallback: Union["EdgeProperties", None] = None,
     ) -> "EdgeProperties":
         fallback = fallback or cls()
-        style: Style = data.get(f"$style{suffix}", fallback.style)
-        show: bool = data.get(f"$show{suffix}", fallback.show)
-        label: str | None = data.get(f"$label{suffix}", fallback.label)
-        routing_mode: EdgeRoutingMode = data.get(f"$edge-routing-mode{suffix}", fallback.routing_mode)
-        segment_drawing_mode: EdgeSegmentDrawingMode = data.get(
-            f"$edge-segment-drawing-mode{suffix}", fallback.segment_drawing_mode
+        style: Style = _get_allow_none_if_exists(data, f"$style{suffix}", fallback.style)
+        show: bool = _get_allow_none_if_exists(data, f"$show{suffix}", fallback.show)
+        label: str | None = _get_allow_none_if_exists(data, f"$label{suffix}", fallback.label)
+        routing_mode: EdgeRoutingMode = _get_allow_none_if_exists(
+            data, f"$edge-routing-mode{suffix}", fallback.routing_mode
         )
-        start_arrow_tip: ArrowTip | None = data.get(f"$start-arrow-tip{suffix}", fallback.start_arrow_tip)
-        end_arrow_tip: ArrowTip | None = data.get(f"$end-arrow-tip{suffix}", fallback.end_arrow_tip)
-        start_port: str | None = data.get(f"$start-port{suffix}", fallback.start_port)
-        end_port: str | None = data.get(f"$end-port{suffix}", fallback.end_port)
+        segment_drawing_mode: EdgeSegmentDrawingMode = _get_allow_none_if_exists(
+            data, f"$edge-segment-drawing-mode{suffix}", fallback.segment_drawing_mode
+        )
+        start_arrow_tip: ArrowTip | None = _get_allow_none_if_exists(
+            data, f"$start-arrow-tip{suffix}", fallback.start_arrow_tip
+        )
+        end_arrow_tip: ArrowTip | None = _get_allow_none_if_exists(
+            data, f"$end-arrow-tip{suffix}", fallback.end_arrow_tip
+        )
+        start_port: str | None = _get_allow_none_if_exists(data, f"$start-port{suffix}", fallback.start_port)
+        end_port: str | None = _get_allow_none_if_exists(data, f"$end-port{suffix}", fallback.end_port)
 
         lod_properties: dict[int, "EdgeProperties"] = dict()
 
@@ -58,7 +66,12 @@ class EdgeProperties:
             lod_properties=lod_properties,
         )
 
-        for lod, lod_data in data.get("$lod-properties", dict()).items():
-            result.lod_properties[int(lod)] = cls.from_attribute_dict(lod_data, suffix, result)
+        for key in data.keys():
+            try:
+                lod = int(key.removesuffix(suffix).split("-")[-1])
+                if lod not in lod_properties:
+                    lod_properties[lod] = cls.from_attribute_dict(data, f"-{lod}", result)
+            except ValueError:
+                continue
 
         return result

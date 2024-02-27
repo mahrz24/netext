@@ -8,6 +8,13 @@ from rich.text import Text
 from rich.console import RenderableType
 
 
+def _get_allow_none_if_exists(data: dict[str, Any], key: str, default: Any) -> Any:
+    if key in data:
+        return data[key]
+    else:
+        return default
+
+
 def _default_content_renderer(node_str: str, data: dict[str, Any], content_style: Style) -> RenderableType:
     return Text(node_str, style=content_style)
 
@@ -52,12 +59,12 @@ class NodeProperties:
         fallback: Union["NodeProperties", None] = None,
     ) -> "NodeProperties":
         fallback = fallback or cls()
-        shape: ShapeProperties = data.get(f"$shape{suffix}", fallback.shape)
-        style: Style = data.get(f"$style{suffix}", fallback.style)
-        content_style = data.get(f"$content-style{suffix}", fallback.content_style)
-        margin: int = data.get(f"$margin{suffix}", fallback.margin)
-        padding: PaddingDimensions = data.get(f"$padding{suffix}", fallback.padding)
-        content_renderer = data.get(f"$content-renderer{suffix}", fallback.content_renderer)
+        shape: ShapeProperties = _get_allow_none_if_exists(data, f"$shape{suffix}", fallback.shape)
+        style: Style = _get_allow_none_if_exists(data, f"$style{suffix}", fallback.style)
+        content_style = _get_allow_none_if_exists(data, f"$content-style{suffix}", fallback.content_style)
+        margin: int = _get_allow_none_if_exists(data, f"$margin{suffix}", fallback.margin)
+        padding: PaddingDimensions = _get_allow_none_if_exists(data, f"$padding{suffix}", fallback.padding)
+        content_renderer = _get_allow_none_if_exists(data, f"$content-renderer{suffix}", fallback.content_renderer)
         lod_properties: dict[int, "NodeProperties"] = dict()
         ports: dict[str, dict[str, Any] | Port] = data.get("$ports", dict())
 

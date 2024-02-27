@@ -11,6 +11,7 @@ from netext.rendering.segment_buffer import Strip, StripBuffer
 
 class ArrowTip(Enum):
     ARROW = "arrow"
+    NONE = "none"
 
 
 class ArrowDirections(Enum):
@@ -119,7 +120,7 @@ def render_arrow_tip_buffers(
     start_arrow_tip_position = edge_segments.edge_iter_point(0)
     start_arrow_tip_dir = edge_segments.edge_iter_point(1)
 
-    if start_arrow_tip is not None:
+    if start_arrow_tip is not None and start_arrow_tip != ArrowTip.NONE:
         buffers.append(
             render_arrow_tip_buffer(
                 edge,
@@ -134,7 +135,7 @@ def render_arrow_tip_buffers(
     end_arrow_tip_position = edge_segments.edge_iter_point(-1)
     end_arrow_tip_dir = edge_segments.edge_iter_point(-2)
 
-    if end_arrow_tip is not None:
+    if end_arrow_tip is not None and end_arrow_tip != ArrowTip.NONE:
         buffers.append(
             render_arrow_tip_buffer(
                 edge,
