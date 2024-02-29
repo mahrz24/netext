@@ -1,4 +1,4 @@
-from typing import Any, Hashable, cast
+from typing import Hashable
 
 from rich.console import Console
 from rich.style import Style
@@ -12,10 +12,8 @@ from netext.edge_routing.edge import EdgeLayout, RoutedEdgeSegments
 from netext.edge_routing.edge import EdgeInput
 from netext.edge_routing.route import route_edge
 from netext.edge_routing.modes import EdgeRoutingMode
-from netext.geometry import Magnet
 from netext.geometry.index import BufferIndex
 from netext.geometry.point import Point
-from netext.node_rasterizer import remove_none_values
 
 from netext.node_rendering.buffers import EdgeLabelBuffer, NodeBuffer
 from netext.properties.edge import EdgeProperties
@@ -30,16 +28,13 @@ def rasterize_edge(
     v_buffer: NodeBuffer,
     all_nodes: list[NodeBuffer],
     routed_edges: list[EdgeLayout],
-    data: Any,
+    properties: EdgeProperties,
     node_idx: BufferIndex[NodeBuffer, None] | None = None,
     edge_idx: BufferIndex[EdgeBuffer, EdgeLayout] | None = None,
     lod: int = 1,
     edge_layout: EdgeLayout | None = None,
     port_positions: dict[Hashable, dict[str, tuple[Point, Point | None]]] = dict(),
 ) -> tuple[EdgeBuffer, EdgeLayout, list[StripBuffer]] | None:
-    remove_none_values(data)
-    properties: EdgeProperties = cast(EdgeProperties, data.get("$properties", EdgeProperties.from_attribute_dict(data)))
-
     if not properties.show:
         return None
 
@@ -50,13 +45,13 @@ def rasterize_edge(
         start, start_helper = port_positions[u_buffer.node][port_name]
         u_buffer.connect_port(port_name, v_buffer.node)
     else:
-        start, start_helper = u_buffer.get_magnet_position(v_buffer.center, data.get("$start-magnet", Magnet.CENTER))
+        start, start_helper = u_buffer.get_magnet_position(v_buffer.center, properties.start_magnet)
 
     if (port_name := properties.end_port) is not None and port_name in port_positions[v_buffer.node]:
         end, end_helper = port_positions[v_buffer.node][port_name]
         v_buffer.connect_port(port_name, u_buffer.node)
     else:
-        end, end_helper = v_buffer.get_magnet_position(u_buffer.center, data.get("$end-magnet", Magnet.CENTER))
+        end, end_helper = v_buffer.get_magnet_position(u_buffer.center, properties.end_magnet)
 
     edge_input = EdgeInput(
         start=start,

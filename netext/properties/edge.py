@@ -1,11 +1,12 @@
 from dataclasses import dataclass, field
-from typing import Any, Union
+from typing import Any, Callable, Union, cast
 from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
 from rich.style import Style
+from netext.geometry.magnet import Magnet
 
-from netext.properties.node import _get_allow_none_if_exists
+from netext.properties.node import _get_allow_none_if_exists, remove_none_values
 
 
 @dataclass
@@ -23,7 +24,16 @@ class EdgeProperties:
     start_port: str | None = None
     end_port: str | None = None
 
+    start_magnet: Magnet = Magnet.CENTER
+    end_magnet: Magnet = Magnet.CENTER
+
+    lod_map: Callable[[float], int] = lambda _: 1  # noqa: E731
     lod_properties: dict[int, "EdgeProperties"] = field(default_factory=dict)
+
+    @classmethod
+    def from_data_dict(cls, data: dict[str, Any]):
+        cleaned_data = remove_none_values(data)
+        return cast(EdgeProperties, cleaned_data.get("$properties", cls.from_attribute_dict(cleaned_data)))
 
     @classmethod
     def from_attribute_dict(
@@ -50,7 +60,10 @@ class EdgeProperties:
         )
         start_port: str | None = _get_allow_none_if_exists(data, f"$start-port{suffix}", fallback.start_port)
         end_port: str | None = _get_allow_none_if_exists(data, f"$end-port{suffix}", fallback.end_port)
+        start_magnet: Magnet = _get_allow_none_if_exists(data, f"$start-magnet{suffix}", fallback.start_magnet)
+        end_magnet: Magnet = _get_allow_none_if_exists(data, f"$end-magnet{suffix}", fallback.end_magnet)
 
+        lod_map: Callable[[float], int] = _get_allow_none_if_exists(data, "$lod-map", fallback.lod_map)
         lod_properties: dict[int, "EdgeProperties"] = dict()
 
         result = cls(
@@ -63,6 +76,9 @@ class EdgeProperties:
             end_arrow_tip=end_arrow_tip,
             start_port=start_port,
             end_port=end_port,
+            start_magnet=start_magnet,
+            end_magnet=end_magnet,
+            lod_map=lod_map,
             lod_properties=lod_properties,
         )
 
@@ -73,5 +89,7 @@ class EdgeProperties:
                     lod_properties[lod] = cls.from_attribute_dict(data, f"-{lod}", result)
             except ValueError:
                 continue
+
+        result.lod_properties = lod_properties
 
         return result

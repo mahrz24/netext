@@ -1,5 +1,5 @@
 from collections.abc import Hashable
-from typing import Any, cast
+from typing import Any
 import warnings
 
 from rich.console import Console
@@ -20,8 +20,7 @@ def rasterize_node(
     lod: int = 1,
     port_side_assignments: dict[ShapeSide, list[str]] = dict(),
 ) -> NodeBuffer:
-    remove_none_values(data)
-    properties: NodeProperties = cast(NodeProperties, data.get("$properties", NodeProperties.from_attribute_dict(data)))
+    properties = NodeProperties.from_data_dict(data)
 
     if lod != 1:
         properties = properties.lod_properties.get(lod, properties)
@@ -112,12 +111,3 @@ def rasterize_node(
         z_index=-1,
         lod=lod,
     )
-
-
-def remove_none_values(data):
-    to_be_ignored = []
-    for key, val in data.items():
-        if val is None:
-            to_be_ignored.append(key)
-    for key in to_be_ignored:
-        del data[key]

@@ -7,6 +7,7 @@ from netext.edge_routing.edge import EdgeSegment, RoutedEdgeSegments
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.edge_routing.route import route_edge
 from netext.node_rasterizer import rasterize_node
+from netext.properties.edge import EdgeProperties
 
 
 @pytest.fixture
@@ -27,7 +28,7 @@ def test_trivial_edge(console: Console) -> None:
         node_buffer_v,
         [node_buffer_u, node_buffer_u],
         [],
-        data=dict(),
+        properties=EdgeProperties(),
     )
 
     assert edge.width == 5
