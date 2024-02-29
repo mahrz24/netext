@@ -34,6 +34,7 @@ def _default_content_renderer(node_str: str, data: dict[str, Any], content_style
 class Port:
     label: str = ""
     magnet: Magnet | None = None
+    key: int = 0
     symbol: str = "○"
     symbol_connected: str = "●"
     offset: int | None = None
@@ -42,11 +43,14 @@ class Port:
     def parse(cls, value: Union[dict[str, Any], "Port"]) -> "Port":
         if isinstance(value, dict):
             label = value.get("label", "")
+            key = value.get("key", 0)
             magnet = value.get("magnet")
             symbol = value.get("symbol", "○")
             symbol_connected = value.get("symbol_connected", "●")
             offset = value.get("offset")
-            return cls(label=label, magnet=magnet, symbol=symbol, symbol_connected=symbol_connected, offset=offset)
+            return cls(
+                label=label, magnet=magnet, symbol=symbol, symbol_connected=symbol_connected, offset=offset, key=key
+            )
         else:
             return value
 
