@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Hashable, Tuple
 
 from rich.segment import Segment
@@ -30,10 +31,98 @@ class Reference:
     ref: Hashable
 
 
+class Layer(Enum):
+    BACKGROUND = 0
+    EDGES = -1
+    EDGE_DECORATIONS = -2
+    EDGE_LABELS = -3
+    NODES = -4
+    PORTS = -5
+    PORT_LABELS = -6
+    NODE_LABELS = -7
+    FOREGROUND = -8
+
+    def __lt__(self, other):
+        if isinstance(other, Layer):
+            return self.value < other.value
+        return NotImplemented
+
+    def __le__(self, other):
+        if isinstance(other, Layer):
+            return self.value <= other.value
+        return NotImplemented
+
+    def __eq__(self, other):
+        if isinstance(other, Layer):
+            return self.value == other.value
+        return NotImplemented
+
+    def __ne__(self, other):
+        if isinstance(other, Layer):
+            return self.value != other.value
+        return NotImplemented
+
+    def __gt__(self, other):
+        if isinstance(other, Layer):
+            return self.value > other.value
+        return NotImplemented
+
+    def __ge__(self, other):
+        if isinstance(other, Layer):
+            return self.value >= other.value
+        return NotImplemented
+
+
+@dataclass
+class ZIndex:
+    layer: Layer
+    layer_index: float = 0
+
+    def __lt__(self, value: Any) -> bool:
+        if isinstance(value, ZIndex):
+            if self.layer < value.layer:
+                return True
+            if self.layer == value.layer:
+                return self.layer_index < value.layer_index
+        return False
+
+    def __le__(self, value: Any) -> bool:
+        if isinstance(value, ZIndex):
+            if self.layer < value.layer:
+                return True
+            if self.layer == value.layer:
+                return self.layer_index <= value.layer_index
+        return False
+
+    def __gt__(self, value: Any) -> bool:
+        if isinstance(value, ZIndex):
+            if self.layer > value.layer:
+                return True
+            if self.layer == value.layer:
+                return self.layer_index > value.layer_index
+        return False
+
+    def __ge__(self, value: Any) -> bool:
+        if isinstance(value, ZIndex):
+            if self.layer > value.layer:
+                return True
+            if self.layer == value.layer:
+                return self.layer_index >= value.layer_index
+        return False
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                self.layer.value,
+                self.layer_index,
+            )
+        )
+
+
 @dataclass(kw_only=True)
 class StripBuffer:
     strips: list[Strip]
-    z_index: float
+    z_index: ZIndex
 
     @property
     def reference(self) -> Reference | None:

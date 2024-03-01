@@ -9,11 +9,11 @@ class ShapeProperties:
 
 
 @dataclass
-class JustContentProperties(ShapeProperties):
+class JustContent(ShapeProperties):
     shape_type: Literal["box", "just_content"] = "just_content"
 
 
 @dataclass
-class BoxProperties(ShapeProperties):
+class Box(ShapeProperties):
     shape_type: Literal["box", "just_content"] = "box"
     box_type: RichBox = ROUNDED

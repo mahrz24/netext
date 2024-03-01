@@ -8,9 +8,10 @@ from netext.geometry import Point
 from netext.geometry.magnet import ShapeSide
 from netext.node_rendering.buffers import NodeBuffer
 from netext.properties.node import NodeProperties
-from netext.properties.shape import BoxProperties, JustContentProperties, ShapeProperties
-from netext.shapes.box import Box
-from netext.shapes.shape import JustContent, Shape
+from netext.properties.shape import Box, JustContent, ShapeProperties
+from netext.rendering.segment_buffer import Layer, ZIndex
+from netext.shapes.box import BoxShape
+from netext.shapes.shape import JustContentShape, Shape
 
 
 def rasterize_node(
@@ -73,22 +74,22 @@ def rasterize_node(
         )
 
     match properties.shape:
-        case BoxProperties():
-            shape: Shape = Box()
-            shape_props: ShapeProperties = properties.shape
-        case JustContentProperties():
-            shape = JustContent()
-            shape_props = properties.shape
         case Box():
+            shape: Shape = BoxShape()
+            shape_props: ShapeProperties = properties.shape
+        case JustContent():
+            shape = JustContentShape()
+            shape_props = properties.shape
+        case BoxShape():
             shape = properties.shape
-            shape_props = BoxProperties()
+            shape_props = Box()
             # This path is deprecated, output deprecation warning
             warnings.warn(
                 "Using the Box shape directly is deprecated, use the BoxProperties instead", DeprecationWarning
             )
-        case JustContent():
+        case JustContentShape():
             shape = properties.shape
-            shape_props = JustContentProperties()
+            shape_props = JustContent()
             warnings.warn(
                 "Using the JustContent shape directly is deprecated, use the JustContentProperties instead",
                 DeprecationWarning,
@@ -108,6 +109,6 @@ def rasterize_node(
         node=node,
         properties=properties,
         center=Point(x=0, y=0),
-        z_index=-1,
+        z_index=ZIndex(layer=Layer.NODES),
         lod=lod,
     )

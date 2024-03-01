@@ -17,9 +17,9 @@ from netext.geometry.point import Point
 
 from netext.node_rendering.buffers import EdgeLabelBuffer, NodeBuffer
 from netext.properties.edge import EdgeProperties
-from netext.properties.shape import JustContentProperties
-from netext.shapes.shape import JustContent
-from netext.rendering.segment_buffer import StripBuffer
+from netext.properties.shape import JustContent
+from netext.shapes.shape import JustContentShape
+from netext.rendering.segment_buffer import Layer, StripBuffer, ZIndex
 
 
 def rasterize_edge(
@@ -120,9 +120,9 @@ def rasterize_edge(
             style=properties.style,
         )
 
-    z_index = len(all_nodes) ** 2
+    z_index = ZIndex(layer=Layer.EDGES)
     if routed_edges:
-        z_index += len(routed_edges)
+        z_index.layer_index += len(routed_edges)
     edge_layout = EdgeLayout(input=edge_input, segments=edge_segments.segments, z_index=z_index)
 
     label_buffers: list[StripBuffer] = []
@@ -131,17 +131,15 @@ def rasterize_edge(
     # so maybe use the shape to create the node buffer
     # and link it to the creating shape?
     if properties.label is not None:
-        shape = JustContent()
-        label_strips = shape.render_shape(
-            console, properties.label, style=Style(), properties=JustContentProperties(), padding=0
-        )
+        shape = JustContentShape()
+        label_strips = shape.render_shape(console, properties.label, style=Style(), properties=JustContent(), padding=0)
 
         label_position = edge_segments.edge_iter_point(round(edge_segments.length / 2))
 
         label_buffer = EdgeLabelBuffer.from_strips_and_edge(
             label_strips,
             edge=(u_buffer.node, v_buffer.node),
-            z_index=1,
+            z_index=ZIndex(layer=Layer.EDGE_LABELS),
             shape=shape,
             center=label_position,
         )

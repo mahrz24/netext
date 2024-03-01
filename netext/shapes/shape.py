@@ -187,7 +187,7 @@ class RectangularShapeMixin:
         raise RuntimeError(magnet)
 
 
-class JustContent(RectangularShapeMixin):
+class JustContentShape(RectangularShapeMixin):
     def render_shape(
         self,
         console: Console,
@@ -204,7 +204,7 @@ class JustContent(RectangularShapeMixin):
 @dataclass(kw_only=True)
 class ShapeBuffer(StripBuffer):
     center: Point
-    shape: Shape = JustContent()
+    shape: Shape = JustContentShape()
 
     shape_width: int
     shape_height: int

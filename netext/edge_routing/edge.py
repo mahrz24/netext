@@ -11,6 +11,8 @@ from shapely import LineString
 
 from typing import Iterable, Iterator
 
+from netext.rendering.segment_buffer import ZIndex
+
 
 class EdgeSegment(LineSegment):
     def intersects_with_node(self, node_buffer: NodeBuffer) -> bool:
@@ -119,7 +121,7 @@ class EdgeInput:
 class EdgeLayout:
     input: EdgeInput
     segments: list[EdgeSegment]
-    z_index: int
+    z_index: ZIndex
 
     def __hash__(self) -> int:
         return hash(

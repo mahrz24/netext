@@ -8,13 +8,13 @@ from rich.style import Style
 from rich.panel import Panel
 
 from netext.geometry.magnet import ShapeSide
-from netext.properties.shape import BoxProperties, ShapeProperties
+from netext.properties.shape import Box, ShapeProperties
 
 from netext.rendering.segment_buffer import Strip
 from netext.shapes.shape import RectangularShapeMixin
 
 
-class Box(RectangularShapeMixin):
+class BoxShape(RectangularShapeMixin):
     def render_shape(
         self,
         console: Console,
@@ -24,7 +24,7 @@ class Box(RectangularShapeMixin):
         properties: ShapeProperties,
         port_side_assignments: dict[ShapeSide, list[str]] = dict(),
     ) -> list[Strip]:
-        properties = cast(BoxProperties, properties)
+        properties = cast(Box, properties)
 
         padding = Padding.unpack(padding)
 

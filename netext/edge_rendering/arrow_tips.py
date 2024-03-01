@@ -6,7 +6,7 @@ from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_rendering.buffer import EdgeBuffer
 from netext.edge_routing.edge import RoutedEdgeSegments
 from netext.geometry import Point
-from netext.rendering.segment_buffer import Strip, StripBuffer
+from netext.rendering.segment_buffer import Layer, Strip, StripBuffer, ZIndex
 
 
 class ArrowTip(Enum):
@@ -100,7 +100,7 @@ def render_arrow_tip_buffer(
 
     return EdgeBuffer(
         edge=edge,
-        z_index=-1,
+        z_index=ZIndex(layer=Layer.EDGE_DECORATIONS),
         boundary_1=arrow_tip_position,
         boundary_2=arrow_tip_position,
         strips=[Strip([Segment(text=tip_character, style=style)])],

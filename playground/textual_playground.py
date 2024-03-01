@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 import uuid
 from netext.geometry.magnet import Magnet
-from netext.node_rasterizer import Box, JustContent
+from netext.node_rasterizer import BoxShape, JustContentShape
 from netext.rendering.segment_buffer import Reference
 from netext.textual.widget import GraphView
 from textual import events
@@ -239,7 +239,7 @@ class StyleEditor(Widget):
 
     def compose(self) -> ComposeResult:
         # TODO with proper property system, defaults are materialized before this
-        shape = self.node_data.get("$shape", Box())
+        shape = self.node_data.get("$shape", BoxShape())
         box_type = self.node_data.get("$box-type", box.ROUNDED)
 
         with Vertical():
@@ -248,12 +248,12 @@ class StyleEditor(Widget):
                 yield RadioButton(
                     "Just Content",
                     id="just-content",
-                    value=isinstance(shape, JustContent),
+                    value=isinstance(shape, JustContentShape),
                 )
-                yield RadioButton("Box", id="box", value=isinstance(shape, Box))
+                yield RadioButton("Box", id="box", value=isinstance(shape, BoxShape))
             with RadioSet(
                 id="box-type-selector",
-                classes="invisible" if not isinstance(shape, Box) else None,
+                classes="invisible" if not isinstance(shape, BoxShape) else None,
             ):
                 yield RadioButton("ASCII", id="ascii", value=box_type == box.ASCII)
                 yield RadioButton("SQUARE", id="square", value=box_type == box.SQUARE)
@@ -266,11 +266,11 @@ class StyleEditor(Widget):
     @on(RadioSet.Changed, "#shape-selector")
     def shape_changed(self, event: RadioSet.Changed) -> None:
         if event.index == 0:
-            self.node_data["$shape"] = JustContent()
+            self.node_data["$shape"] = JustContentShape()
             self.query("#box-type-selector").add_class("invisible")
         elif event.index == 1:
             self.query("#box-type-selector").remove_class("invisible")
-            self.node_data["$shape"] = Box()
+            self.node_data["$shape"] = BoxShape()
         self.post_message(self.StyleChanged(node=self.node, node_data=self.node_data))
 
     @on(RadioSet.Changed, "#box-type-selector")

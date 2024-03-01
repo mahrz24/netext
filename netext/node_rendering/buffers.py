@@ -9,10 +9,10 @@ from rich.style import Style
 from netext.geometry import Magnet, Point
 from netext.geometry.magnet import ShapeSide
 from netext.properties.node import NodeProperties, Port
-from netext.properties.shape import JustContentProperties
+from netext.properties.shape import JustContent
 
-from netext.rendering.segment_buffer import Reference, Strip, StripBuffer
-from netext.shapes.shape import JustContent, Shape, ShapeBuffer
+from netext.rendering.segment_buffer import Layer, Reference, Strip, StripBuffer, ZIndex
+from netext.shapes.shape import JustContentShape, Shape, ShapeBuffer
 
 
 @dataclass(kw_only=True)
@@ -32,7 +32,7 @@ class PortBuffer(ShapeBuffer):
         node: Hashable,
         center: Point,
         shape: Shape,
-        z_index: int = 0,
+        z_index: ZIndex = ZIndex(layer=Layer.PORTS),
     ) -> "PortBuffer":
         width = max(sum(segment.cell_length for segment in strip.segments) for strip in strips)
 
@@ -77,7 +77,7 @@ class NodeBuffer(ShapeBuffer):
         node: Hashable,
         properties: NodeProperties,
         center: Point,
-        z_index: int = 0,
+        z_index: ZIndex = ZIndex(layer=Layer.NODES),
         lod: int = 1,
     ) -> "NodeBuffer":
         width = max(sum(segment.cell_length for segment in strip.segments) for strip in strips)
@@ -190,15 +190,13 @@ class NodeBuffer(ShapeBuffer):
         buffers: list[StripBuffer] = []
         ports = self.properties.ports
         for port_name, port in ports.items():
-            shape = JustContent()
+            shape = JustContentShape()
             # TODO Check if the symbol default should be moved to the property as it is not dynamic
             # Only dynamic defaults should be nullable.
             port_symbol = port.symbol
             if port_name in self.connected_ports:
                 port_symbol = port.symbol_connected
-            port_strips = shape.render_shape(
-                console, port_symbol, style=Style(), padding=0, properties=JustContentProperties()
-            )
+            port_strips = shape.render_shape(console, port_symbol, style=Style(), padding=0, properties=JustContent())
 
             port_position, port_helper = self.get_port_position(
                 port_name=port_name,
@@ -211,8 +209,6 @@ class NodeBuffer(ShapeBuffer):
                 port_strips,
                 port_name=port_name,
                 node=self.node,
-                # TODO Z indices need a layer concept
-                z_index=-2,
                 shape=shape,
                 center=port_position,
             )
@@ -226,7 +222,7 @@ class NodeBuffer(ShapeBuffer):
                 if port_sides[port_name] in [ShapeSide.TOP, ShapeSide.BOTTOM]:
                     port_label = "\n".join([c for c in port.label])
                 port_label_strips = shape.render_shape(
-                    console, port_label, style=Style(), padding=0, properties=JustContentProperties()
+                    console, port_label, style=Style(), padding=0, properties=JustContent()
                 )
 
                 normalizer = port_helper.distance_to(port_position)
@@ -241,9 +237,8 @@ class NodeBuffer(ShapeBuffer):
                     port_label_strips,
                     port_name=port_name,
                     node=self.node,
-                    # TODO Z indices need a layer concept
-                    z_index=-2,
                     shape=shape,
+                    z_index=ZIndex(layer=Layer.PORT_LABELS),
                     center=label_position,
                 )
                 buffers.append(port_label_buffer)
@@ -266,7 +261,7 @@ class EdgeLabelBuffer(ShapeBuffer):
         edge: tuple[Hashable, Hashable],
         center: Point,
         shape: Shape,
-        z_index: int = 0,
+        z_index: ZIndex = ZIndex(layer=Layer.EDGE_LABELS),
     ) -> "EdgeLabelBuffer":
         width = max(sum(segment.cell_length for segment in strip.segments) for strip in strips)
 

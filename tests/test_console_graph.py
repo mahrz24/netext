@@ -173,7 +173,7 @@ def test_render_graph_with_mutations_update_positions_and_data(console):
             "$content-renderer": lambda _, d, __: d["label"],
         },
     )
-    print("ADDING EDGE")
+
     graph.add_edge(1, 2)
 
     console_graph = ConsoleGraph[DiGraph](graph, layout_engine=StaticLayout())
