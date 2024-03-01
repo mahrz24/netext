@@ -49,8 +49,7 @@ class PortBuffer(ShapeBuffer):
 
 
 @dataclass(kw_only=True)
-class PortLabelBuffer(PortBuffer):
-    ...
+class PortLabelBuffer(PortBuffer): ...
 
 
 @dataclass(kw_only=True)
