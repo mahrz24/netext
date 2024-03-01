@@ -50,7 +50,7 @@ jobs:
       - name : Run linting
         run: hatch run lint:ruff check
       - name : Run formatting
-        run: hatch run lint:ruff format
+        run: hatch run lint:ruff format --check
       - name: Run mypy
         run: hatch run test:mypy netext
       - name: Test with pytest
