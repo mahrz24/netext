@@ -9,7 +9,7 @@ from netext.buffer_renderer import flatten_strips, render_buffers
 from netext.geometry import Point
 from netext.geometry.region import Region
 from netext.node_rasterizer import NodeBuffer
-from netext.rendering.segment_buffer import Strip, StripBuffer, Spacer
+from netext.rendering.segment_buffer import Layer, Strip, StripBuffer, Spacer, ZIndex
 
 
 @dataclass
@@ -49,7 +49,7 @@ def console():
 
 def test_render_trivial(console):
     test_buffer = LineBuffer(
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         x=0,
         line_width=10,
         strips=[Strip(segments=[Segment(10 * "X")])],
@@ -63,7 +63,7 @@ def test_render_trivial(console):
 
 def test_render_spacer_trivial(console):
     test_buffer = LineBuffer(
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         x=0,
         line_width=10,
         strips=[Strip(segments=[Spacer(width=10)])],
@@ -77,7 +77,7 @@ def test_render_spacer_trivial(console):
 
 def test_render_trivial_multiple_segments(console):
     test_buffer = LineBuffer(
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         x=0,
         line_width=10,
         strips=[Strip(segments=cast(list[Segment | Spacer], 10 * [Segment("X")]))],
@@ -91,7 +91,7 @@ def test_render_trivial_multiple_segments(console):
 
 def test_render_trivial_multiple_segments_spacers(console):
     test_buffer = LineBuffer(
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         x=0,
         line_width=10,
         strips=[
@@ -108,7 +108,7 @@ def test_render_trivial_multiple_segments_spacers(console):
 def test_render_multiple_segments_spacers_layered(console):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=0,
             line_width=9,
             strips=[
@@ -120,7 +120,7 @@ def test_render_multiple_segments_spacers_layered(console):
             ],
         ),
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=2,
             line_width=6,
             strips=[
@@ -139,7 +139,7 @@ def test_render_multiple_segments_spacers_layered(console):
 
 def test_render_segment_with_offset(console):
     test_buffer = LineBuffer(
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         x=0,
         line_width=10,
         strips=[Strip(segments=[Spacer(width=1), Segment(9 * "X")])],
@@ -153,7 +153,7 @@ def test_render_segment_with_offset(console):
 
 def test_render_buffer_with_offset(console):
     test_buffer = LineBuffer(
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         x=1,
         line_width=9,
         strips=[Strip(segments=[Segment(9 * "X")])],
@@ -167,7 +167,7 @@ def test_render_buffer_with_offset(console):
 
 def test_render_segment_with_offset_cropped(console):
     test_buffer = LineBuffer(
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         x=0,
         line_width=11,
         strips=[Strip(segments=[Spacer(width=1), Segment(9 * "X" + "Y")])],
@@ -181,7 +181,7 @@ def test_render_segment_with_offset_cropped(console):
 
 def test_render_segment_with_offset_cropped_multiple_segments(console):
     test_buffer = LineBuffer(
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         x=0,
         line_width=11,
         strips=[Strip(segments=[Spacer(width=1), Segment(9 * "X"), Segment("Y")])],
@@ -195,7 +195,7 @@ def test_render_segment_with_offset_cropped_multiple_segments(console):
 
 def test_render_buffer_with_offset_cropped(console):
     test_buffer = LineBuffer(
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         x=1,
         line_width=10,
         strips=[Strip(segments=[Segment(9 * "X" + "Y")])],
@@ -209,7 +209,7 @@ def test_render_buffer_with_offset_cropped(console):
 
 def test_render_fill_remaining_buffer(console):
     test_buffer = LineBuffer(
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         x=0,
         line_width=10,
         strips=[Strip(segments=[Spacer(width=3), Segment("X")])],
@@ -223,7 +223,7 @@ def test_render_fill_remaining_buffer(console):
 
 def test_render_buffer_with_offset_and_fill_right(console):
     test_buffer = LineBuffer(
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         x=3,
         line_width=1,
         strips=[Strip(segments=[Segment("X")])],
@@ -237,7 +237,7 @@ def test_render_buffer_with_offset_and_fill_right(console):
 
 def test_render_segment_empty(console):
     test_buffer = LineBuffer(
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         x=0,
         line_width=10,
         strips=[Strip(segments=[Segment("")])],
@@ -251,7 +251,7 @@ def test_render_segment_empty(console):
 
 def test_render_segment_empty_with_multiple_segments(console):
     test_buffer = LineBuffer(
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         x=0,
         line_width=10,
         strips=[Strip(segments=[Segment(""), Segment("X"), Segment(""), Segment("Y")])],
@@ -266,7 +266,7 @@ def test_render_segment_empty_with_multiple_segments(console):
 def test_render_mutliple_buffers(console):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=1,
             line_width=2,
             strips=[
@@ -274,7 +274,7 @@ def test_render_mutliple_buffers(console):
             ],
         ),
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=5,
             line_width=2,
             strips=[
@@ -292,7 +292,7 @@ def test_render_mutliple_buffers(console):
 def test_render_multiple_buffers_with_overlap(console):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=1,
             line_width=8,
             strips=[
@@ -302,7 +302,7 @@ def test_render_multiple_buffers_with_overlap(console):
         LineBuffer(
             x=5,
             line_width=2,
-            z_index=-1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-1),
             strips=[
                 Strip(segments=[Segment("YY")]),
             ],
@@ -318,7 +318,7 @@ def test_render_multiple_buffers_with_overlap(console):
 def test_render_multiple_buffers_with_overlap_and_spacer(console):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=1,
             line_width=8,
             strips=[
@@ -328,7 +328,7 @@ def test_render_multiple_buffers_with_overlap_and_spacer(console):
         LineBuffer(
             x=5,
             line_width=4,
-            z_index=-1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-1),
             strips=[
                 Strip(
                     segments=[Segment("Y"), Spacer(width=2), Segment("Y")],
@@ -346,7 +346,7 @@ def test_render_multiple_buffers_with_overlap_and_spacer(console):
 def test_render_multiple_buffers_with_overlap_and_multiple_segments(console):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=1,
             line_width=8,
             strips=[
@@ -356,7 +356,7 @@ def test_render_multiple_buffers_with_overlap_and_multiple_segments(console):
         LineBuffer(
             x=5,
             line_width=2,
-            z_index=-1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-1),
             strips=[
                 Strip(segments=[Segment("YY")]),
             ],
@@ -372,7 +372,7 @@ def test_render_multiple_buffers_with_overlap_and_multiple_segments(console):
 def test_render_multiple_buffers_with_overlap_and_multiple_segments_in_overlap(console):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=1,
             line_width=8,
             strips=[
@@ -382,7 +382,7 @@ def test_render_multiple_buffers_with_overlap_and_multiple_segments_in_overlap(c
         LineBuffer(
             x=5,
             line_width=2,
-            z_index=-1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-1),
             strips=[
                 Strip(segments=[Segment("Y"), Segment("Y")]),
             ],
@@ -398,7 +398,7 @@ def test_render_multiple_buffers_with_overlap_and_multiple_segments_in_overlap(c
 def test_render_multiple_buffers_with_overlap_hidden(console):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=1,
             line_width=8,
             strips=[
@@ -408,7 +408,7 @@ def test_render_multiple_buffers_with_overlap_hidden(console):
         LineBuffer(
             x=5,
             line_width=2,
-            z_index=1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=1),
             strips=[
                 Strip(segments=[Segment("YY")]),
             ],
@@ -424,7 +424,7 @@ def test_render_multiple_buffers_with_overlap_hidden(console):
 def test_render_multiple_buffers_with_overlap_hidden_multiple_segments(console):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=1,
             line_width=8,
             strips=[
@@ -434,7 +434,7 @@ def test_render_multiple_buffers_with_overlap_hidden_multiple_segments(console):
         LineBuffer(
             x=5,
             line_width=2,
-            z_index=1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=1),
             strips=[
                 Strip(segments=[Segment("YY")]),
             ],
@@ -450,7 +450,7 @@ def test_render_multiple_buffers_with_overlap_hidden_multiple_segments(console):
 def test_render_multiple_buffers_with_nested_overlap(console):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=1,
             line_width=8,
             strips=[
@@ -460,7 +460,7 @@ def test_render_multiple_buffers_with_nested_overlap(console):
         LineBuffer(
             x=2,
             line_width=4,
-            z_index=-1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-1),
             strips=[
                 Strip(segments=[Segment("XYZW")]),
             ],
@@ -468,7 +468,7 @@ def test_render_multiple_buffers_with_nested_overlap(console):
         LineBuffer(
             x=3,
             line_width=2,
-            z_index=-2,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-2),
             strips=[
                 Strip(segments=[Segment("12")]),
             ],
@@ -486,13 +486,13 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments(console):
         LineBuffer(
             x=2,
             line_width=4,
-            z_index=-1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-1),
             strips=[
                 Strip(segments=[Segment("XYZ"), Segment("W")]),
             ],
         ),
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=1,
             line_width=8,
             strips=[
@@ -502,7 +502,7 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments(console):
         LineBuffer(
             x=3,
             line_width=2,
-            z_index=-2,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-2),
             strips=[
                 Strip(segments=[Segment("1"), Segment("2")]),
             ],
@@ -522,13 +522,13 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_different
         LineBuffer(
             x=2,
             line_width=4,
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             strips=[
                 Strip(segments=[Segment("XYZ"), Segment("W")]),
             ],
         ),
         LineBuffer(
-            z_index=-1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-1),
             x=1,
             line_width=8,
             strips=[
@@ -538,7 +538,7 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_different
         LineBuffer(
             x=3,
             line_width=2,
-            z_index=-2,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-2),
             strips=[
                 Strip(segments=[Segment("1"), Segment("2")]),
             ],
@@ -556,7 +556,7 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_and_space
 ):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=1,
             line_width=8,
             strips=[
@@ -566,7 +566,7 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_and_space
         LineBuffer(
             x=2,
             line_width=4,
-            z_index=-1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-1),
             strips=[
                 Strip(segments=[Segment("XYZ"), Segment("W")]),
             ],
@@ -574,7 +574,7 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_and_space
         LineBuffer(
             x=3,
             line_width=3,
-            z_index=-2,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-2),
             strips=[
                 Strip(
                     segments=[Segment("1"), Spacer(width=1), Segment("2")],
@@ -592,7 +592,7 @@ def test_render_multiple_buffers_with_nested_overlap_multiple_segments_and_space
 def test_render_multiple_buffers_with_nested_overlap_one_hidden(console):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=1,
             line_width=8,
             strips=[
@@ -602,7 +602,7 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden(console):
         LineBuffer(
             x=2,
             line_width=4,
-            z_index=-2,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-2),
             strips=[
                 Strip(segments=[Segment("XYZW")]),
             ],
@@ -610,7 +610,7 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden(console):
         LineBuffer(
             x=3,
             line_width=2,
-            z_index=-1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-1),
             strips=[
                 Strip(segments=[Segment("12")]),
             ],
@@ -626,7 +626,7 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden(console):
 def test_render_multiple_buffers_with_multiple_overlaps(console):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=0,
             line_width=8,
             strips=[
@@ -636,7 +636,7 @@ def test_render_multiple_buffers_with_multiple_overlaps(console):
         LineBuffer(
             x=1,
             line_width=4,
-            z_index=-1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-1),
             strips=[
                 Strip(segments=[Segment("XYZW")]),
             ],
@@ -644,7 +644,7 @@ def test_render_multiple_buffers_with_multiple_overlaps(console):
         LineBuffer(
             x=4,
             line_width=4,
-            z_index=-2,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-2),
             strips=[
                 Strip(segments=[Segment("1234")]),
             ],
@@ -662,7 +662,7 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden_multiple_spacers
 ):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=1,
             line_width=8,
             strips=[
@@ -674,7 +674,7 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden_multiple_spacers
         LineBuffer(
             x=2,
             line_width=4,
-            z_index=-2,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-2),
             strips=[
                 Strip(
                     segments=[Segment("X"), Spacer(width=2), Segment("W")],
@@ -684,7 +684,7 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden_multiple_spacers
         LineBuffer(
             x=3,
             line_width=2,
-            z_index=-1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-1),
             strips=[
                 Strip(segments=[Segment("12")]),
             ],
@@ -700,7 +700,7 @@ def test_render_multiple_buffers_with_nested_overlap_one_hidden_multiple_spacers
 def test_render_multiple_buffers_with_multiple_overlaps_middle_in_front(console):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=0,
             line_width=8,
             strips=[
@@ -710,7 +710,7 @@ def test_render_multiple_buffers_with_multiple_overlaps_middle_in_front(console)
         LineBuffer(
             x=1,
             line_width=4,
-            z_index=-2,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-2),
             strips=[
                 Strip(segments=[Segment("XYZW")]),
             ],
@@ -718,7 +718,7 @@ def test_render_multiple_buffers_with_multiple_overlaps_middle_in_front(console)
         LineBuffer(
             x=4,
             line_width=4,
-            z_index=-1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-1),
             strips=[
                 Strip(segments=[Segment("1234")]),
             ],
@@ -734,7 +734,7 @@ def test_render_multiple_buffers_with_multiple_overlaps_middle_in_front(console)
 def test_render_multiple_buffers_with_empty_segment(console):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=1,
             line_width=8,
             strips=[
@@ -744,7 +744,7 @@ def test_render_multiple_buffers_with_empty_segment(console):
         LineBuffer(
             x=1,
             line_width=4,
-            z_index=-1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-1),
             strips=[
                 Strip(segments=[Segment("")]),
             ],
@@ -752,7 +752,7 @@ def test_render_multiple_buffers_with_empty_segment(console):
         LineBuffer(
             x=2,
             line_width=2,
-            z_index=-2,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=-2),
             strips=[
                 Strip(segments=[Segment("")]),
             ],
@@ -768,7 +768,7 @@ def test_render_multiple_buffers_with_empty_segment(console):
 def test_render_node_buffer(console):
     test_buffer = NodeBuffer(
         node=0,
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         center=Point(x=1, y=1),
         shape_width=3,
         shape_height=3,
@@ -788,7 +788,7 @@ def test_render_node_buffer(console):
 def test_render_node_buffer_with_spacers(console):
     test_buffer = NodeBuffer(
         node=0,
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         center=Point(x=1, y=1),
         shape_width=3,
         shape_height=3,
@@ -813,7 +813,7 @@ def test_render_node_buffers_with_spacers(console):
     test_buffers = [
         NodeBuffer(
             node=0,
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             center=Point(x=1, y=1),
             shape_width=3,
             shape_height=3,
@@ -831,7 +831,7 @@ def test_render_node_buffers_with_spacers(console):
         ),
         NodeBuffer(
             node=0,
-            z_index=1,
+            z_index=ZIndex(layer=Layer.BACKGROUND, layer_index=1),
             center=Point(x=1, y=1),
             shape_width=3,
             shape_height=3,
@@ -858,7 +858,7 @@ def test_render_node_buffers_with_spacers(console):
 def test_render_node_buffer_with_empty_line(console):
     test_buffer = NodeBuffer(
         node=0,
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         center=Point(x=1, y=1),
         shape_width=3,
         shape_height=3,
@@ -878,7 +878,7 @@ def test_render_node_buffer_with_empty_line(console):
 def test_render_node_buffer_with_empty_line_and_no_buffer(console):
     test_buffer = NodeBuffer(
         node=0,
-        z_index=0,
+        z_index=ZIndex(layer=Layer.BACKGROUND),
         center=Point(x=1, y=1),
         shape_width=3,
         shape_height=3,
@@ -898,7 +898,7 @@ def test_render_node_buffer_with_empty_line_and_no_buffer(console):
 def test_render_buffer_with_overflow_segment_fails(console):
     test_buffers = [
         LineBuffer(
-            z_index=0,
+            z_index=ZIndex(layer=Layer.BACKGROUND),
             x=1,
             line_width=1,
             strips=[

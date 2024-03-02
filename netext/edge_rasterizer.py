@@ -1,4 +1,4 @@
-from typing import Any, Hashable
+from typing import Hashable
 
 from rich.console import Console
 from rich.style import Style
@@ -12,12 +12,14 @@ from netext.edge_routing.edge import EdgeLayout, RoutedEdgeSegments
 from netext.edge_routing.edge import EdgeInput
 from netext.edge_routing.route import route_edge
 from netext.edge_routing.modes import EdgeRoutingMode
-from netext.geometry import Magnet
 from netext.geometry.index import BufferIndex
 from netext.geometry.point import Point
 
-from netext.node_rasterizer import EdgeLabelBuffer, JustContent, NodeBuffer
-from netext.rendering.segment_buffer import StripBuffer
+from netext.node_rendering.buffers import EdgeLabelBuffer, NodeBuffer
+from netext.properties.edge import EdgeProperties
+from netext.properties.shape import JustContent
+from netext.shapes.shape import JustContentShape
+from netext.rendering.segment_buffer import Layer, StripBuffer, ZIndex
 
 
 def rasterize_edge(
@@ -26,57 +28,37 @@ def rasterize_edge(
     v_buffer: NodeBuffer,
     all_nodes: list[NodeBuffer],
     routed_edges: list[EdgeLayout],
-    data: Any,
+    properties: EdgeProperties,
     node_idx: BufferIndex[NodeBuffer, None] | None = None,
     edge_idx: BufferIndex[EdgeBuffer, EdgeLayout] | None = None,
     lod: int = 1,
     edge_layout: EdgeLayout | None = None,
     port_positions: dict[Hashable, dict[str, tuple[Point, Point | None]]] = dict(),
 ) -> tuple[EdgeBuffer, EdgeLayout, list[StripBuffer]] | None:
-    show = data.get("$show", True)
-
-    if not show:
+    if not properties.show:
         return None
 
-    end_arrow_tip = data.get("$end-arrow-tip", None)
-    start_arrow_tip = data.get("$start-arrow-tip", None)
-
-    routing_mode: EdgeRoutingMode = data.get("$edge-routing-mode", EdgeRoutingMode.STRAIGHT)
-    edge_segment_drawing_mode: EdgeSegmentDrawingMode = data.get(
-        "$edge-segment-drawing-mode", EdgeSegmentDrawingMode.SINGLE_CHARACTER
-    )
-
-    label = data.get("$label", None)
-    style = data.get("$style", None)
-
     if lod != 1:
-        end_arrow_tip = data.get(f"$end-arrow-tip-{lod}", end_arrow_tip)
-        start_arrow_tip = data.get(f"$start-arrow-tip-{lod}", start_arrow_tip)
+        properties = properties.lod_properties.get(lod, properties)
 
-        routing_mode = data.get(f"$edge-routing-mode-{lod}", routing_mode)
-        edge_segment_drawing_mode = data.get(f"$edge-segment-drawing-mode-{lod}", edge_segment_drawing_mode)
-
-        label = data.get(f"$label-{lod}", label)
-        style = data.get(f"$style-{lod}", style)
-
-    if (port_name := data.get("$start-port")) is not None and port_name in port_positions[u_buffer.node]:
+    if (port_name := properties.start_port) is not None and port_name in port_positions[u_buffer.node]:
         start, start_helper = port_positions[u_buffer.node][port_name]
         u_buffer.connect_port(port_name, v_buffer.node)
     else:
-        start, start_helper = u_buffer.get_magnet_position(v_buffer.center, data.get("$start-magnet", Magnet.CENTER))
+        start, start_helper = u_buffer.get_magnet_position(v_buffer.center, properties.start_magnet)
 
-    if (port_name := data.get("$end-port")) is not None and port_name in port_positions[v_buffer.node]:
+    if (port_name := properties.end_port) is not None and port_name in port_positions[v_buffer.node]:
         end, end_helper = port_positions[v_buffer.node][port_name]
         v_buffer.connect_port(port_name, u_buffer.node)
     else:
-        end, end_helper = v_buffer.get_magnet_position(u_buffer.center, data.get("$end-magnet", Magnet.CENTER))
+        end, end_helper = v_buffer.get_magnet_position(u_buffer.center, properties.end_magnet)
 
     edge_input = EdgeInput(
         start=start,
         end=end,
-        label=label,
-        routing_mode=routing_mode,
-        edge_segment_drawing_mode=edge_segment_drawing_mode,
+        label=properties.label,
+        routing_mode=properties.routing_mode,
+        edge_segment_drawing_mode=properties.segment_drawing_mode,
         routing_hints=[],  # TODO: If doing relayout, the edge input should contain the existing segments
     )
 
@@ -86,7 +68,7 @@ def rasterize_edge(
             end=end,
             start_helper=start_helper,
             end_helper=end_helper,
-            routing_mode=routing_mode,
+            routing_mode=properties.routing_mode,
             all_nodes=all_nodes,  # non_start_end_nodes,
             routed_edges=routed_edges,
             node_idx=node_idx,
@@ -102,20 +84,22 @@ def rasterize_edge(
     else:
         edge_segments = RoutedEdgeSegments(segments=edge_layout.segments, intersections=0)
 
-    if edge_segment_drawing_mode in [
+    if properties.segment_drawing_mode in [
         EdgeSegmentDrawingMode.BOX,
         EdgeSegmentDrawingMode.BOX_ROUNDED,
         EdgeSegmentDrawingMode.BOX_HEAVY,
         EdgeSegmentDrawingMode.BOX_DOUBLE,
         EdgeSegmentDrawingMode.ASCII,
     ]:
-        assert routing_mode == EdgeRoutingMode.ORTHOGONAL, "Box characters are only supported on orthogonal lines"
+        assert (
+            properties.routing_mode == EdgeRoutingMode.ORTHOGONAL
+        ), "Box characters are only supported on orthogonal lines"
         strips = orthogonal_segments_to_strips_with_box_characters(
-            edge_segments.segments, edge_segment_drawing_mode, style=style
+            edge_segments.segments, properties.segment_drawing_mode, style=properties.style
         )
     else:
         # In case of pixel / braille we scale and then map character per character
-        match edge_segment_drawing_mode:
+        match properties.segment_drawing_mode:
             case EdgeSegmentDrawingMode.SINGLE_CHARACTER:
                 x_scaling = 1
                 y_scaling = 1
@@ -132,13 +116,13 @@ def rasterize_edge(
         bitmap_buffer = rasterize_edge_segments(edge_segments.segments, x_scaling=x_scaling, y_scaling=y_scaling)
         strips = bitmap_to_strips(
             bitmap_buffer,
-            edge_segment_drawing_mode=edge_segment_drawing_mode,
-            style=style,
+            edge_segment_drawing_mode=properties.segment_drawing_mode,
+            style=properties.style,
         )
 
-    z_index = len(all_nodes) ** 2
+    z_index = ZIndex(layer=Layer.EDGES)
     if routed_edges:
-        z_index += len(routed_edges)
+        z_index.layer_index += len(routed_edges)
     edge_layout = EdgeLayout(input=edge_input, segments=edge_segments.segments, z_index=z_index)
 
     label_buffers: list[StripBuffer] = []
@@ -146,16 +130,16 @@ def rasterize_edge(
     # TODO Think about this: Shape and node buffer are bound
     # so maybe use the shape to create the node buffer
     # and link it to the creating shape?
-    if label is not None:
-        shape = JustContent()
-        label_strips = shape.render_shape(console, label, style=Style(), data={}, padding=0)
+    if properties.label is not None:
+        shape = JustContentShape()
+        label_strips = shape.render_shape(console, properties.label, style=Style(), properties=JustContent(), padding=0)
 
         label_position = edge_segments.edge_iter_point(round(edge_segments.length / 2))
 
         label_buffer = EdgeLabelBuffer.from_strips_and_edge(
             label_strips,
             edge=(u_buffer.node, v_buffer.node),
-            z_index=1,
+            z_index=ZIndex(layer=Layer.EDGE_LABELS),
             shape=shape,
             center=label_position,
         )
@@ -164,11 +148,11 @@ def rasterize_edge(
     label_buffers.extend(
         render_arrow_tip_buffers(
             (u_buffer.node, v_buffer.node),
-            end_arrow_tip,
-            start_arrow_tip,
+            properties.end_arrow_tip,
+            properties.start_arrow_tip,
             edge_segments,
-            edge_segment_drawing_mode,
-            style=style,
+            properties.segment_drawing_mode,
+            style=properties.style,
         )
     )
 

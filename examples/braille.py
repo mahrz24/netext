@@ -1,10 +1,11 @@
 from rich.style import Style
 from netext import ConsoleGraph
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
-from netext.node_rasterizer import JustContent
 from rich import print
 
 import networkx as nx
+
+from netext.properties.shape import JustContent
 
 num_nodes = 6
 

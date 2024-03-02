@@ -11,6 +11,8 @@ from shapely import LineString
 
 from typing import Iterable, Iterator
 
+from netext.rendering.segment_buffer import ZIndex
+
 
 class EdgeSegment(LineSegment):
     def intersects_with_node(self, node_buffer: NodeBuffer) -> bool:
@@ -38,7 +40,7 @@ class EdgeSegment(LineSegment):
             )
 
     def cut(self, node_buffer: NodeBuffer) -> list["EdgeSegment"]:
-        node_shape = node_buffer.shape.polygon(node_buffer=node_buffer, margin=0.75)
+        node_shape = node_buffer.shape.polygon(shape_buffer=node_buffer, margin=0.75)
         result = []
         if self.shapely.intersects(node_shape):
             remaining = self.shapely.difference(node_shape)
@@ -119,7 +121,7 @@ class EdgeInput:
 class EdgeLayout:
     input: EdgeInput
     segments: list[EdgeSegment]
-    z_index: int
+    z_index: ZIndex
 
     def __hash__(self) -> int:
         return hash(

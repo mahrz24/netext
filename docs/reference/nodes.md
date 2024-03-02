@@ -28,7 +28,7 @@ Possible values are:
 ### Examples
 
 ```{.rich title='Shapes' }
-from netext.node_rasterizer import JustContent
+from netext.shapes.shape import JustContent
 from netext import ConsoleGraph
 from netext.layout_engines.static import StaticLayout
 from rich import print
@@ -57,7 +57,7 @@ Type: [Box](https://rich.readthedocs.io/en/stable/appendix/box.html#appendix-box
 ##### Example
 
 ```{.rich title='Box Types' }
-from netext.node_rasterizer import JustContent
+from netext.shapes.shape import JustContent
 from netext import ConsoleGraph
 from netext.layout_engines.static import StaticLayout
 from rich import box
@@ -86,7 +86,7 @@ Type: [Style][rich.style.Style] | None
 ##### Example
 
 ```{.rich title='Style' }
-from netext.node_rasterizer import JustContent
+from netext.shapes.shape import JustContent
 from netext import ConsoleGraph
 from netext.layout_engines.static import StaticLayout
 from rich import print

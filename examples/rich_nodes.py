@@ -4,7 +4,7 @@ from rich import print
 from rich.table import Table
 from rich.text import Text
 from netext import ConsoleGraph
-from netext.node_rasterizer import JustContent
+from netext.properties.shape import JustContent
 
 
 def read_file(file_path):
