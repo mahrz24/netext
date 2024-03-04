@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Setup rye
         id: setup-rye
-        uses: eifinger/setup-rye@v2.0.0
+        uses: eifinger/setup-rye@v2
         with:
           cache-prefix: 'py3.10'
           enable-cache: true
