@@ -23,7 +23,10 @@ jobs:
         with:
           enable-cache: true
       - name: Sync
-        run: rye sync
+        run: |
+          rye config --set-bool behavior.use-uv=true
+          rye tools install ruff
+          rye sync
       - name : Run linting
         run: ruff check
       - name : Run formatting
