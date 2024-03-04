@@ -23,7 +23,7 @@ jobs:
           enable-cache: true
       - name: Sync
         run: |
-          touch $RYE_HOME/config.toml
+          rye fetch
           rye config --set-bool behavior.use-uv=true
           rye sync
       - name: Activate virtualenv
