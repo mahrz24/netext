@@ -3,17 +3,17 @@ repos:
   hooks:
     - id: ruff lint
       name: ruff lint
-      entry: hatch run lint:ruff check
+      entry: ruff check
       language: system
       types: [python]
     - id: ruff format
       name: ruff format
-      entry: hatch run lint:ruff format
+      entry: ruff format
       language: system
       types: [python]
     - id: mypy
       name: mypy
-      entry: hatch run dev:mypy
+      entry: mypy
       language: system
       types: [python]
       exclude: ^(tests/|playground/|examples/|benchmarks/)
