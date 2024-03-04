@@ -1,6 +1,6 @@
 from netext.edge_routing.edge import EdgeLayout, EdgeSegment, RoutedEdgeSegments
 from netext.edge_routing.modes import EdgeRoutingMode
-from netext.edge_routing.orthogonal import route_orthogonal_edge
+from netext.edge_routing.orthogonal_fast import route_orthogonal_edge
 from netext.geometry import Point
 from netext.geometry.index import BufferIndex
 from netext.node_rasterizer import NodeBuffer

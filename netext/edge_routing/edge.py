@@ -132,6 +132,18 @@ class EdgeLayout:
             )
         )
 
+    def left_x(self) -> int:
+        return min(min(segment.end.x for segment in self.segments), min(segment.start.x for segment in self.segments))
+
+    def right_x(self) -> int:
+        return max(max(segment.end.x for segment in self.segments), max(segment.start.x for segment in self.segments))
+
+    def top_y(self) -> int:
+        return min(min(segment.end.y for segment in self.segments), min(segment.start.y for segment in self.segments))
+
+    def bottom_y(self) -> int:
+        return max(max(segment.end.y for segment in self.segments), max(segment.start.y for segment in self.segments))
+
 
 @dataclass
 class RoutedEdgeSegments:

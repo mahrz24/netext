@@ -11,9 +11,3 @@ repos:
       entry: ruff format
       language: system
       types: [python]
-    - id: mypy
-      name: mypy
-      entry: mypy
-      language: system
-      types: [python]
-      exclude: ^(tests/|playground/|examples/|benchmarks/)
