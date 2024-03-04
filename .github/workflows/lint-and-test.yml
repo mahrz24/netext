@@ -12,8 +12,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: true
 
     steps:
       - uses: actions/checkout@v3
@@ -25,6 +23,7 @@ jobs:
           enable-cache: true
       - name: Sync
         run: |
+          touch $RYE_HOME/config.toml
           rye config --set-bool behavior.use-uv=true
           rye sync
       - name: Activate virtualenv
