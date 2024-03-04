@@ -103,7 +103,6 @@ def route_orthogonal_edge(
                     distance_factor *= 1.5
 
             if new_helper_point is not None and helper_start is not None:
-                new_helper_point
                 helper_segments_start.append(EdgeSegment(start=helper_start, end=new_helper_point))
                 start = new_helper_point
             else:

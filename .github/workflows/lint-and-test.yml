@@ -31,11 +31,11 @@ jobs:
           . .venv/bin/activate
           echo PATH=$PATH >> $GITHUB_ENV
       - name : Run linting
-        run: ruff check
+        run: rye lint
       - name : Run formatting
-        run: ruff format --check
+        run: rye fmt
       - name: Run mypy
-        run: mypy netext
+        run: pyright netext
       - name: Test with pytest
         run: pytest --cov=netext --cov-report=xml:coverage.xml
       - uses: codecov/codecov-action@v3

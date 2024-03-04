@@ -527,4 +527,4 @@ class GraphView(ScrollView, Generic[G]):
 
 
 class InitializedGraphView(GraphView[G]):
-    _console_graph: ConsoleGraph[G]
+    _console_graph: ConsoleGraph[G]  # type: ignore

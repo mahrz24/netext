@@ -73,10 +73,12 @@ def rasterize_node(
             padding[3] + additional_left_padding,
         )
 
+    shape: Shape = JustContentShape()
+    shape_props: ShapeProperties = JustContent()
     match properties.shape:
         case Box():
-            shape: Shape = BoxShape()
-            shape_props: ShapeProperties = properties.shape
+            shape = BoxShape()
+            shape_props = properties.shape
         case JustContent():
             shape = JustContentShape()
             shape_props = properties.shape

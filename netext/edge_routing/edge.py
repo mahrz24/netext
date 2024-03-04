@@ -132,15 +132,19 @@ class EdgeLayout:
             )
         )
 
+    @property
     def left_x(self) -> int:
         return min(min(segment.end.x for segment in self.segments), min(segment.start.x for segment in self.segments))
 
+    @property
     def right_x(self) -> int:
         return max(max(segment.end.x for segment in self.segments), max(segment.start.x for segment in self.segments))
 
+    @property
     def top_y(self) -> int:
         return min(min(segment.end.y for segment in self.segments), min(segment.start.y for segment in self.segments))
 
+    @property
     def bottom_y(self) -> int:
         return max(max(segment.end.y for segment in self.segments), max(segment.start.y for segment in self.segments))
 

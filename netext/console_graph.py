@@ -477,7 +477,7 @@ class ConsoleGraph(Generic[G]):
             return
 
         connected_ports = self.node_buffers[node].connected_ports
-
+        properties = NodeProperties.from_data_dict({})
         if data is not None:
             # Replace the data of the node with the new data
             if update_data:
@@ -517,7 +517,8 @@ class ConsoleGraph(Generic[G]):
             if new_node.shape.polygon(new_node) != old_node.shape.polygon(old_node):
                 force_edge_rerender = True
 
-        data = cast(dict[str, Any], self._nx_graph.nodes(data=True)[node])
+        node_data = cast(dict[Hashable, Any], self._nx_graph.nodes(data=True))
+        data = cast(dict[str, Any], node_data[node])
         properties = NodeProperties.from_data_dict(data)
 
         force_edge_rerender = force_edge_rerender or (position is not None) or "$ports" in data
@@ -735,7 +736,7 @@ class ConsoleGraph(Generic[G]):
             properties = NodeProperties.from_data_dict(data)
             if properties.ports:
                 for current_port_name, port in sorted(properties.ports.items(), key=lambda x: x[1].key):
-                    if port.magnet == Magnet.CENTER or port.magnet == Magnet.CLOSEST:
+                    if port.magnet == Magnet.CENTER or port.magnet == Magnet.CLOSEST or port.magnet is None:
                         # Determine the port magnet
                         port_side = ShapeSide.LEFT
                         neighbours = self._nx_graph.neighbors(node)
