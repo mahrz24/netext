@@ -59,6 +59,9 @@ version-file = "_version.py"
 detached = true
 python = "3.12"
 dependencies = ["scriv>=1.3.1", "pre-commit>=2.20.0"]
+type = "pip-compile"
+pip-compile-resolver = "uv"
+pip-compile-installer = "uv"
 
 
 [tool.hatch.envs.docs]
@@ -70,11 +73,16 @@ dependencies = [
     "rich-pixels>=2.1.1",
 ]
 features = ["textual"]
+pip-compile-resolver = "uv"
+pip-compile-installer = "uv"
 
 [tool.hatch.envs.lint]
 detached = true
 python = "3.12"
-dependencies = ["ruff>=0.1.5"]
+dependencies = ["ruff>=0.3.0"]
+type = "pip-compile"
+pip-compile-resolver = "uv"
+pip-compile-installer = "uv"
 
 [tool.hatch.envs.test_base]
 dependencies = [
@@ -89,6 +97,9 @@ dependencies = [
     "aiohttp>=3.9.0b6",
 ]
 features = ["textual"]
+type = "pip-compile"
+pip-compile-resolver = "uv"
+pip-compile-installer = "uv"
 
 [tool.hatch.envs.test]
 template = "test_base"
