@@ -14,7 +14,8 @@ rye = { dev-dependencies = [
     "importlib-metadata",
     "rich-pixels>=2.1.1",
     "ruff",
-    "textual>=0.40"
+    "textual>=0.40",
+    "pygraphviz>=1.12",
 ] }
 
 [tool.pyright]

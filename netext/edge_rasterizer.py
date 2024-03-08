@@ -63,12 +63,12 @@ def rasterize_edge(
     )
 
     if edge_layout is None:
-        edge_segments = route_edge(
+        edge_path = route_edge(
             start=start,
             end=end,
             start_helper=start_helper,
             end_helper=end_helper,
-            routing_mode=properties.routing_mode,
+#            routing_mode=properties.routing_mode,
             all_nodes=all_nodes,  # non_start_end_nodes,
             routed_edges=routed_edges,
             node_idx=node_idx,
@@ -77,43 +77,43 @@ def rasterize_edge(
 
         # We cut the edge segments with the nodes to get rid of the
         # parts hidden behind the nodes to draw correct arrow tips
-        edge_segments = edge_segments.cut_with_nodes([u_buffer, v_buffer])
+        edge_path = edge_path.cut_with_nodes([u_buffer, v_buffer])
 
-        if not edge_segments.segments:
+        if not edge_path.points:
             return None
     else:
-        edge_segments = RoutedEdgeSegments(segments=edge_layout.segments, intersections=0)
+        edge_path = edge_layout.path
 
-    if properties.segment_drawing_mode in [
-        EdgeSegmentDrawingMode.BOX,
-        EdgeSegmentDrawingMode.BOX_ROUNDED,
-        EdgeSegmentDrawingMode.BOX_HEAVY,
-        EdgeSegmentDrawingMode.BOX_DOUBLE,
-        EdgeSegmentDrawingMode.ASCII,
-    ]:
-        assert (
-            properties.routing_mode == EdgeRoutingMode.ORTHOGONAL
-        ), "Box characters are only supported on orthogonal lines"
-        strips = orthogonal_segments_to_strips_with_box_characters(
-            edge_segments.segments, properties.segment_drawing_mode, style=properties.style
-        )
-    else:
-        # In case of pixel / braille we scale and then map character per character
-        match properties.segment_drawing_mode:
-            case EdgeSegmentDrawingMode.SINGLE_CHARACTER:
-                x_scaling = 1
-                y_scaling = 1
-            case EdgeSegmentDrawingMode.BRAILLE:
-                x_scaling = 2
-                y_scaling = 4
-            case EdgeSegmentDrawingMode.BLOCK:
-                x_scaling = 2
-                y_scaling = 2
-            case _:
-                x_scaling = 1
-                y_scaling = 1
+    # if properties.segment_drawing_mode in [
+    #     EdgeSegmentDrawingMode.BOX,
+    #     EdgeSegmentDrawingMode.BOX_ROUNDED,
+    #     EdgeSegmentDrawingMode.BOX_HEAVY,
+    #     EdgeSegmentDrawingMode.BOX_DOUBLE,
+    #     EdgeSegmentDrawingMode.ASCII,
+    # ]:
+    #     assert (
+    #         properties.routing_mode == EdgeRoutingMode.ORTHOGONAL
+    #     ), "Box characters are only supported on orthogonal lines"
+    #     strips = orthogonal_segments_to_strips_with_box_characters(
+    #         edge_segments.segments, properties.segment_drawing_mode, style=properties.style
+    #     )
+    # else:
+    #     # In case of pixel / braille we scale and then map character per character
+    #     match properties.segment_drawing_mode:
+    #         case EdgeSegmentDrawingMode.SINGLE_CHARACTER:
+    #             x_scaling = 1
+    #             y_scaling = 1
+    #         case EdgeSegmentDrawingMode.BRAILLE:
+    #             x_scaling = 2
+    #             y_scaling = 4
+    #         case EdgeSegmentDrawingMode.BLOCK:
+    #             x_scaling = 2
+    #             y_scaling = 2
+    #         case _:
+    #             x_scaling = 1
+    #             y_scaling = 1
 
-        bitmap_buffer = rasterize_edge_segments(edge_segments.segments, x_scaling=x_scaling, y_scaling=y_scaling)
+    bitmap_buffer = rasterize_edge_path(edge_segments.segments, x_scaling=x_scaling, y_scaling=y_scaling)
         strips = bitmap_to_strips(
             bitmap_buffer,
             edge_segment_drawing_mode=properties.segment_drawing_mode,
@@ -121,9 +121,11 @@ def rasterize_edge(
         )
 
     z_index = ZIndex(layer=Layer.EDGES)
+
     if routed_edges:
         z_index.layer_index += len(routed_edges)
-    edge_layout = EdgeLayout(input=edge_input, segments=edge_segments.segments, z_index=z_index)
+
+    edge_layout = EdgeLayout(input=edge_input, path=edge_path, z_index=z_index)
 
     label_buffers: list[StripBuffer] = []
 
