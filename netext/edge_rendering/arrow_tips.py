@@ -4,7 +4,7 @@ from rich.segment import Segment
 from rich.style import Style
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_rendering.buffer import EdgeBuffer
-from netext.edge_routing.edge import RoutedEdgeSegments
+from netext.edge_routing.edge import EdgePath
 from netext.geometry import Point
 from netext.rendering.segment_buffer import Layer, Strip, StripBuffer, ZIndex
 
@@ -111,14 +111,14 @@ def render_arrow_tip_buffers(
     edge: tuple[Hashable, Hashable],
     end_arrow_tip: ArrowTip | None,
     start_arrow_tip: ArrowTip | None,
-    edge_segments: RoutedEdgeSegments,
+    edge_path: EdgePath,
     edge_segment_drawing_mode: EdgeSegmentDrawingMode,
     style: Style | None = None,
 ) -> list[StripBuffer]:
     buffers: list[StripBuffer] = []
 
-    start_arrow_tip_position = edge_segments.edge_iter_point(0)
-    start_arrow_tip_dir = edge_segments.edge_iter_point(1)
+    start_arrow_tip_position = edge_path.edge_iter_point(0)
+    start_arrow_tip_dir = edge_path.edge_iter_point(1)
 
     if start_arrow_tip is not None and start_arrow_tip != ArrowTip.NONE:
         buffers.append(
@@ -132,8 +132,8 @@ def render_arrow_tip_buffers(
             )
         )
 
-    end_arrow_tip_position = edge_segments.edge_iter_point(-1)
-    end_arrow_tip_dir = edge_segments.edge_iter_point(-2)
+    end_arrow_tip_position = edge_path.edge_iter_point(-1)
+    end_arrow_tip_dir = edge_path.edge_iter_point(-2)
 
     if end_arrow_tip is not None and end_arrow_tip != ArrowTip.NONE:
         buffers.append(

@@ -3,15 +3,11 @@ from typing import Hashable
 from rich.console import Console
 from rich.style import Style
 from netext.edge_rendering.arrow_tips import render_arrow_tip_buffers
-from netext.edge_rendering.bitmap import bitmap_to_strips
-from netext.edge_rendering.box import orthogonal_segments_to_strips_with_box_characters
-from netext.edge_rendering.bresenham import rasterize_edge_segments
 from netext.edge_rendering.buffer import EdgeBuffer
-from netext.edge_rendering.modes import EdgeSegmentDrawingMode
-from netext.edge_routing.edge import EdgeLayout, RoutedEdgeSegments
+from netext.edge_rendering.path_rasterizer import rasterize_edge_path
+from netext.edge_routing.edge import EdgeLayout
 from netext.edge_routing.edge import EdgeInput
 from netext.edge_routing.route import route_edge
-from netext.edge_routing.modes import EdgeRoutingMode
 from netext.geometry.index import BufferIndex
 from netext.geometry.point import Point
 
@@ -62,63 +58,28 @@ def rasterize_edge(
         routing_hints=[],  # TODO: If doing relayout, the edge input should contain the existing segments
     )
 
+    non_start_end_nodes = [node for node in all_nodes if node not in [u_buffer, v_buffer]]
+
     if edge_layout is None:
         edge_path = route_edge(
             start=start,
             end=end,
             start_helper=start_helper,
             end_helper=end_helper,
-#            routing_mode=properties.routing_mode,
-            all_nodes=all_nodes,  # non_start_end_nodes,
+            all_nodes=non_start_end_nodes,
             routed_edges=routed_edges,
-            node_idx=node_idx,
-            edge_idx=edge_idx,
         )
 
         # We cut the edge segments with the nodes to get rid of the
         # parts hidden behind the nodes to draw correct arrow tips
         edge_path = edge_path.cut_with_nodes([u_buffer, v_buffer])
 
-        if not edge_path.points:
+        if not edge_path.directed_points or edge_path.start == edge_path.end:
             return None
     else:
         edge_path = edge_layout.path
 
-    # if properties.segment_drawing_mode in [
-    #     EdgeSegmentDrawingMode.BOX,
-    #     EdgeSegmentDrawingMode.BOX_ROUNDED,
-    #     EdgeSegmentDrawingMode.BOX_HEAVY,
-    #     EdgeSegmentDrawingMode.BOX_DOUBLE,
-    #     EdgeSegmentDrawingMode.ASCII,
-    # ]:
-    #     assert (
-    #         properties.routing_mode == EdgeRoutingMode.ORTHOGONAL
-    #     ), "Box characters are only supported on orthogonal lines"
-    #     strips = orthogonal_segments_to_strips_with_box_characters(
-    #         edge_segments.segments, properties.segment_drawing_mode, style=properties.style
-    #     )
-    # else:
-    #     # In case of pixel / braille we scale and then map character per character
-    #     match properties.segment_drawing_mode:
-    #         case EdgeSegmentDrawingMode.SINGLE_CHARACTER:
-    #             x_scaling = 1
-    #             y_scaling = 1
-    #         case EdgeSegmentDrawingMode.BRAILLE:
-    #             x_scaling = 2
-    #             y_scaling = 4
-    #         case EdgeSegmentDrawingMode.BLOCK:
-    #             x_scaling = 2
-    #             y_scaling = 2
-    #         case _:
-    #             x_scaling = 1
-    #             y_scaling = 1
-
-    bitmap_buffer = rasterize_edge_path(edge_segments.segments, x_scaling=x_scaling, y_scaling=y_scaling)
-        strips = bitmap_to_strips(
-            bitmap_buffer,
-            edge_segment_drawing_mode=properties.segment_drawing_mode,
-            style=properties.style,
-        )
+    strips = rasterize_edge_path(edge_path)
 
     z_index = ZIndex(layer=Layer.EDGES)
 
@@ -136,7 +97,7 @@ def rasterize_edge(
         shape = JustContentShape()
         label_strips = shape.render_shape(console, properties.label, style=Style(), properties=JustContent(), padding=0)
 
-        label_position = edge_segments.edge_iter_point(round(edge_segments.length / 2))
+        label_position = edge_path.edge_iter_point(round(edge_path.length / 2))
 
         label_buffer = EdgeLabelBuffer.from_strips_and_edge(
             label_strips,
@@ -152,14 +113,14 @@ def rasterize_edge(
             (u_buffer.node, v_buffer.node),
             properties.end_arrow_tip,
             properties.start_arrow_tip,
-            edge_segments,
+            edge_path,
             properties.segment_drawing_mode,
             style=properties.style,
         )
     )
 
-    boundary_1 = edge_segments.min_bound
-    boundary_2 = edge_segments.max_bound
+    boundary_1 = edge_path.min_bound
+    boundary_2 = edge_path.max_bound
 
     if boundary_1 == boundary_2:
         return None

@@ -1,8 +1,6 @@
 from typing import cast
-from netext.edge_rendering.buffer import EdgeBuffer
-from netext.edge_routing.edge import Direction, EdgeLayout, EdgePath, EdgeSegment, RoutedEdgeSegments
+from netext.edge_routing.edge import Direction, EdgeLayout, EdgePath
 from netext.geometry import Point
-from netext.geometry.index import BufferIndex
 from netext.node_rasterizer import NodeBuffer
 import networkx as nx
 
@@ -12,9 +10,6 @@ def route_edge(
     end: Point,
     all_nodes: list[NodeBuffer] = [],
     routed_edges: list[EdgeLayout] = [],
-    node_idx: BufferIndex[NodeBuffer, None] | None = None,
-    edge_idx: BufferIndex[EdgeBuffer, EdgeLayout] | None = None,
-    recursion_depth: int = 0,
     start_helper: Point | None = None,
     end_helper: Point | None = None,
 ) -> EdgePath:
@@ -67,6 +62,7 @@ def route_edge(
     G = nx.Graph()
 
     all_directions = [
+        Direction.CENTER,
         Direction.UP,
         Direction.DOWN,
         Direction.LEFT,
@@ -104,80 +100,42 @@ def route_edge(
         **{"weight": 1},
     )
 
-    G.add_edges_from(
-        [
-            ((x, y, Direction.UP_RIGHT), (x + 1, y - 1, Direction.DOWN_LEFT))
-            for x in range(left_x - 3, right_x + 3)
-            for y in range(top_y - 2, bottom_y + 4)
-        ],
-        **{"weight": 1},
-    )
+    # G.add_edges_from(
+    #     [
+    #         ((x, y, Direction.UP_RIGHT), (x + 1, y - 1, Direction.DOWN_LEFT))
+    #         for x in range(left_x - 3, right_x + 3)
+    #         for y in range(top_y - 2, bottom_y + 4)
+    #     ],
+    #     **{"weight": 2},
+    # )
 
-    G.add_edges_from(
-        [
-            ((x, y, Direction.DOWN_RIGHT), (x + 1, y + 1, Direction.UP_LEFT))
-            for x in range(left_x - 3, right_x + 3)
-            for y in range(top_y - 3, bottom_y + 4)
-        ],
-        **{"weight": 1},
-    )
-
-    # Add edges for changing direction (the graph is not directed)
-    G.add_edges_from(
-        [
-            ((x, y, Direction.UP), (x, y, Direction.DOWN))
-            for x in range(left_x - 3, right_x + 4)
-            for y in range(top_y - 3, bottom_y + 4)
-        ],
-        **{"weight": 0},
-    )
-
-    G.add_edges_from(
-        [
-            ((x, y, Direction.LEFT), (x, y, Direction.RIGHT))
-            for x in range(left_x - 3, right_x + 4)
-            for y in range(top_y - 3, bottom_y + 4)
-        ],
-        **{"weight": 0},
-    )
-
-    G.add_edges_from(
-        [
-            ((x, y, Direction.LEFT), (x, y, Direction.UP))
-            for x in range(left_x - 3, right_x + 4)
-            for y in range(top_y - 3, bottom_y + 4)
-        ],
-        **{"weight": 0},
-    )
-
-    G.add_edges_from(
-        [
-            ((x, y, Direction.LEFT), (x, y, Direction.DOWN))
-            for x in range(left_x - 3, right_x + 4)
-            for y in range(top_y - 3, bottom_y + 4)
-        ],
-        **{"weight": 0},
-    )
-
-    G.add_edges_from(
-        [
-            ((x, y, Direction.UP), (x, y, Direction.RIGHT))
-            for x in range(left_x - 3, right_x + 4)
-            for y in range(top_y - 3, bottom_y + 4)
-        ],
-        **{"weight": 0},
-    )
+    # G.add_edges_from(
+    #     [
+    #         ((x, y, Direction.DOWN_RIGHT), (x + 1, y + 1, Direction.UP_LEFT))
+    #         for x in range(left_x - 3, right_x + 3)
+    #         for y in range(top_y - 3, bottom_y + 4)
+    #     ],
+    #     **{"weight": 2},
+    # )
 
     for src in all_directions:
         for tgt in all_directions:
             if src != tgt:
+                weight = 2
+                if (src, tgt) in [
+                    (Direction.UP, Direction.DOWN),
+                    (Direction.DOWN, Direction.UP),
+                    (Direction.LEFT, Direction.RIGHT),
+                    (Direction.RIGHT, Direction.LEFT),
+                ]:
+                    weight = 1
                 G.add_edges_from(
                     [
                         ((x, y, src), (x, y, tgt))
                         for x in range(left_x - 3, right_x + 4)
                         for y in range(top_y - 3, bottom_y + 4)
                     ],
-                    **{"weight": 0},
+                    **{"weight": weight},
                 )
 
     # Remove weights for edges covered by nodes
@@ -188,11 +146,28 @@ def route_edge(
                 edges += list(nx.edges(G, (x, y, Direction.DOWN)))
                 edges += list(nx.edges(G, (x, y, Direction.LEFT)))
                 edges += list(nx.edges(G, (x, y, Direction.RIGHT)))
+                edges += list(nx.edges(G, (x, y, Direction.UP_RIGHT)))
+                edges += list(nx.edges(G, (x, y, Direction.UP_LEFT)))
+                edges += list(nx.edges(G, (x, y, Direction.DOWN_RIGHT)))
+                edges += list(nx.edges(G, (x, y, Direction.DOWN_LEFT)))
                 for edge in edges:
                     G.edges[edge]["weight"] = None
 
+    for edge in routed_edges:
+        for point in edge.path.points:
+            edges = list(nx.edges(G, (point.x, point.y, Direction.UP)))
+            edges += list(nx.edges(G, (point.x, point.y, Direction.DOWN)))
+            edges += list(nx.edges(G, (point.x, point.y, Direction.LEFT)))
+            edges += list(nx.edges(G, (point.x, point.y, Direction.RIGHT)))
+            edges += list(nx.edges(G, (point.x, point.y, Direction.UP_RIGHT)))
+            edges += list(nx.edges(G, (point.x, point.y, Direction.UP_LEFT)))
+            edges += list(nx.edges(G, (point.x, point.y, Direction.DOWN_RIGHT)))
+            edges += list(nx.edges(G, (point.x, point.y, Direction.DOWN_LEFT)))
+            for edge in edges:
+                G.edges[edge]["weight"] = 1.5
+
     # TODO Compute initial direction from helper
-    start_direction = Direction.UP
+    start_direction = Direction.CENTER
     if start_helper is not None:
         delta = start_helper - start
         if delta.x > 0 and delta.y > 0:
@@ -212,7 +187,7 @@ def route_edge(
         else:
             start_direction = Direction.DOWN
 
-    end_direction = Direction.UP
+    end_direction = Direction.CENTER
     if end_helper is not None:
         delta = end_helper - end
         if delta.x > 0 and delta.y > 0:
@@ -240,10 +215,5 @@ def route_edge(
     return EdgePath(
         start=start,
         end=end,
-        points=[
-            (Point(x=x, y=y), direction)
-            for (x, y, direction) in path
-            if (x, y, direction) != (start.x, start.y, Direction.UP)
-            and (x, y, direction) != (end.x, end.y, Direction.UP)
-        ],
+        directed_points=[(Point(x=x, y=y), direction) for (x, y, direction) in path],
     )
