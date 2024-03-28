@@ -1,23 +1,36 @@
+from dataclasses import dataclass
 from typing import cast
 from netext.edge_routing.edge import Direction, EdgeLayout, EdgePath
 from netext.geometry import Point
 from netext.node_rasterizer import NodeBuffer
 import networkx as nx
+from numba import jit
+
+
+@dataclass
+class EdgeGraph:
+    G: nx.Graph
+    left_x: int
+    right_x: int
+    top_y: int
+    bottom_y: int
 
 
 def route_edge(
     start: Point,
     end: Point,
-    all_nodes: list[NodeBuffer] = [],
-    routed_edges: list[EdgeLayout] = [],
+    all_nodes: list[NodeBuffer],
+    routed_edges: list[EdgeLayout],
     start_helper: Point | None = None,
     end_helper: Point | None = None,
+    edge_graph: EdgeGraph | None = None,
 ) -> EdgePath:
     helper_points: list[Point] = []
     if start_helper is not None:
         helper_points.append(start_helper)
     if end_helper is not None:
         helper_points.append(end_helper)
+
     # Get the offset and maximum dimension that needs to be supported by the edge.
     left_x = min(
         start.x,
@@ -59,84 +72,23 @@ def route_edge(
     # of routing. It can be used to route any kind of edge, not only orthogonal edges. With modifications to the weights
     # we can control a lot of the routing behavior.
 
-    G = nx.Graph()
-
-    all_directions = [
-        Direction.CENTER,
-        Direction.UP,
-        Direction.DOWN,
-        Direction.LEFT,
-        Direction.RIGHT,
-        Direction.UP_RIGHT,
-        Direction.UP_LEFT,
-        Direction.DOWN_RIGHT,
-        Direction.DOWN_LEFT,
-    ]
-
-    G.add_nodes_from(
-        [
-            (x, y, dir)
-            for x in range(left_x - 3, right_x + 11)
-            for y in range(top_y - 3, bottom_y + 11)
-            for dir in all_directions
-        ]
-    )
-
-    G.add_edges_from(
-        [
-            ((x, y, Direction.DOWN), (x, y + 1, Direction.UP))
-            for x in range(left_x - 3, right_x + 4)
-            for y in range(top_y - 3, bottom_y + 3)
-        ],
-        **{"weight": 1},
-    )
-
-    G.add_edges_from(
-        [
-            ((x, y, Direction.RIGHT), (x + 1, y, Direction.LEFT))
-            for x in range(left_x - 3, right_x + 3)
-            for y in range(top_y - 3, bottom_y + 4)
-        ],
-        **{"weight": 1},
-    )
-
-    # G.add_edges_from(
-    #     [
-    #         ((x, y, Direction.UP_RIGHT), (x + 1, y - 1, Direction.DOWN_LEFT))
-    #         for x in range(left_x - 3, right_x + 3)
-    #         for y in range(top_y - 2, bottom_y + 4)
-    #     ],
-    #     **{"weight": 2},
-    # )
-
-    # G.add_edges_from(
-    #     [
-    #         ((x, y, Direction.DOWN_RIGHT), (x + 1, y + 1, Direction.UP_LEFT))
-    #         for x in range(left_x - 3, right_x + 3)
-    #         for y in range(top_y - 3, bottom_y + 4)
-    #     ],
-    #     **{"weight": 2},
-    # )
-
-    for src in all_directions:
-        for tgt in all_directions:
-            if src != tgt:
-                weight = 2
-                if (src, tgt) in [
-                    (Direction.UP, Direction.DOWN),
-                    (Direction.DOWN, Direction.UP),
-                    (Direction.LEFT, Direction.RIGHT),
-                    (Direction.RIGHT, Direction.LEFT),
-                ]:
-                    weight = 1
-                G.add_edges_from(
-                    [
-                        ((x, y, src), (x, y, tgt))
-                        for x in range(left_x - 3, right_x + 4)
-                        for y in range(top_y - 3, bottom_y + 4)
-                    ],
-                    **{"weight": weight},
-                )
+    if edge_graph is not None:
+        # Check if bounds are correct, if not we need to extend remove from the graph and recompute
+        if (
+            edge_graph.left_x == left_x
+            and edge_graph.right_x == right_x
+            and edge_graph.top_y == top_y
+            and edge_graph.bottom_y == bottom_y
+        ):
+            G = edge_graph.G
+        else:
+            raise ValueError("Bounds do not match the provided graph")
+    else:
+        nodes, edges = generate_edge_graph(left_x, right_x, top_y, bottom_y)
+        G = nx.Graph()
+        G.add_nodes_from(nodes)
+        for edge_set, weight in edges:
+            G.add_edges_from(edge_set, **{"weight": weight})
 
     # Remove weights for edges covered by nodes
     for node in all_nodes:
@@ -217,3 +169,85 @@ def route_edge(
         end=end,
         directed_points=[(Point(x=x, y=y), direction) for (x, y, direction) in path],
     )
+
+
+def generate_edge_graph(left_x, right_x, top_y, bottom_y):
+    all_directions = [
+        Direction.CENTER,
+        Direction.UP,
+        Direction.DOWN,
+        Direction.LEFT,
+        Direction.RIGHT,
+        Direction.UP_RIGHT,
+        Direction.UP_LEFT,
+        Direction.DOWN_RIGHT,
+        Direction.DOWN_LEFT,
+    ]
+
+    all_positions = [(x, y) for x in range(left_x - 3, right_x + 4) for y in range(top_y - 3, bottom_y + 4)]
+    edges = []
+    nodes = [(x, y, dir) for (x, y) in all_positions for dir in all_directions]
+
+    edges.append(
+        (
+            [
+                ((x, y, Direction.DOWN), (x, y + 1, Direction.UP))
+                for x in range(left_x - 3, right_x + 4)
+                for y in range(top_y - 3, bottom_y + 3)
+            ],
+            1,
+        )
+    )
+
+    edges.append(
+        (
+            [
+                ((x, y, Direction.RIGHT), (x + 1, y, Direction.LEFT))
+                for x in range(left_x - 3, right_x + 3)
+                for y in range(top_y - 3, bottom_y + 4)
+            ],
+            1,
+        )
+    )
+
+    edges.append(
+        (
+            [
+                ((x, y, Direction.UP_RIGHT), (x + 1, y - 1, Direction.DOWN_LEFT))
+                for x in range(left_x - 3, right_x + 3)
+                for y in range(top_y - 2, bottom_y + 4)
+            ],
+            2,
+        )
+    )
+
+    edges.append(
+        (
+            [
+                ((x, y, Direction.DOWN_RIGHT), (x + 1, y + 1, Direction.UP_LEFT))
+                for x in range(left_x - 3, right_x + 3)
+                for y in range(top_y - 3, bottom_y + 4)
+            ],
+            2,
+        )
+    )
+
+    for src in all_directions:
+        for tgt in all_directions:
+            if src != tgt:
+                weight = 2
+                if (src, tgt) in [
+                    (Direction.UP, Direction.DOWN),
+                    (Direction.DOWN, Direction.UP),
+                    (Direction.LEFT, Direction.RIGHT),
+                    (Direction.RIGHT, Direction.LEFT),
+                ]:
+                    weight = 1
+                edges.append(
+                    (
+                        [((x, y, src), (x, y, tgt)) for (x, y) in all_positions],
+                        weight,
+                    )
+                )
+
+    return nodes, edges

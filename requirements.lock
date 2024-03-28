@@ -24,6 +24,8 @@ grandalf==0.8
     # via netext
 kiwisolver==1.4.5
     # via matplotlib
+llvmlite==0.42.0
+    # via numba
 markdown-it-py==3.0.0
     # via rich
 matplotlib==3.8.3
@@ -32,10 +34,14 @@ mdurl==0.1.2
     # via markdown-it-py
 networkx==3.2.1
     # via netext
+numba==0.59.1
+    # via netext
 numpy==1.26.4
     # via contourpy
     # via matplotlib
+    # via netext
     # via networkx
+    # via numba
     # via pandas
     # via scipy
     # via shapely

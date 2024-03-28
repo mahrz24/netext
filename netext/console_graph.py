@@ -183,9 +183,6 @@ class ConsoleGraph(Generic[G]):
         self.port_sides: dict[Hashable, dict[str, ShapeSide]] = defaultdict(dict)
         self.port_positions: dict[Hashable, dict[str, tuple[Point, Point | None]]] = defaultdict(dict)
 
-        self.node_idx: BufferIndex[NodeBuffer, None] = BufferIndex()
-        self.edge_idx: BufferIndex[EdgeBuffer, EdgeLayout] = BufferIndex()
-
     def _require(self, required_state: RenderState):
         if required_state in nx.descendants(transition_graph, self._render_state):
             self._transition_to(required_state)
@@ -330,8 +327,6 @@ class ConsoleGraph(Generic[G]):
             )
             self.node_buffers[node].center = position_view_space
 
-            self.node_idx.insert(self.node_buffers[node])
-
             self._render_port_buffer_for_node(node)
         else:
             self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_FOR_LAYOUT)
@@ -379,8 +374,6 @@ class ConsoleGraph(Generic[G]):
             list(self.node_buffers.values()),
             list(self.edge_layouts.values()),
             properties,
-            self.node_idx,
-            self.edge_idx,
             edge_lod,
             port_positions=self.port_positions,
         )
@@ -388,7 +381,6 @@ class ConsoleGraph(Generic[G]):
             edge_buffer, edge_layout, label_nodes = result
 
         if edge_buffer is not None:
-            self.edge_idx.insert(edge_buffer, edge_layout)
             self.edge_buffers[(u, v)] = edge_buffer
         if label_nodes is not None:
             self.edge_label_buffers[(u, v)] = label_nodes
@@ -417,14 +409,11 @@ class ConsoleGraph(Generic[G]):
 
         self.node_positions.pop(node)
         self.node_buffers_for_layout.pop(node)
-        node_buffer = self.node_buffers.pop(node)
+        self.node_buffers.pop(node)
 
         self.port_buffers.pop(node, None)
         self.port_positions.pop(node, None)
         self.port_side_assignments.pop(node, None)
-
-        if node_buffer is not None:
-            self.node_idx.delete(node_buffer)
 
         self._nx_graph.remove_node(node)
 
@@ -445,9 +434,8 @@ class ConsoleGraph(Generic[G]):
 
         self._nx_graph.remove_edge(u, v)
 
-        edge_buffer = self.edge_buffers.pop((u, v))
+        self.edge_buffers.pop((u, v))
         self.edge_label_buffers.pop((u, v))
-        self.edge_idx.delete(edge_buffer)
 
         self._render_port_buffer_for_node(u)
         self._render_port_buffer_for_node(v)
@@ -576,8 +564,6 @@ class ConsoleGraph(Generic[G]):
             if (v, node) in self.edge_buffers:
                 affected_edges.append((v, node))
 
-        self.node_idx.update(self.node_buffers[node])
-
         if affected_edges and force_edge_rerender:
             for u, v in affected_edges:
                 # self.edge_buffers.pop((u, v), None)
@@ -673,8 +659,6 @@ class ConsoleGraph(Generic[G]):
             list(self.node_buffers.values()),
             list(self.edge_layouts.values()),
             properties,
-            self.node_idx,
-            self.edge_idx,
             edge_lod,
             edge_layout=old_edge_layout,
             port_positions=self.port_positions,
@@ -685,7 +669,6 @@ class ConsoleGraph(Generic[G]):
         if result is not None:
             edge_buffer, edge_layout, label_nodes = result
         if edge_buffer is not None:
-            self.edge_idx.update(edge_buffer, edge_layout)
             self.edge_buffers[(u, v)] = edge_buffer
         if label_nodes is not None:
             self.edge_label_buffers[(u, v)] = label_nodes
@@ -853,14 +836,10 @@ class ConsoleGraph(Generic[G]):
         # Now we rasterize the edges
 
         # Iterate over all edges (so far in no particular order)
-        self.node_idx.reset()
-        self.edge_idx.reset()
-
         edge_layouts: list[EdgeLayout] = []
 
         all_node_buffers = []
         for _, node_buffer in self.node_buffers.items():
-            self.node_idx.insert(node_buffer)
             all_node_buffers.append(node_buffer)
 
         for u, v, data in self._nx_graph.edges(data=True):
@@ -874,8 +853,6 @@ class ConsoleGraph(Generic[G]):
                 all_node_buffers,
                 edge_layouts,
                 properties,
-                self.node_idx,
-                self.edge_idx,
                 edge_lod,
                 port_positions=self.port_positions,
             )
@@ -886,7 +863,6 @@ class ConsoleGraph(Generic[G]):
             edge_buffer, edge_layout, label_nodes = result
 
             if edge_buffer is not None:
-                self.edge_idx.insert(edge_buffer, edge_layout)
                 self.edge_buffers[(u, v)] = edge_buffer
             if label_nodes is not None:
                 self.edge_label_buffers[(u, v)] = label_nodes

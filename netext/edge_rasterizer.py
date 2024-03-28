@@ -8,7 +8,6 @@ from netext.edge_rendering.path_rasterizer import rasterize_edge_path
 from netext.edge_routing.edge import EdgeLayout
 from netext.edge_routing.edge import EdgeInput
 from netext.edge_routing.route import route_edge
-from netext.geometry.index import BufferIndex
 from netext.geometry.point import Point
 
 from netext.node_rendering.buffers import EdgeLabelBuffer, NodeBuffer
@@ -25,8 +24,6 @@ def rasterize_edge(
     all_nodes: list[NodeBuffer],
     routed_edges: list[EdgeLayout],
     properties: EdgeProperties,
-    node_idx: BufferIndex[NodeBuffer, None] | None = None,
-    edge_idx: BufferIndex[EdgeBuffer, EdgeLayout] | None = None,
     lod: int = 1,
     edge_layout: EdgeLayout | None = None,
     port_positions: dict[Hashable, dict[str, tuple[Point, Point | None]]] = dict(),
