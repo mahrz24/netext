@@ -1,19 +1,9 @@
-from dataclasses import dataclass
-from typing import cast
-from netext.edge_routing.edge import Direction, EdgeLayout, EdgePath
+
+import netext._core as core
+from netext._core import Direction
+from netext.edge_routing.edge import EdgeLayout, EdgePath
 from netext.geometry import Point
 from netext.node_rasterizer import NodeBuffer
-import networkx as nx
-from numba import jit
-
-
-@dataclass
-class EdgeGraph:
-    G: nx.Graph
-    left_x: int
-    right_x: int
-    top_y: int
-    bottom_y: int
 
 
 def route_edge(
@@ -23,100 +13,12 @@ def route_edge(
     routed_edges: list[EdgeLayout],
     start_helper: Point | None = None,
     end_helper: Point | None = None,
-    edge_graph: EdgeGraph | None = None,
 ) -> EdgePath:
     helper_points: list[Point] = []
     if start_helper is not None:
         helper_points.append(start_helper)
     if end_helper is not None:
         helper_points.append(end_helper)
-
-    # Get the offset and maximum dimension that needs to be supported by the edge.
-    left_x = min(
-        start.x,
-        end.x,
-        *map(lambda p: p.x, helper_points),
-        *map(lambda n: n.left_x, all_nodes),
-        *map(lambda e: e.left_x, routed_edges),
-    )
-
-    right_x = max(
-        start.x,
-        end.x,
-        *map(lambda p: p.x, helper_points),
-        *map(lambda n: n.left_x, all_nodes),
-        *map(lambda e: e.left_x, routed_edges),
-    )
-
-    top_y = min(
-        start.y,
-        end.y,
-        *map(lambda p: p.y, helper_points),
-        *map(lambda n: n.top_y, all_nodes),
-        *map(lambda e: e.top_y, routed_edges),
-    )
-
-    bottom_y = max(
-        start.y,
-        end.y,
-        *map(lambda p: p.y, helper_points),
-        *map(lambda n: n.bottom_y, all_nodes),
-        *map(lambda e: e.bottom_y, routed_edges),
-    )
-
-    # Generate a graph from spaning all nodes and edges and some additional space to avoid intersections the graph has four
-    # nodes per coordinate to generate a grid of nodes where the needed character can be routed.
-
-    # This is a naive but correct implementation of the graph generation. It is not optimized and can be improved.
-    # The nice thing about this implementation is that it is very easy to understand and debug and also powerful in terms
-    # of routing. It can be used to route any kind of edge, not only orthogonal edges. With modifications to the weights
-    # we can control a lot of the routing behavior.
-
-    if edge_graph is not None:
-        # Check if bounds are correct, if not we need to extend remove from the graph and recompute
-        if (
-            edge_graph.left_x == left_x
-            and edge_graph.right_x == right_x
-            and edge_graph.top_y == top_y
-            and edge_graph.bottom_y == bottom_y
-        ):
-            G = edge_graph.G
-        else:
-            raise ValueError("Bounds do not match the provided graph")
-    else:
-        nodes, edges = generate_edge_graph(left_x, right_x, top_y, bottom_y)
-        G = nx.Graph()
-        G.add_nodes_from(nodes)
-        for edge_set, weight in edges:
-            G.add_edges_from(edge_set, **{"weight": weight})
-
-    # Remove weights for edges covered by nodes
-    for node in all_nodes:
-        for x in range(node.left_x, node.right_x + 1):
-            for y in range(node.top_y, node.bottom_y + 1):
-                edges = list(nx.edges(G, (x, y, Direction.UP)))
-                edges += list(nx.edges(G, (x, y, Direction.DOWN)))
-                edges += list(nx.edges(G, (x, y, Direction.LEFT)))
-                edges += list(nx.edges(G, (x, y, Direction.RIGHT)))
-                edges += list(nx.edges(G, (x, y, Direction.UP_RIGHT)))
-                edges += list(nx.edges(G, (x, y, Direction.UP_LEFT)))
-                edges += list(nx.edges(G, (x, y, Direction.DOWN_RIGHT)))
-                edges += list(nx.edges(G, (x, y, Direction.DOWN_LEFT)))
-                for edge in edges:
-                    G.edges[edge]["weight"] = None
-
-    for edge in routed_edges:
-        for point in edge.path.points:
-            edges = list(nx.edges(G, (point.x, point.y, Direction.UP)))
-            edges += list(nx.edges(G, (point.x, point.y, Direction.DOWN)))
-            edges += list(nx.edges(G, (point.x, point.y, Direction.LEFT)))
-            edges += list(nx.edges(G, (point.x, point.y, Direction.RIGHT)))
-            edges += list(nx.edges(G, (point.x, point.y, Direction.UP_RIGHT)))
-            edges += list(nx.edges(G, (point.x, point.y, Direction.UP_LEFT)))
-            edges += list(nx.edges(G, (point.x, point.y, Direction.DOWN_RIGHT)))
-            edges += list(nx.edges(G, (point.x, point.y, Direction.DOWN_LEFT)))
-            for edge in edges:
-                G.edges[edge]["weight"] = 1.5
 
     # TODO Compute initial direction from helper
     start_direction = Direction.CENTER
@@ -159,9 +61,13 @@ def route_edge(
         else:
             end_direction = Direction.DOWN
 
-    path = cast(
-        list[tuple[int, int, Direction]],
-        nx.shortest_paths.dijkstra_path(G, (start.x, start.y, start_direction), (end.x, end.y, end_direction)),
+    path = core.route_edge(
+        start=core.Point(x=start.x, y=start.y),
+        end=core.Point(x=end.x, y=end.y),
+        start_direction=start_direction,
+        end_direction=end_direction,
+        nodes=[],
+        routed_edges=[],
     )
 
     return EdgePath(

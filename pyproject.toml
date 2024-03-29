@@ -1,5 +1,6 @@
-[tool]
-rye = { dev-dependencies = [
+[tool.rye]
+managed = true
+dev-dependencies = [
     "pytest>=8.0.0",
     "syrupy>=4.0.1",
     "jinja2>=3.1.2",
@@ -15,9 +16,18 @@ rye = { dev-dependencies = [
     "rich-pixels>=2.1.1",
     "ruff",
     "textual>=0.40",
-    "pygraphviz>=1.12",
     "pyinstrument>=4.6.2",
-] }
+    "pip>=24.0",
+]
+
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+python-source = "."
+module-name = "netext._core"
+features = ["pyo3/extension-module"]
 
 [tool.pyright]
 typeCheckingMode="standard"
@@ -52,13 +62,10 @@ dependencies = [
     "rich>=13",
     "networkx[default]~=3.0",
     "grandalf>=0.7",
-    "bitarray>=2.6.2",
     "shapely~=2.0",
     "rtree>=1.0.1",
     "cachetools>=5.3.0",
     "plum-dispatch >=2.1.1",
-    "numpy>=1.26.4",
-    "numba>=0.59.1",
 ]
 
 [project.optional-dependencies]

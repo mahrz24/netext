@@ -22,8 +22,6 @@ babel==2.14.0
     # via mkdocs-material
 beartype==0.17.2
     # via plum-dispatch
-bitarray==2.9.2
-    # via netext
 build==1.1.1
     # via asv
 cachetools==5.3.3
@@ -78,8 +76,6 @@ kiwisolver==1.4.5
     # via matplotlib
 linkify-it-py==2.0.3
     # via markdown-it-py
-llvmlite==0.42.0
-    # via numba
 markdown==3.5.2
     # via mkdocs
     # via mkdocs-autorefs
@@ -123,14 +119,10 @@ networkx==3.2.1
     # via netext
 nodeenv==1.8.0
     # via pyright
-numba==0.59.1
-    # via netext
 numpy==1.26.4
     # via contourpy
     # via matplotlib
-    # via netext
     # via networkx
-    # via numba
     # via pandas
     # via scipy
     # via shapely
@@ -148,6 +140,7 @@ pathspec==0.12.1
 pillow==10.2.0
     # via matplotlib
     # via rich-pixels
+pip==24.0
 platformdirs==4.2.0
     # via mkdocs
     # via mkdocstrings
@@ -159,7 +152,6 @@ plum-dispatch==2.3.2
 pygments==2.17.2
     # via mkdocs-material
     # via rich
-pygraphviz==1.12
 pyinstrument==4.6.2
 pymdown-extensions==10.7
     # via mkdocs-material
