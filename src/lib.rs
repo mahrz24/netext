@@ -1,3 +1,4 @@
+use pyo3::exceptions::PyIndexError;
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
 
@@ -17,7 +18,7 @@ impl Point {
 }
 
 #[pyclass]
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 enum Direction {
     #[pyo3(name = "CENTER")]
     Center = -1,
@@ -42,14 +43,15 @@ enum Direction {
 #[pyclass]
 #[derive(Clone)]
 struct Shape {
-    // Define the properties of NodeBuffer according to your requirements
+    top_left: Point,
+    bottom_right: Point,
 }
 
 #[pymethods]
 impl Shape {
     #[new]
-    fn new() -> Self {
-        Shape {}
+    fn new(top_left: Point, bottom_right: Point) -> Self {
+        Shape { top_left, bottom_right }
     }
 }
 
@@ -59,6 +61,47 @@ struct DirectedPoint {
     x: i32,
     y: i32,
     direction: Direction,
+}
+
+#[pymethods]
+impl DirectedPoint {
+    #[new]
+    fn new(x: i32, y: i32, direction: Direction) -> Self {
+        DirectedPoint { x, y, direction }
+    }
+
+    #[getter]
+    fn get_x(&self) -> PyResult<i32> {
+        Ok(self.x)
+    }
+
+    #[getter]
+    fn get_y(&self) -> PyResult<i32> {
+        Ok(self.y)
+    }
+
+    #[getter]
+    fn get_direction(&self) -> PyResult<Direction> {
+        Ok(self.direction.clone())
+    }
+
+    fn __len__(&self) -> PyResult<usize> {
+        Ok(3) // The number of elements in the class
+    }
+
+    fn __getitem__(&self, idx: usize, py: Python<'_>) -> PyResult<PyObject> {
+        let direction = match Py::new(py, self.direction) {
+            Ok(direction) => direction,
+            Err(e) => return Err(e),
+        };
+
+        match idx {
+            0 => Ok(self.x.to_object(py)),
+            1 => Ok(self.y.to_object(py)),
+            2 => Ok(direction.to_object(py)),
+            _ => Err(PyIndexError::new_err("index out of range")),
+        }
+    }
 }
 
 
@@ -73,11 +116,10 @@ fn route_edge(
     routed_edges: Vec<Vec<Point>>,
 ) -> PyResult<Vec<DirectedPoint>> {
     // Implement your routing logic here and return an EdgePath
-
     // Placeholder return value
     Ok(vec![
         DirectedPoint {
-            x: 0,
+            x: 1,
             y: 0,
             direction: Direction::Center,
         },

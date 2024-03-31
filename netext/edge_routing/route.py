@@ -1,4 +1,3 @@
-
 import netext._core as core
 from netext._core import Direction
 from netext.edge_routing.edge import EdgeLayout, EdgePath
@@ -61,13 +60,24 @@ def route_edge(
         else:
             end_direction = Direction.DOWN
 
+    nodes = [
+        core.Shape(
+            top_left=core.Point(x=node.left_x, y=node.top_y), bottom_right=core.Point(x=node.right_x, y=node.bottom_y)
+        )
+        for node in all_nodes
+    ]
+    edges = [
+        [core.Point(x=point[0].x, y=point[0].y) for point in edge.path.directed_points]
+        for edge in routed_edges
+    ]
+
     path = core.route_edge(
         start=core.Point(x=start.x, y=start.y),
         end=core.Point(x=end.x, y=end.y),
         start_direction=start_direction,
         end_direction=end_direction,
-        nodes=[],
-        routed_edges=[],
+        nodes=nodes,
+        routed_edges=edges,
     )
 
     return EdgePath(
