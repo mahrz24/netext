@@ -9,6 +9,7 @@ name = "netext_core"
 crate-type = ["cdylib"]
 
 [dependencies]
+petgraph = "0.6.4"
 rand = "0.8.4"
 
 [dependencies.pyo3]

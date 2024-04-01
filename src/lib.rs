@@ -1,6 +1,11 @@
+use petgraph::algo::dijkstra;
+use petgraph::graph::NodeIndex;
+use petgraph::visit::EdgeRef;
+use petgraph::Graph;
 use pyo3::exceptions::PyIndexError;
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
+use std::collections::HashMap;
 
 #[pyclass]
 #[derive(Clone)]
@@ -18,7 +23,7 @@ impl Point {
 }
 
 #[pyclass]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 enum Direction {
     #[pyo3(name = "CENTER")]
     Center = -1,
@@ -37,7 +42,31 @@ enum Direction {
     #[pyo3(name = "DOWN_RIGHT")]
     DownRight = 6,
     #[pyo3(name = "DOWN_LEFT")]
-    DownLeft = 7
+    DownLeft = 7,
+}
+
+impl Direction {
+    fn all_directions() -> Vec<Direction> {
+        vec![
+            Direction::Center,
+            Direction::Up,
+            Direction::Down,
+            Direction::Left,
+            Direction::Right,
+            Direction::UpRight,
+            Direction::UpLeft,
+            Direction::DownRight,
+            Direction::DownLeft,
+        ]
+    }
+
+    fn other_directions(&self) -> Vec<Direction> {
+        Direction::all_directions()
+            .iter()
+            .filter(|&d| *d != *self)
+            .cloned()
+            .collect()
+    }
 }
 
 #[pyclass]
@@ -51,7 +80,10 @@ struct Shape {
 impl Shape {
     #[new]
     fn new(top_left: Point, bottom_right: Point) -> Self {
-        Shape { top_left, bottom_right }
+        Shape {
+            top_left,
+            bottom_right,
+        }
     }
 }
 
@@ -104,7 +136,6 @@ impl DirectedPoint {
     }
 }
 
-
 #[pyfunction]
 fn route_edge(
     py: Python,
@@ -115,20 +146,137 @@ fn route_edge(
     nodes: Vec<Shape>,
     routed_edges: Vec<Vec<Point>>,
 ) -> PyResult<Vec<DirectedPoint>> {
-    // Implement your routing logic here and return an EdgePath
-    // Placeholder return value
-    Ok(vec![
-        DirectedPoint {
-            x: 1,
-            y: 0,
-            direction: Direction::Center,
-        },
-        DirectedPoint {
-            x: 1,
-            y: 1,
-            direction: Direction::Center,
-        },
-    ])
+    // Create a graph
+    let mut graph = Graph::<(i32, i32, Direction), i32>::new();
+
+    // Create a map to store node indices
+    let mut node_indices: HashMap<(i32, i32, Direction), NodeIndex> = HashMap::new();
+
+    // Get the maximum and minimum coordinates
+    let mut min_x = start.x.min(end.x);
+    let mut min_y = start.y.min(end.y);
+    let mut max_x = start.x.max(end.x);
+    let mut max_y = start.y.max(end.y);
+
+    // Update the maximum and minimum coordinates based on the nodes
+    for node in &nodes {
+        min_x = min_x.min(node.top_left.x);
+        min_y = min_y.min(node.top_left.y);
+        max_x = max_x.max(node.bottom_right.x);
+        max_y = max_y.max(node.bottom_right.y);
+    }
+
+    // Add a margin of 4
+    min_x -= 4;
+    min_y -= 4;
+    max_x += 4;
+    max_y += 4;
+
+    // Create nodes for all possible positions and directions
+    for x in min_x..=max_x {
+        for y in min_y..=max_y {
+            for direction in Direction::all_directions() {
+                let node_index = graph.add_node((x, y, direction));
+                node_indices.insert((x, y, direction), node_index);
+            }
+        }
+    }
+
+    // Add edges
+    for x in min_x..=max_x {
+        for y in min_y..=max_y {
+            for direction in Direction::all_directions() {
+                let source_index = match node_indices.get(&(x, y, direction)) {
+                    Some(index) => *index,
+                    None => continue,
+                };
+
+                let other_directions = direction.other_directions();
+
+                let self_targets = other_directions
+                    .iter()
+                    .map(|&d| DirectedPoint::new(x, y, d));
+
+                // Add edges from down to up, right to left, etc.
+                let targets = match direction {
+                    Direction::Up => {
+                        self_targets.chain([DirectedPoint::new(x, y - 1, Direction::Down)])
+                    }
+                    Direction::Down => {
+                        self_targets.chain([DirectedPoint::new(x, y + 1, Direction::Up)])
+                    }
+                    Direction::Left => {
+                        self_targets.chain([DirectedPoint::new(x - 1, y, Direction::Right)])
+                    }
+                    Direction::Right => {
+                        self_targets.chain([DirectedPoint::new(x + 1, y, Direction::Left)])
+                    }
+                    Direction::UpRight => {
+                        self_targets.chain([DirectedPoint::new(x + 1, y - 1, Direction::DownLeft)])
+                    }
+                    Direction::UpLeft => {
+                        self_targets.chain([DirectedPoint::new(x - 1, y - 1, Direction::DownRight)])
+                    }
+                    Direction::DownRight => {
+                        self_targets.chain([DirectedPoint::new(x + 1, y + 1, Direction::UpLeft)])
+                    }
+                    Direction::DownLeft => {
+                        self_targets.chain([DirectedPoint::new(x - 1, y + 1, Direction::UpRight)])
+                    }
+                    Direction::Center => {
+                        self_targets.chain([DirectedPoint::new(x - 1, y + 1, Direction::UpRight)])
+                    }
+                };
+
+                for target in targets {
+                    let target_index =
+                        match node_indices.get(&(target.x, target.y, target.direction)) {
+                            Some(index) => *index,
+                            None => continue,
+                        };
+
+                    if source_index != target_index {
+                        graph.add_edge(source_index, target_index, 1);
+                    }
+                }
+            }
+        }
+    }
+
+    // Use Dijkstra's algorithm to find the shortest path
+
+    let start_index = *node_indices
+        .get(&(start.x, start.y, start_direction))
+        .unwrap();
+    let end_index = *node_indices.get(&(end.x, end.y, end_direction)).unwrap();
+
+    let path_weights = dijkstra(&graph, start_index, Some(end_index), |e| *e.weight());
+
+    let mut path = Vec::new();
+    let mut current_index = end_index;
+
+    while current_index != start_index {
+        path.push(current_index);
+        let edge = graph
+            .edges_directed(current_index, petgraph::Direction::Incoming)
+            .min_by_key(|edge| path_weights.get(&edge.source()).unwrap())
+            .unwrap();
+        current_index = edge.source();
+    }
+
+    path.push(start_index);
+    path.reverse();
+
+    // Convert NodeIndex to DirectedPoint
+    let directed_path: Vec<DirectedPoint> = path
+        .iter()
+        .map(|&node_index| {
+            let (x, y, direction) = graph[node_index];
+            DirectedPoint::new(x, y, direction)
+        })
+        .collect();
+
+    Ok(directed_path)
 }
 
 // A module to wrap the Python functions and structs
