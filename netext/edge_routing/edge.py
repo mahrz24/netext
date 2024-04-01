@@ -59,6 +59,8 @@ class EdgePath:
             for point, dir in self.directed_points
             if not any(node_buffer.shape.polygon(node_buffer).covers(point.shapely) for node_buffer in node_buffers)
         ]
+        if not cut_points:
+            return self
         start = cut_points[0][0]
         end = cut_points[-1][0]
         return EdgePath(start=start, end=end, directed_points=cut_points)

@@ -1,3 +1,4 @@
+import time
 import netext._core as core
 from netext._core import Direction
 from netext.edge_routing.edge import EdgeLayout, EdgePath

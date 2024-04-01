@@ -26,7 +26,7 @@ def rasterize_edge_path(path: EdgePath) -> list[Strip]:
     for y in range(min_y, max_y + 1):
         segments: list[Spacer | Segment] = []
         if y not in y_to_x:
-            segments.append(Spacer(max_x - min_x + 1))
+            strips.append(Strip([Spacer(max_x - min_x + 1)]))
             continue
         x_coords = y_to_x[y]
 
