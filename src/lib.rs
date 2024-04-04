@@ -136,6 +136,18 @@ impl DirectedPoint {
     }
 }
 
+fn directed_point_to_subdivision(
+    directed_point: DirectedPoint,
+    min: Point,
+    n_subdivisions_x: i32,
+    n_subdivisions_y: i32,
+) -> (i32, i32) {
+    let x = (directed_point.x - min.x) / n_subdivisions_x;
+    let y = (directed_point.y - min.y) / n_subdivisions_y;
+
+    (x, y)
+}
+
 #[pyfunction]
 fn route_edge(
     py: Python,
@@ -166,11 +178,74 @@ fn route_edge(
         max_y = max_y.max(node.bottom_right.y);
     }
 
-    // Add a margin of 4
-    min_x -= 4;
-    min_y -= 4;
-    max_x += 4;
-    max_y += 4;
+    // Do a vertical and horizontal subdivision
+    // Make sure that each subdivision is at most 15 units wide and high and at least 1 unit wide and high
+    let n_subdivisions_x = ((max_x - min_x) / 15).max(1);
+    let n_subdivisions_y = ((max_y - min_y) / 15).max(1);
+
+    // Create a subdivision graph connecting neighboring subdivisions
+    let mut subdivision_graph = Graph::<(i32, i32), i32>::new();
+    let mut subdivision_node_indices: HashMap<(i32, i32), NodeIndex> = HashMap::new();
+    for x in 0..n_subdivisions_x {
+        for y in 0..n_subdivisions_y {
+            let node_index = subdivision_graph.add_node((x, y));
+            subdivision_node_indices.insert((x, y), node_index);
+        }
+    }
+
+    for x in 0..n_subdivisions_x {
+        for y in 0..n_subdivisions_y {
+            let source_index = *subdivision_node_indices.get(&(x, y)).unwrap();
+
+            let targets = [
+                (x + 1, y),
+                (x, y + 1),
+                (x - 1, y),
+                (x, y - 1),
+            ];
+
+            for (target_x, target_y) in targets.iter() {
+                if *target_x >= 0 && *target_x < n_subdivisions_x && *target_y >= 0 && *target_y < n_subdivisions_y {
+                    let target_index = *subdivision_node_indices.get(&(*target_x, *target_y)).unwrap();
+                    subdivision_graph.add_edge(source_index, target_index, 1);
+                }
+            }
+        }
+    }
+
+    // Find a shortest path from start to end using the subdivision graph
+    let (start_subdivision_x, start_subdivision_y) = directed_point_to_subdivision(
+        DirectedPoint::new(start.x, start.y, start_direction),
+        Point::new(min_x, min_y),
+        n_subdivisions_x,
+        n_subdivisions_y,
+    );
+    let (end_subdivision_x, end_subdivision_y) = directed_point_to_subdivision(
+        DirectedPoint::new(end.x, end.y, end_direction),
+        Point::new(min_x, min_y),
+        n_subdivisions_x,
+        n_subdivisions_y,
+    );
+    let start_subdivision_index = *subdivision_node_indices.get(&(start_subdivision_x, start_subdivision_y)).unwrap();
+    let end_subdivision_index = *subdivision_node_indices.get(&(end_subdivision_x, end_subdivision_y)).unwrap();
+
+    let subdivision_path_weights = dijkstra(&subdivision_graph, start_subdivision_index, Some(end_subdivision_index), |e| *e.weight());
+
+    let mut subdivision_path = Vec::new();
+    let mut current_subdivision_index = end_subdivision_index;
+
+    while current_subdivision_index != start_subdivision_index {
+        subdivision_path.push(current_subdivision_index);
+        let edge = subdivision_graph.edges_directed(current_subdivision_index, petgraph::Direction::Incoming).min_by_key(|edge| subdivision_path_weights.get(&edge.source()).unwrap()).unwrap();
+        current_subdivision_index = edge.source();
+    }
+
+    subdivision_path.push(start_subdivision_index);
+    subdivision_path.reverse();
+
+
+    // For each subdivision part of the path, find the shortest path using a graph connecting each node in the subdivision (with some margin to extend outside of the node)
+    // Connect the boundaries in this graph to the goal (next subdivision or end)
 
     // Create nodes for all possible positions and directions
     for x in min_x..=max_x {

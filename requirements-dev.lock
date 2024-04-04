@@ -192,7 +192,7 @@ rich==13.7.1
     # via plum-dispatch
     # via rich-pixels
     # via textual
-rich-pixels==3.0.0
+rich-pixels==3.0.1
 rtree==1.2.0
     # via netext
 ruff==0.3.0
