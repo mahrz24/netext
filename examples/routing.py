@@ -9,8 +9,8 @@ import networkx as nx
 
 g = nx.Graph()
 g.add_node(1, **{"$x": 1, "$y": 1})
-g.add_node(2, **{"$x": 1, "$y": 10})
-g.add_node(3, **{"$x": 10, "$y": 10})
+g.add_node(2, **{"$x": 1, "$y": 30})
+g.add_node(3, **{"$x": 30, "$y": 30})
 
 g.add_edge(
     1,
