@@ -280,9 +280,8 @@ fn route_edge(
     subdivision_path.push(start_subdivision_index);
     subdivision_path.reverse();
 
-    if subdivision_path.len() == 1 {
-        subdivision_path.push(end_subdivision_index);
-    }
+    // Add the last subdivision twice, as we need to route the endpoint within in the same subdivision
+    subdivision_path.push(end_subdivision_index);
 
     println!("Subdivision path: {:?}", subdivision_path);
 
@@ -329,6 +328,9 @@ fn route_edge(
             TargetLocation::OtherSubdivision(subdivision_direction)
         };
 
+        println!("Routing from subdivision {:?} to subdivision {:?}", start_subdivision_index, end_subdivision_index);
+        println!("From {:?} to {:?}", current_start_point, target_location);
+
         let subdivision_path =
             route_edge_in_subdivision(range, *current_start_point, target_location);
 
@@ -365,6 +367,8 @@ fn route_edge_in_subdivision(
     min_y -= 2;
     max_x += 2;
     max_y += 2;
+
+    println!("Subdivision range: ({}, {}) to ({}, {})", min_x, min_y, max_x, max_y);
 
     // Create a graph
     let mut graph = Graph::<PointOrPlaceholder, i32>::new();
