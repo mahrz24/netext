@@ -88,7 +88,10 @@ def render_buffers(
             line_left_x, segments, buffer_row, buffer = working_buffers.pop(0)
             full_segments_cell_length = sum(segment.cell_length for segment in segments)
 
-            assert line_left_x + full_segments_cell_length <= buffer.right_x + 1, "Segment overflow."
+            if line_left_x + full_segments_cell_length > buffer.right_x + 1:
+                raise RuntimeError(
+                    f"Segment overflow in buffer {buffer} at {line_left_x} + {full_segments_cell_length} > {buffer.right_x + 1}"
+                )
 
             segment_left_x = line_left_x
             skip_remaining_segments = False

@@ -123,6 +123,7 @@ def rasterize_edge(
         return None
 
     edge_buffer = EdgeBuffer(
+        path=edge_path,
         edge=(u_buffer.node, v_buffer.node),
         z_index=edge_layout.z_index,
         boundary_1=boundary_1,

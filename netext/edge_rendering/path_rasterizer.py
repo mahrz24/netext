@@ -13,7 +13,8 @@ def rasterize_edge_path(path: EdgePath) -> list[Strip]:
     for point in path.points:
         if point.y not in y_to_x:
             y_to_x[point.y] = []
-        y_to_x[point.y].append(point.x)
+        if point.x not in y_to_x[point.y]:
+            y_to_x[point.y].append(point.x)
         min_x = min(min_x, point.x)
         max_x = max(max_x, point.x)
     # Sort the x coordinates

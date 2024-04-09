@@ -1,4 +1,5 @@
 from typing import Hashable
+from netext.edge_routing.edge import EdgePath
 from netext.geometry import Point
 from netext.rendering.segment_buffer import Reference, StripBuffer
 
@@ -11,6 +12,7 @@ class EdgeBuffer(StripBuffer):
     edge: tuple[Hashable, Hashable]
     boundary_1: Point
     boundary_2: Point
+    path: EdgePath | None = None
 
     @property
     def reference(self) -> Reference | None:
