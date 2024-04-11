@@ -60,13 +60,13 @@ def route_edge(
         else:
             end_direction = Direction.DOWN
 
-    nodes = [
+    shapes = [
         core.Shape(
             top_left=core.Point(x=node.left_x, y=node.top_y), bottom_right=core.Point(x=node.right_x, y=node.bottom_y)
         )
         for node in all_nodes
     ]
-    edges = [[core.Point(x=point[0].x, y=point[0].y) for point in edge.path.directed_points] for edge in routed_edges]
+    lines = [[core.Point(x=point[0].x, y=point[0].y) for point in edge.path.directed_points] for edge in routed_edges]
 
     start_time = time.monotonic()
     path = core.route_edge(
@@ -74,8 +74,8 @@ def route_edge(
         end=core.Point(x=end.x, y=end.y),
         start_direction=start_direction,
         end_direction=end_direction,
-        nodes=nodes,
-        routed_edges=edges,
+        shapes=shapes,
+        lines=lines,
     )
     end_time = time.monotonic()
     print(f"Route edge: {(end_time - start_time)*1000:.6f} ms")
