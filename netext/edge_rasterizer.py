@@ -58,6 +58,9 @@ def rasterize_edge(
     non_start_end_nodes = [node for node in all_nodes if node not in [u_buffer, v_buffer]]
 
     if edge_layout is None:
+        print("#" * 40)
+        print(f"{u_buffer.node} ({u_buffer.center} | {start}) ->  {v_buffer.node} ({v_buffer.center} | {end})")
+        print("=" * 40)
         edge_path = route_edge(
             start=start,
             end=end,
@@ -66,6 +69,10 @@ def rasterize_edge(
             all_nodes=non_start_end_nodes,
             routed_edges=routed_edges,
         )
+
+        print(edge_path.directed_points[0])
+        print(edge_path.directed_points[-1])
+        print("-" * 40)
 
         # We cut the edge segments with the nodes to get rid of the
         # parts hidden behind the nodes to draw correct arrow tips
