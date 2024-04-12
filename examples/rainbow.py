@@ -5,6 +5,8 @@ from netext import ConsoleGraph
 from rich.style import Style
 from rich import print
 
+from netext.edge_rendering.modes import EdgeSegmentDrawingMode
+
 G = nx.star_graph(10)
 
 nx.set_node_attributes(G, Style(color="blue", bold=True), "$content-style")
@@ -23,5 +25,6 @@ colors = [
 
 for edge, color in zip(G.edges, itertools.cycle(colors)):
     G.edges[edge]["$style"] = color
+    G.edges[edge]["$edge-segment-drawing-mode"] = EdgeSegmentDrawingMode.BOX
 
 print(ConsoleGraph(G))

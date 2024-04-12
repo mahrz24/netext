@@ -225,6 +225,11 @@ fn route_edge(
         max_y = max_y.max(node.bottom_right.y);
     }
 
+    min_x -= 5;
+    min_y -= 5;
+    max_x += 5;
+    max_y += 5;
+
 
     let mut nodes_in_subdivision = HashMap::<(i32, i32), HashSet<&Shape>>::new();
     let mut lines_in_subdivision = HashMap::<(i32, i32), HashSet<&Vec<Point>>>::new();
