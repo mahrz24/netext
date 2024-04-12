@@ -230,7 +230,6 @@ fn route_edge(
     max_x += 5;
     max_y += 5;
 
-
     let mut nodes_in_subdivision = HashMap::<(i32, i32), HashSet<&Shape>>::new();
     let mut lines_in_subdivision = HashMap::<(i32, i32), HashSet<&Vec<Point>>>::new();
 
@@ -283,7 +282,16 @@ fn route_edge(
         for y in 0..n_subdivisions_y {
             let source_index = *subdivision_node_indices.get(&(x, y)).unwrap();
 
-            let targets = [(x + 1, y), (x, y + 1), (x - 1, y), (x, y - 1)];
+            let targets = [
+                (x + 1, y),
+                (x, y + 1),
+                (x - 1, y),
+                (x, y - 1),
+                (x + 1, y + 1),
+                (x - 1, y + 1),
+                (x + 1, y - 1),
+                (x - 1, y - 1),
+            ];
 
             for (target_x, target_y) in targets.iter() {
                 if *target_x >= 0
@@ -305,7 +313,11 @@ fn route_edge(
                         .unwrap_or(&HashSet::new())
                         .len() as f64;
 
-                    subdivision_graph.add_edge(source_index, target_index, 1.0 + node_weight+line_weight);
+                    subdivision_graph.add_edge(
+                        source_index,
+                        target_index,
+                        1.0 + node_weight + line_weight,
+                    );
                 }
             }
         }
@@ -368,6 +380,10 @@ fn route_edge(
         subdivision_path.push_back(end_subdivision_index);
     }
 
+
+    println!("Subdivision path: {:?}", subdivision_path);
+
+
     // For each subdivision part of the path, find the shortest path using a graph connecting each node
     // in the subdivision (with some margin to extend outside of the node).
     // Connect the boundaries in this graph to the goal (next subdivision or end)
@@ -399,13 +415,24 @@ fn route_edge(
         let target_location = if *end_subdivision_index == start_subdivision_index {
             TargetLocation::Concrete(DirectedPoint::new(end.x, end.y, end_direction))
         } else {
-
             let (end_subdivision_x, end_subdivision_y) = subdivision_graph[*end_subdivision_index];
 
             let subdivision_direction = if end_subdivision_x > start_subdivision_x {
-                Direction::Right
+                if end_subdivision_y > start_subdivision_y {
+                    Direction::DownRight
+                } else if end_subdivision_y < start_subdivision_y {
+                    Direction::UpRight
+                } else {
+                    Direction::Right
+                }
             } else if end_subdivision_x < start_subdivision_x {
-                Direction::Left
+                if end_subdivision_y > start_subdivision_y {
+                    Direction::DownLeft
+                } else if end_subdivision_y < start_subdivision_y {
+                    Direction::UpLeft
+                } else {
+                    Direction::Left
+                }
             } else if end_subdivision_y > start_subdivision_y {
                 Direction::Down
             } else {
@@ -449,6 +476,8 @@ fn route_edge(
         last_subdivision_index = end_subdivision_index.clone();
     }
 
+    println!("Last subvision {:?} (coords {:?})", last_subdivision_index, subdivision_graph[last_subdivision_index]);
+
     // Connect the ends of the two paths
     let range =
         range_from_subdivision_index(&subdivision_graph, &last_subdivision_index, (min_x, min_y));
@@ -457,15 +486,17 @@ fn route_edge(
         return Ok(directed_path_fwd);
     }
 
+    println!("Find connecting path from {:?} to {:?}", directed_path_fwd, directed_path_bwd);
+
     let mut connecting_path = route_edge_in_subdivision(
         range,
         SourceLocation::Multiple(directed_path_fwd.clone()),
         TargetLocation::Multiple(directed_path_bwd.clone()),
         nodes_in_subdivision
-            .get(&subdivision_graph[start_subdivision_index])
+            .get(&subdivision_graph[last_subdivision_index])
             .unwrap_or(&HashSet::new()),
         lines_in_subdivision
-            .get(&subdivision_graph[start_subdivision_index])
+            .get(&subdivision_graph[last_subdivision_index])
             .unwrap_or(&HashSet::new()),
     );
 
@@ -486,7 +517,40 @@ fn route_edge(
 
     directed_path_fwd.append(&mut connecting_path);
     directed_path_fwd.append(&mut directed_path_bwd);
-    Ok(directed_path_fwd)
+
+    // Remove any sub path between duplicate points
+    // This can happen due to the subdivisions and connecting them
+    Ok(remove_subsequences(directed_path_fwd))
+}
+
+fn remove_subsequences<T: Eq + std::hash::Hash + Copy>(vec: Vec<T>) -> Vec<T> {
+    let mut first_occurrences = HashMap::new();
+    let mut result = Vec::new();
+    let mut skip_until = None;
+
+    for (i, &item) in vec.iter().enumerate() {
+        // Check if we are skipping elements
+        if let Some(skip_idx) = skip_until {
+            if i <= skip_idx {
+                continue;
+            } else {
+                skip_until = None;
+            }
+        }
+
+        if let Some(&start_idx) = first_occurrences.get(&item) {
+            // Found a duplicate, set the next skip index
+            skip_until = Some(i);
+            // Remove elements from result that are within the range to be skipped
+            result.truncate(start_idx);
+        } else {
+            // Record the first occurrence of this item
+            first_occurrences.insert(item, result.len());
+            result.push(item);
+        }
+    }
+
+    result
 }
 
 #[derive(Clone, Eq, PartialEq, Hash, Copy, Debug)]
@@ -509,10 +573,12 @@ fn route_edge_in_subdivision(
     let mut max_x = range.bottom_right.x;
     let mut max_y = range.bottom_right.y;
 
-    min_x -= 2;
-    min_y -= 2;
-    max_x += 2;
-    max_y += 2;
+    let overlap = 2;
+
+    min_x -= overlap;
+    min_y -= overlap;
+    max_x += overlap;
+    max_y += overlap;
 
     // Create a graph
     let mut graph = Graph::<PointOrPlaceholder, f64>::new();
@@ -665,13 +731,14 @@ fn route_edge_in_subdivision(
             let node_weight = PointOrPlaceholder::EndPlaceholder;
             let node_index = graph.add_node(node_weight);
             node_indices.insert(node_weight, node_index);
-
             for end_point in end_points {
                 let target_weight = PointOrPlaceholder::EndPlaceholder;
                 let target_index = *node_indices.get(&target_weight).unwrap();
                 let source_weight = PointOrPlaceholder::Point(*end_point);
+                println!("Trying from {:?} to {:?}", source_weight, target_weight);
                 if let Some(source_index) = node_indices.get(&source_weight) {
                     graph.add_edge(*source_index, target_index, 1.0);
+                    println!("Adding edge from {:?} to {:?}", source_weight, target_weight);
                 }
             }
         }
@@ -735,48 +802,64 @@ fn route_edge_in_subdivision(
                     }
                 }
                 Direction::UpRight => {
-                    let source_weight = PointOrPlaceholder::Point(DirectedPoint::new(
-                        max_x,
-                        min_y,
-                        Direction::DownLeft,
-                    ));
-                    let source_index = *node_indices.get(&source_weight).unwrap();
-                    let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
-                    let target_index = *node_indices.get(&target_weight).unwrap();
-                    graph.add_edge(source_index, target_index, 1.0);
+                    for y in min_y..=min_y + overlap {
+                        for x in max_x - overlap..=max_x {
+                            let source_weight = PointOrPlaceholder::Point(DirectedPoint::new(
+                                x,
+                                y,
+                                Direction::UpRight,
+                            ));
+                            let source_index = *node_indices.get(&source_weight).unwrap();
+                            let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
+                            let target_index = *node_indices.get(&target_weight).unwrap();
+                            graph.add_edge(source_index, target_index, 1.0);
+                        }
+                    }
                 }
                 Direction::UpLeft => {
-                    let source_weight = PointOrPlaceholder::Point(DirectedPoint::new(
-                        min_x,
-                        min_y,
-                        Direction::DownRight,
-                    ));
-                    let source_index = *node_indices.get(&source_weight).unwrap();
-                    let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
-                    let target_index = *node_indices.get(&target_weight).unwrap();
-                    graph.add_edge(source_index, target_index, 1.0);
+                    for y in min_y..=min_y + overlap {
+                        for x in min_x..=min_x + overlap {
+                            let source_weight = PointOrPlaceholder::Point(DirectedPoint::new(
+                                x,
+                                y,
+                                Direction::UpLeft,
+                            ));
+                            let source_index = *node_indices.get(&source_weight).unwrap();
+                            let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
+                            let target_index = *node_indices.get(&target_weight).unwrap();
+                            graph.add_edge(source_index, target_index, 1.0);
+                        }
+                    }
                 }
                 Direction::DownRight => {
-                    let source_weight = PointOrPlaceholder::Point(DirectedPoint::new(
-                        max_x,
-                        max_y,
-                        Direction::UpLeft,
-                    ));
-                    let source_index = *node_indices.get(&source_weight).unwrap();
-                    let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
-                    let target_index = *node_indices.get(&target_weight).unwrap();
-                    graph.add_edge(source_index, target_index, 1.0);
+                    for y in max_y - overlap..=max_y {
+                        for x in max_x - overlap..=max_x {
+                            let source_weight = PointOrPlaceholder::Point(DirectedPoint::new(
+                                x,
+                                y,
+                                Direction::DownRight,
+                            ));
+                            let source_index = *node_indices.get(&source_weight).unwrap();
+                            let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
+                            let target_index = *node_indices.get(&target_weight).unwrap();
+                            graph.add_edge(source_index, target_index, 1.0);
+                        }
+                    }
                 }
                 Direction::DownLeft => {
-                    let source_weight = PointOrPlaceholder::Point(DirectedPoint::new(
-                        min_x,
-                        max_y,
-                        Direction::UpRight,
-                    ));
-                    let source_index = *node_indices.get(&source_weight).unwrap();
-                    let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
-                    let target_index = *node_indices.get(&target_weight).unwrap();
-                    graph.add_edge(source_index, target_index, 1.0);
+                    for y in max_y - overlap..=max_y {
+                        for x in min_x..=min_x + overlap {
+                            let source_weight = PointOrPlaceholder::Point(DirectedPoint::new(
+                                x,
+                                y,
+                                Direction::DownLeft,
+                            ));
+                            let source_index = *node_indices.get(&source_weight).unwrap();
+                            let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
+                            let target_index = *node_indices.get(&target_weight).unwrap();
+                            graph.add_edge(source_index, target_index, 1.0);
+                        }
+                    }
                 }
             }
         }
@@ -797,7 +880,8 @@ fn route_edge_in_subdivision(
         TargetLocation::Concrete(end_point) => PointOrPlaceholder::Point(end_point),
         TargetLocation::OtherSubdivision(_) => PointOrPlaceholder::SubdivisionPlaceholder,
     };
-
+    println!("Range: {:?}", range);
+    println!("Start: {:?}", start_weight);
     let start_index = *node_indices.get(&start_weight).unwrap();
     let end_index = *node_indices.get(&end_weight).unwrap();
 
@@ -805,9 +889,10 @@ fn route_edge_in_subdivision(
 
     let mut path = Vec::new();
     let mut current_index = end_index;
-
+    println!("Finding subdiv path");
     while current_index != start_index {
         path.push(current_index);
+        println!("{:?} pos {:?}", current_index, graph[current_index]);
         let edge = graph
             .edges_directed(current_index, petgraph::Direction::Incoming)
             .min_by(|edge1, edge2| {
