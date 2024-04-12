@@ -83,7 +83,7 @@ def rasterize_edge(
     else:
         edge_path = edge_layout.path
 
-    strips = rasterize_edge_path(edge_path)
+    strips = rasterize_edge_path(edge_path, style=properties.style)
 
     z_index = ZIndex(layer=Layer.EDGES)
 

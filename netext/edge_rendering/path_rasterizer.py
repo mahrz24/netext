@@ -2,9 +2,10 @@ import sys
 from netext.edge_routing.edge import EdgePath
 from netext.rendering.segment_buffer import Spacer, Strip
 from rich.segment import Segment
+from rich.style import Style
 
 
-def rasterize_edge_path(path: EdgePath) -> list[Strip]:
+def rasterize_edge_path(path: EdgePath, style: Style) -> list[Strip]:
     strips = []
     # Create a map of the points y coordinates to a list of points sorted by the x coordinate
     y_to_x = {}
@@ -37,7 +38,7 @@ def rasterize_edge_path(path: EdgePath) -> list[Strip]:
             if x - last_x > 1:
                 segments.append(Spacer(x - last_x - 1))
             if x != last_x or x == min_x:
-                segments.append(Segment("*"))
+                segments.append(Segment("*", style=style))
             last_x = x
         if x < max_x and x - last_x > 0:
             segments.append(Spacer(max_x - x - 1))

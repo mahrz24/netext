@@ -226,7 +226,8 @@ fn route_edge(
     }
 
 
-    let mut nodes_in_subdivision = HashMap::<(i32, i32), HashSet<Shape>>::new();
+    let mut nodes_in_subdivision = HashMap::<(i32, i32), HashSet<&Shape>>::new();
+    let mut lines_in_subdivision = HashMap::<(i32, i32), HashSet<&Vec<Point>>>::new();
 
     println!("Shapes: {:?}", shapes);
 
@@ -240,7 +241,21 @@ fn route_edge(
             let subdivision = nodes_in_subdivision
                 .entry((subdivision_x, subdivision_y))
                 .or_insert(HashSet::new());
-            subdivision.insert(node.clone());
+            subdivision.insert(node);
+        }
+    }
+
+    for line in &lines {
+        for point in line {
+            let (subdivision_x, subdivision_y) = directed_point_to_subdivision(
+                DirectedPoint::new(point.x, point.y, Direction::Center),
+                Point::new(min_x, min_y),
+            );
+
+            let subdivision = lines_in_subdivision
+                .entry((subdivision_x, subdivision_y))
+                .or_insert(HashSet::new());
+            subdivision.insert(line);
         }
     }
 
@@ -284,7 +299,13 @@ fn route_edge(
                         .get(&(*target_x, *target_y))
                         .unwrap_or(&HashSet::new())
                         .len() as f64;
-                    subdivision_graph.add_edge(source_index, target_index, 1.0 + node_weight);
+
+                    let line_weight = lines_in_subdivision
+                        .get(&(*target_x, *target_y))
+                        .unwrap_or(&HashSet::new())
+                        .len() as f64;
+
+                    subdivision_graph.add_edge(source_index, target_index, 1.0 + node_weight+line_weight);
                 }
             }
         }
@@ -409,6 +430,9 @@ fn route_edge(
             nodes_in_subdivision
                 .get(&(start_subdivision_x, start_subdivision_y))
                 .unwrap_or(&HashSet::new()),
+            lines_in_subdivision
+                .get(&(start_subdivision_x, start_subdivision_y))
+                .unwrap_or(&HashSet::new()),
         );
 
         let mut last_point: DirectedPoint = current_start_point;
@@ -446,6 +470,9 @@ fn route_edge(
         SourceLocation::Multiple(directed_path_fwd.clone()),
         TargetLocation::Multiple(directed_path_bwd.clone()),
         nodes_in_subdivision
+            .get(&subdivision_graph[start_subdivision_index])
+            .unwrap_or(&HashSet::new()),
+        lines_in_subdivision
             .get(&subdivision_graph[start_subdivision_index])
             .unwrap_or(&HashSet::new()),
     );
@@ -493,7 +520,8 @@ fn route_edge_in_subdivision(
     range: Rectangle,
     start: SourceLocation,
     end: TargetLocation,
-    shapes: &HashSet<Shape>,
+    shapes: &HashSet<&Shape>,
+    lines: &HashSet<&Vec<Point>>,
 ) -> Vec<DirectedPoint> {
     let mut min_x = range.top_left.x;
     let mut min_y = range.top_left.y;
@@ -510,7 +538,9 @@ fn route_edge_in_subdivision(
 
     // Create a map to store node indices
     let mut node_indices: HashMap<PointOrPlaceholder, NodeIndex> = HashMap::new();
-    let mut shape_map: HashMap<(i32, i32), i32> = HashMap::new();
+
+    // Create a map to store obstacles
+    let mut obstacle_map: HashMap<(i32, i32), i32> = HashMap::new();
     println!("Shapes: {:?}", shapes);
     for x in min_x..=max_x {
         for y in min_y..=max_y {
@@ -522,10 +552,21 @@ fn route_edge_in_subdivision(
                     && y <= shape.bottom_right.y
                 {
                     // Increase counter for the position by one
-                    shape_map
+                    obstacle_map
                         .entry((x, y))
                         .and_modify(|counter| *counter += 1)
                         .or_insert(1);
+                }
+            }
+
+            for line in lines {
+                for point in *line {
+                    if x == point.x && y == point.y {
+                        obstacle_map
+                            .entry((x, y))
+                            .and_modify(|counter| *counter += 2)
+                            .or_insert(1);
+                    }
                 }
             }
 
@@ -537,7 +578,7 @@ fn route_edge_in_subdivision(
         }
     }
 
-    println!("Shape map for subdivision ({:?}): {:?}", range, shape_map);
+    println!("Shape map for subdivision ({:?}): {:?}", range, obstacle_map);
 
     if let TargetLocation::OtherSubdivision(_) = end {
         let node_weight = PointOrPlaceholder::SubdivisionPlaceholder;
@@ -615,7 +656,7 @@ fn route_edge_in_subdivision(
                         graph.add_edge(
                             source_index,
                             target_index,
-                            weight + 100.0 * (*shape_map.get(&(x, y)).unwrap_or(&0) as f64),
+                            weight + 100.0 * (*obstacle_map.get(&(x, y)).unwrap_or(&0) as f64),
                         );
                     }
                 }
