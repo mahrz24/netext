@@ -229,8 +229,6 @@ fn route_edge(
     let mut nodes_in_subdivision = HashMap::<(i32, i32), HashSet<&Shape>>::new();
     let mut lines_in_subdivision = HashMap::<(i32, i32), HashSet<&Vec<Point>>>::new();
 
-    println!("Shapes: {:?}", shapes);
-
     for node in &shapes {
         for (x, y) in node.corner_points() {
             let (subdivision_x, subdivision_y) = directed_point_to_subdivision(
@@ -258,9 +256,6 @@ fn route_edge(
             subdivision.insert(line);
         }
     }
-
-    println!("Nodes in subdivision: {:?}", nodes_in_subdivision);
-
 
     // Do a vertical and horizontal subdivision
     // Make sure that each subdivision is at most SUBDIVISION_SIZE units wide and high and at least 1 unit wide and high
@@ -421,8 +416,6 @@ fn route_edge(
             (min_x, min_y),
         );
 
-        println!("Nodes in subdiv: {:?} {:?}", (start_subdivision_x, start_subdivision_y), nodes_in_subdivision.get(&(start_subdivision_x, start_subdivision_y)));
-
         let subdivision_path = route_edge_in_subdivision(
             range,
             SourceLocation::Concrete(current_start_point),
@@ -455,12 +448,6 @@ fn route_edge(
     let range =
         range_from_subdivision_index(&subdivision_graph, &last_subdivision_index, (min_x, min_y));
 
-    println!(
-        "Directed path fwd: {:?} => {:?}",
-        directed_path_fwd.first().unwrap(),
-        directed_path_fwd.last().unwrap()
-    );
-
     if directed_path_bwd.is_empty() {
         return Ok(directed_path_fwd);
     }
@@ -475,17 +462,6 @@ fn route_edge(
         lines_in_subdivision
             .get(&subdivision_graph[start_subdivision_index])
             .unwrap_or(&HashSet::new()),
-    );
-
-    println!(
-        "Directed path bwd: {:?} => {:?}",
-        directed_path_bwd.first().unwrap(),
-        directed_path_bwd.last().unwrap()
-    );
-    println!(
-        "Connecting path: {:?} => {:?}",
-        connecting_path.first().unwrap(),
-        connecting_path.last().unwrap()
     );
 
     let fwd_index = directed_path_fwd
@@ -541,7 +517,7 @@ fn route_edge_in_subdivision(
 
     // Create a map to store obstacles
     let mut obstacle_map: HashMap<(i32, i32), i32> = HashMap::new();
-    println!("Shapes: {:?}", shapes);
+
     for x in min_x..=max_x {
         for y in min_y..=max_y {
             for shape in shapes {
@@ -577,8 +553,6 @@ fn route_edge_in_subdivision(
             }
         }
     }
-
-    println!("Shape map for subdivision ({:?}): {:?}", range, obstacle_map);
 
     if let TargetLocation::OtherSubdivision(_) = end {
         let node_weight = PointOrPlaceholder::SubdivisionPlaceholder;

@@ -38,7 +38,7 @@ nx.set_node_attributes(G, Style(color="green"), "$style")
 
 nx.set_edge_attributes(G, ArrowTip.ARROW, "$end-arrow-tip")
 nx.set_edge_attributes(G, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
-nx.set_edge_attributes(G, EdgeSegmentDrawingMode.BOX_DOUBLE, "$edge-segment-drawing-mode")
+nx.set_edge_attributes(G, EdgeSegmentDrawingMode.BOX, "$edge-segment-drawing-mode")
 
 for edge in G.edges:
     if edge in T.edges:
