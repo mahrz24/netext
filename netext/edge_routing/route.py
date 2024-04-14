@@ -75,6 +75,18 @@ def route_edge(
         end_direction=end_direction,
         shapes=shapes,
         lines=lines,
+        config=core.RoutingConfig(
+            canvas_padding=5,
+            subdivision_size=20,
+            overlap=5,
+            shape_margin=1,
+            line_margin=1,
+            neighborhood=core.Neighborhood.MOORE,
+            corner_cost=1.5,
+            diagonal_cost=1.5,
+            line_cost=1000,
+            shape_cost=1000,
+        )
     )
 
     return EdgePath(

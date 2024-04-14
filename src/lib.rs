@@ -10,8 +10,6 @@ use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::f64::MAX;
 
-const SUBDIVISION_SIZE: i32 = 8;
-
 #[pyclass]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
 struct Point {
@@ -36,6 +34,15 @@ impl Point {
     fn new(x: i32, y: i32) -> Self {
         Point { x, y }
     }
+}
+
+#[pyclass]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+enum Neighborhood {
+    #[pyo3(name = "ORTHOGONAL")]
+    Orthogonal,
+    #[pyo3(name = "MOORE")]
+    Moore,
 }
 
 #[pyclass]
@@ -75,22 +82,45 @@ enum TargetLocation {
 }
 
 impl Direction {
-    fn all_directions() -> Vec<Direction> {
-        vec![
-            Direction::Center,
-            Direction::Up,
-            Direction::Down,
-            Direction::Left,
-            Direction::Right,
-            Direction::UpRight,
-            Direction::UpLeft,
-            Direction::DownRight,
-            Direction::DownLeft,
-        ]
+    fn corner_cost(&self, other: Direction, corner_cost: f64) -> f64 {
+        match (self, other) {
+            (Direction::Up, Direction::Down) => 1.0,
+            (Direction::Down, Direction::Up) => 1.0,
+            (Direction::Left, Direction::Right) => 1.0,
+            (Direction::Right, Direction::Left) => 1.0,
+            (Direction::UpRight, Direction::DownLeft) => 1.0,
+            (Direction::DownLeft, Direction::UpRight) => 1.0,
+            (Direction::UpLeft, Direction::DownRight) => 1.0,
+            (Direction::DownRight, Direction::UpLeft) => 1.0,
+            _ => corner_cost,
+        }
     }
 
-    fn other_directions(&self) -> Vec<Direction> {
-        Direction::all_directions()
+    fn all_directions(neighborhood: Neighborhood) -> Vec<Direction> {
+        match neighborhood {
+            Neighborhood::Orthogonal => vec![
+                Direction::Center,
+                Direction::Up,
+                Direction::Down,
+                Direction::Left,
+                Direction::Right,
+            ],
+            Neighborhood::Moore => vec![
+                Direction::Center,
+                Direction::Up,
+                Direction::Down,
+                Direction::Left,
+                Direction::Right,
+                Direction::UpRight,
+                Direction::UpLeft,
+                Direction::DownRight,
+                Direction::DownLeft,
+            ],
+        }
+    }
+
+    fn other_directions(&self, neighborhood: Neighborhood) -> Vec<Direction> {
+        Direction::all_directions(neighborhood)
             .iter()
             .filter(|&d| *d != *self)
             .cloned()
@@ -175,9 +205,13 @@ impl DirectedPoint {
     }
 }
 
-fn directed_point_to_subdivision(directed_point: DirectedPoint, min: Point) -> (i32, i32) {
-    let x = (directed_point.x - min.x) / SUBDIVISION_SIZE;
-    let y = (directed_point.y - min.y) / SUBDIVISION_SIZE;
+fn directed_point_to_subdivision(
+    directed_point: DirectedPoint,
+    min: Point,
+    subdivision_size: i32,
+) -> (i32, i32) {
+    let x = (directed_point.x - min.x) / subdivision_size;
+    let y = (directed_point.y - min.y) / subdivision_size;
 
     (x, y)
 }
@@ -186,14 +220,15 @@ fn range_from_subdivision_index(
     subdivision_graph: &Graph<(i32, i32), f64>,
     subdivision_index: &NodeIndex,
     min: (i32, i32),
+    subdivision_size: i32,
 ) -> Rectangle {
     let (subdivision_x, subdivision_y) = subdivision_graph[*subdivision_index];
     let (min_x, min_y) = min;
 
-    let subdivision_min_x = min_x + subdivision_x * SUBDIVISION_SIZE;
-    let subdivision_min_y = min_y + subdivision_y * SUBDIVISION_SIZE;
-    let subdivision_max_x = min_x + (subdivision_x + 1) * SUBDIVISION_SIZE;
-    let subdivision_max_y = min_y + (subdivision_y + 1) * SUBDIVISION_SIZE;
+    let subdivision_min_x = min_x + subdivision_x * subdivision_size;
+    let subdivision_min_y = min_y + subdivision_y * subdivision_size;
+    let subdivision_max_x = min_x + (subdivision_x + 1) * subdivision_size;
+    let subdivision_max_y = min_y + (subdivision_y + 1) * subdivision_size;
 
     Rectangle {
         top_left: Point::new(subdivision_min_x, subdivision_min_y),
@@ -201,15 +236,78 @@ fn range_from_subdivision_index(
     }
 }
 
+#[pyclass]
+#[derive(Clone, PartialEq, Debug)]
+struct RoutingConfig {
+    canvas_padding: i32,
+    subdivision_size: i32,
+    overlap: i32,
+    shape_margin: i32,
+    line_margin: i32,
+    neighborhood: Neighborhood,
+    corner_cost: f64,
+    diagonal_cost: f64,
+    line_cost: f64,
+    shape_cost: f64,
+}
+
+#[pymethods]
+impl RoutingConfig {
+    #[new]
+    fn new(
+        canvas_padding: i32,
+        subdivision_size: i32,
+        overlap: i32,
+        shape_margin: i32,
+        line_margin: i32,
+        neighborhood: Neighborhood,
+        corner_cost: f64,
+        diagonal_cost: f64,
+        line_cost: f64,
+        shape_cost: f64,
+    ) -> Self {
+        RoutingConfig {
+            canvas_padding,
+            subdivision_size,
+            overlap,
+            shape_margin,
+            line_margin,
+            neighborhood,
+            corner_cost,
+            diagonal_cost,
+            line_cost,
+            shape_cost,
+        }
+    }
+}
+
+impl Default for RoutingConfig {
+    fn default() -> Self {
+        RoutingConfig {
+            canvas_padding: 0,
+            subdivision_size: 8,
+            overlap: 4,
+            shape_margin: 0,
+            line_margin: 0,
+            neighborhood: Neighborhood::Orthogonal,
+            corner_cost: 1.0,
+            diagonal_cost: 1.0,
+            line_cost: 1.0,
+            shape_cost: 1.0,
+        }
+    }
+}
+
 #[pyfunction]
 fn route_edge(
-    py: Python,
+    _py: Python,
     start: Point,
     end: Point,
     start_direction: Direction,
     end_direction: Direction,
     shapes: Vec<Shape>,
     lines: Vec<Vec<Point>>,
+    config: RoutingConfig,
 ) -> PyResult<Vec<DirectedPoint>> {
     // Get the maximum and minimum coordinates
     let mut min_x = start.x.min(end.x);
@@ -225,10 +323,10 @@ fn route_edge(
         max_y = max_y.max(node.bottom_right.y);
     }
 
-    min_x -= 5;
-    min_y -= 5;
-    max_x += 5;
-    max_y += 5;
+    min_x -= config.canvas_padding;
+    min_y -= config.canvas_padding;
+    max_x += config.canvas_padding;
+    max_y += config.canvas_padding;
 
     let mut nodes_in_subdivision = HashMap::<(i32, i32), HashSet<&Shape>>::new();
     let mut lines_in_subdivision = HashMap::<(i32, i32), HashSet<&Vec<Point>>>::new();
@@ -238,6 +336,7 @@ fn route_edge(
             let (subdivision_x, subdivision_y) = directed_point_to_subdivision(
                 DirectedPoint::new(x, y, Direction::Center),
                 Point::new(min_x, min_y),
+                config.subdivision_size,
             );
 
             let subdivision = nodes_in_subdivision
@@ -252,6 +351,7 @@ fn route_edge(
             let (subdivision_x, subdivision_y) = directed_point_to_subdivision(
                 DirectedPoint::new(point.x, point.y, Direction::Center),
                 Point::new(min_x, min_y),
+                config.subdivision_size,
             );
 
             let subdivision = lines_in_subdivision
@@ -264,9 +364,9 @@ fn route_edge(
     // Do a vertical and horizontal subdivision
     // Make sure that each subdivision is at most SUBDIVISION_SIZE units wide and high and at least 1 unit wide and high
     let n_subdivisions_x =
-        (((max_x + 1) as f64 - min_x as f64) / SUBDIVISION_SIZE as f64).ceil() as i32;
+        (((max_x + 1) as f64 - min_x as f64) / config.subdivision_size as f64).ceil() as i32;
     let n_subdivisions_y =
-        (((max_y + 1) as f64 - min_y as f64) / SUBDIVISION_SIZE as f64).ceil() as i32;
+        (((max_y + 1) as f64 - min_y as f64) / config.subdivision_size as f64).ceil() as i32;
 
     // Create a subdivision graph connecting neighboring subdivisions
     let mut subdivision_graph = Graph::<(i32, i32), f64>::new();
@@ -282,18 +382,26 @@ fn route_edge(
         for y in 0..n_subdivisions_y {
             let source_index = *subdivision_node_indices.get(&(x, y)).unwrap();
 
-            let targets = [
-                (x + 1, y),
-                (x, y + 1),
-                (x - 1, y),
-                (x, y - 1),
-                (x + 1, y + 1),
-                (x - 1, y + 1),
-                (x + 1, y - 1),
-                (x - 1, y - 1),
-            ];
+            let targets = match config.neighborhood {
+                Neighborhood::Orthogonal => vec![
+                    ((x, y - 1), 1.0),
+                    ((x, y + 1), 1.0),
+                    ((x - 1, y), 1.0),
+                    ((x + 1, y), 1.0),
+                ],
+                Neighborhood::Moore => vec![
+                    ((x, y - 1), 1.0),
+                    ((x, y + 1), 1.0),
+                    ((x - 1, y), 1.0),
+                    ((x + 1, y), 1.0),
+                    ((x - 1, y - 1), config.diagonal_cost),
+                    ((x + 1, y - 1), config.diagonal_cost),
+                    ((x - 1, y + 1), config.diagonal_cost),
+                    ((x + 1, y + 1), config.diagonal_cost),
+                ],
+            };
 
-            for (target_x, target_y) in targets.iter() {
+            for ((target_x, target_y), weight) in targets.iter() {
                 if *target_x >= 0
                     && *target_x < n_subdivisions_x
                     && *target_y >= 0
@@ -316,7 +424,7 @@ fn route_edge(
                     subdivision_graph.add_edge(
                         source_index,
                         target_index,
-                        1.0 + node_weight + line_weight,
+                        weight + config.shape_cost*node_weight + config.line_cost*line_weight,
                     );
                 }
             }
@@ -327,10 +435,12 @@ fn route_edge(
     let (start_subdivision_x, start_subdivision_y) = directed_point_to_subdivision(
         DirectedPoint::new(start.x, start.y, start_direction),
         Point::new(min_x, min_y),
+        config.subdivision_size,
     );
     let (end_subdivision_x, end_subdivision_y) = directed_point_to_subdivision(
         DirectedPoint::new(end.x, end.y, end_direction),
         Point::new(min_x, min_y),
+        config.subdivision_size,
     );
 
     let start_subdivision_index = *subdivision_node_indices
@@ -379,10 +489,6 @@ fn route_edge(
     if subdivision_path.len() <= 2 {
         subdivision_path.push_back(end_subdivision_index);
     }
-
-
-    println!("Subdivision path: {:?}", subdivision_path);
-
 
     // For each subdivision part of the path, find the shortest path using a graph connecting each node
     // in the subdivision (with some margin to extend outside of the node).
@@ -446,6 +552,7 @@ fn route_edge(
             &subdivision_graph,
             &start_subdivision_index,
             (min_x, min_y),
+            config.subdivision_size,
         );
 
         let subdivision_path = route_edge_in_subdivision(
@@ -458,6 +565,7 @@ fn route_edge(
             lines_in_subdivision
                 .get(&(start_subdivision_x, start_subdivision_y))
                 .unwrap_or(&HashSet::new()),
+            &config
         );
 
         let mut last_point: DirectedPoint = current_start_point;
@@ -476,17 +584,17 @@ fn route_edge(
         last_subdivision_index = end_subdivision_index.clone();
     }
 
-    println!("Last subvision {:?} (coords {:?})", last_subdivision_index, subdivision_graph[last_subdivision_index]);
-
     // Connect the ends of the two paths
-    let range =
-        range_from_subdivision_index(&subdivision_graph, &last_subdivision_index, (min_x, min_y));
+    let range = range_from_subdivision_index(
+        &subdivision_graph,
+        &last_subdivision_index,
+        (min_x, min_y),
+        config.subdivision_size,
+    );
 
     if directed_path_bwd.is_empty() {
         return Ok(directed_path_fwd);
     }
-
-    println!("Find connecting path from {:?} to {:?}", directed_path_fwd, directed_path_bwd);
 
     let mut connecting_path = route_edge_in_subdivision(
         range,
@@ -498,6 +606,7 @@ fn route_edge(
         lines_in_subdivision
             .get(&subdivision_graph[last_subdivision_index])
             .unwrap_or(&HashSet::new()),
+        &config
     );
 
     let fwd_index = directed_path_fwd
@@ -567,18 +676,17 @@ fn route_edge_in_subdivision(
     end: TargetLocation,
     shapes: &HashSet<&Shape>,
     lines: &HashSet<&Vec<Point>>,
+    config: &RoutingConfig,
 ) -> Vec<DirectedPoint> {
     let mut min_x = range.top_left.x;
     let mut min_y = range.top_left.y;
     let mut max_x = range.bottom_right.x;
     let mut max_y = range.bottom_right.y;
 
-    let overlap = 2;
-
-    min_x -= overlap;
-    min_y -= overlap;
-    max_x += overlap;
-    max_y += overlap;
+    min_x -= config.overlap;
+    min_y -= config.overlap;
+    max_x += config.overlap;
+    max_y += config.overlap;
 
     // Create a graph
     let mut graph = Graph::<PointOrPlaceholder, f64>::new();
@@ -587,7 +695,7 @@ fn route_edge_in_subdivision(
     let mut node_indices: HashMap<PointOrPlaceholder, NodeIndex> = HashMap::new();
 
     // Create a map to store obstacles
-    let mut obstacle_map: HashMap<(i32, i32), i32> = HashMap::new();
+    let mut obstacle_map: HashMap<(i32, i32), f64> = HashMap::new();
 
     for x in min_x..=max_x {
         for y in min_y..=max_y {
@@ -601,8 +709,8 @@ fn route_edge_in_subdivision(
                     // Increase counter for the position by one
                     obstacle_map
                         .entry((x, y))
-                        .and_modify(|counter| *counter += 1)
-                        .or_insert(1);
+                        .and_modify(|counter| *counter += config.shape_cost)
+                        .or_insert(config.shape_cost);
                 }
             }
 
@@ -611,13 +719,13 @@ fn route_edge_in_subdivision(
                     if x == point.x && y == point.y {
                         obstacle_map
                             .entry((x, y))
-                            .and_modify(|counter| *counter += 2)
-                            .or_insert(1);
+                            .and_modify(|counter| *counter += config.line_cost)
+                            .or_insert(config.line_cost);
                     }
                 }
             }
 
-            for direction in Direction::all_directions() {
+            for direction in Direction::all_directions(config.neighborhood) {
                 let node_weight = PointOrPlaceholder::Point(DirectedPoint::new(x, y, direction));
                 let node_index = graph.add_node(node_weight);
                 node_indices.insert(node_weight, node_index);
@@ -634,28 +742,42 @@ fn route_edge_in_subdivision(
     // Add edges
     for x in min_x..=max_x {
         for y in min_y..=max_y {
-            for direction in Direction::all_directions() {
+            for direction in Direction::all_directions(config.neighborhood) {
                 let node_weight = PointOrPlaceholder::Point(DirectedPoint::new(x, y, direction));
                 let source_index = match node_indices.get(&node_weight) {
                     Some(index) => *index,
                     None => continue,
                 };
 
-                let other_directions = direction.other_directions();
+                let other_directions = direction.other_directions(config.neighborhood);
 
                 let self_targets = other_directions.iter().map(|&d| {
                     (
                         DirectedPoint::new(x, y, d),
                         match d {
-                            Direction::Up => 1.0,
-                            Direction::Down => 1.0,
-                            Direction::Left => 1.0,
-                            Direction::Right => 1.0,
-                            Direction::UpRight => 1.0,
-                            Direction::UpLeft => 1.0,
-                            Direction::DownRight => 1.0,
-                            Direction::DownLeft => 1.0,
-                            Direction::Center => 1.0,
+                            Direction::Up => direction.corner_cost(Direction::Up, config.corner_cost),
+                            Direction::Down => {
+                                direction.corner_cost(Direction::Down, config.corner_cost)
+                            },
+                            Direction::Left => {
+                                direction.corner_cost(Direction::Left, config.corner_cost)
+                            },
+                            Direction::Right => {
+                                direction.corner_cost(Direction::Right, config.corner_cost)
+                            },
+                            Direction::UpRight => {
+                                direction.corner_cost(Direction::UpRight, config.corner_cost)
+                            },
+                            Direction::UpLeft => {
+                                direction.corner_cost(Direction::UpLeft, config.corner_cost)
+                            },
+                            Direction::DownRight => {
+                                direction.corner_cost(Direction::DownRight, config.corner_cost)
+                            },
+                            Direction::DownLeft => {
+                                direction.corner_cost(Direction::DownLeft, config.corner_cost)
+                            },
+                            Direction::Center => 10000.0,
                         },
                     )
                 });
@@ -672,16 +794,22 @@ fn route_edge_in_subdivision(
                             .chain([(DirectedPoint::new(x - 1, y, Direction::Right), 1.0)]),
                         Direction::Right => self_targets
                             .chain([(DirectedPoint::new(x + 1, y, Direction::Left), 1.0)]),
-                        Direction::UpRight => self_targets
-                            .chain([(DirectedPoint::new(x + 1, y - 1, Direction::DownLeft), 4.0)]),
-                        Direction::UpLeft => self_targets
-                            .chain([(DirectedPoint::new(x - 1, y - 1, Direction::DownRight), 4.0)]),
+                        Direction::UpRight => self_targets.chain([(
+                            DirectedPoint::new(x + 1, y - 1, Direction::DownLeft),
+                            config.diagonal_cost,
+                        )]),
+                        Direction::UpLeft => self_targets.chain([(
+                            DirectedPoint::new(x - 1, y - 1, Direction::DownRight),
+                            config.diagonal_cost,
+                        )]),
                         Direction::DownRight => self_targets
-                            .chain([(DirectedPoint::new(x + 1, y + 1, Direction::UpLeft), 4.0)]),
-                        Direction::DownLeft => self_targets
-                            .chain([(DirectedPoint::new(x - 1, y + 1, Direction::UpRight), 4.0)]),
+                            .chain([(DirectedPoint::new(x + 1, y + 1, Direction::UpLeft), config.diagonal_cost)]),
+                        Direction::DownLeft => self_targets.chain([(
+                            DirectedPoint::new(x - 1, y + 1, Direction::UpRight),
+                            config.diagonal_cost,
+                        )]),
                         Direction::Center => self_targets
-                            .chain([(DirectedPoint::new(x, y, Direction::UpRight), 1.0)]),
+                            .chain([(DirectedPoint::new(x, y, Direction::Center), 100000.0)]),
                     };
 
                 for (target, weight) in targets {
@@ -701,7 +829,7 @@ fn route_edge_in_subdivision(
                         graph.add_edge(
                             source_index,
                             target_index,
-                            weight + 100.0 * (*obstacle_map.get(&(x, y)).unwrap_or(&0) as f64),
+                            weight + (*obstacle_map.get(&(x, y)).unwrap_or(&0.0)),
                         );
                     }
                 }
@@ -735,10 +863,8 @@ fn route_edge_in_subdivision(
                 let target_weight = PointOrPlaceholder::EndPlaceholder;
                 let target_index = *node_indices.get(&target_weight).unwrap();
                 let source_weight = PointOrPlaceholder::Point(*end_point);
-                println!("Trying from {:?} to {:?}", source_weight, target_weight);
                 if let Some(source_index) = node_indices.get(&source_weight) {
                     graph.add_edge(*source_index, target_index, 1.0);
-                    println!("Adding edge from {:?} to {:?}", source_weight, target_weight);
                 }
             }
         }
@@ -753,111 +879,129 @@ fn route_edge_in_subdivision(
                     panic!("Cannot route another subdivision in the direction center")
                 }
                 Direction::Up => {
+                    let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
+                    let target_index = *node_indices.get(&target_weight).unwrap();
                     for x in min_x..=max_x {
-                        let source_weight =
-                            PointOrPlaceholder::Point(DirectedPoint::new(x, min_y, Direction::Up));
-                        let source_index = *node_indices.get(&source_weight).unwrap();
-                        let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
-                        let target_index = *node_indices.get(&target_weight).unwrap();
-                        graph.add_edge(source_index, target_index, 1.0);
+                        for direction in
+                            [Direction::Up, Direction::UpRight, Direction::UpLeft].iter()
+                        {
+                            let source_weight =
+                                PointOrPlaceholder::Point(DirectedPoint::new(x, min_y, *direction));
+                            if let Some(source_index) = node_indices.get(&source_weight) {
+                                graph.add_edge(*source_index, target_index, 1.0);
+                            }
+                        }
                     }
                 }
                 Direction::Down => {
+                    let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
+                    let target_index = *node_indices.get(&target_weight).unwrap();
                     for x in min_x..=max_x {
-                        let source_weight = PointOrPlaceholder::Point(DirectedPoint::new(
-                            x,
-                            max_y,
-                            Direction::Down,
-                        ));
-                        let source_index = *node_indices.get(&source_weight).unwrap();
-                        let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
-                        let target_index = *node_indices.get(&target_weight).unwrap();
-                        graph.add_edge(source_index, target_index, 1.0);
+                        for direction in
+                            [Direction::Down, Direction::DownRight, Direction::DownLeft].iter()
+                        {
+                            let source_weight =
+                                PointOrPlaceholder::Point(DirectedPoint::new(x, max_y, *direction));
+                            if let Some(source_index) = node_indices.get(&source_weight) {
+                                graph.add_edge(*source_index, target_index, 1.0);
+                            }
+                        }
                     }
                 }
                 Direction::Left => {
+                    let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
+                    let target_index = *node_indices.get(&target_weight).unwrap();
                     for y in min_y..=max_y {
-                        let source_weight = PointOrPlaceholder::Point(DirectedPoint::new(
-                            min_x,
-                            y,
-                            Direction::Left,
-                        ));
-                        let source_index = *node_indices.get(&source_weight).unwrap();
-                        let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
-                        let target_index = *node_indices.get(&target_weight).unwrap();
-                        graph.add_edge(source_index, target_index, 1.0);
+                        for direction in
+                            [Direction::Left, Direction::UpLeft, Direction::DownLeft].iter()
+                        {
+                            let source_weight =
+                                PointOrPlaceholder::Point(DirectedPoint::new(min_x, y, *direction));
+                            if let Some(source_index) = node_indices.get(&source_weight) {
+                                graph.add_edge(*source_index, target_index, 1.0);
+                            }
+                        }
                     }
                 }
                 Direction::Right => {
+                    let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
+                    let target_index = *node_indices.get(&target_weight).unwrap();
                     for y in min_y..=max_y {
-                        let source_weight = PointOrPlaceholder::Point(DirectedPoint::new(
-                            max_x,
-                            y,
-                            Direction::Right,
-                        ));
-                        let source_index = *node_indices.get(&source_weight).unwrap();
-                        let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
-                        let target_index = *node_indices.get(&target_weight).unwrap();
-                        graph.add_edge(source_index, target_index, 1.0);
+                        for direction in
+                            [Direction::Right, Direction::UpRight, Direction::DownRight].iter()
+                        {
+                            let source_weight =
+                                PointOrPlaceholder::Point(DirectedPoint::new(max_x, y, *direction));
+                            if let Some(source_index) = node_indices.get(&source_weight) {
+                                graph.add_edge(*source_index, target_index, 1.0);
+                            }
+                        }
                     }
                 }
                 Direction::UpRight => {
-                    for y in min_y..=min_y + overlap {
-                        for x in max_x - overlap..=max_x {
-                            let source_weight = PointOrPlaceholder::Point(DirectedPoint::new(
-                                x,
-                                y,
-                                Direction::UpRight,
-                            ));
-                            let source_index = *node_indices.get(&source_weight).unwrap();
-                            let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
-                            let target_index = *node_indices.get(&target_weight).unwrap();
-                            graph.add_edge(source_index, target_index, 1.0);
+                    let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
+                    let target_index = *node_indices.get(&target_weight).unwrap();
+                    for y in min_y..=min_y + config.overlap {
+                        for x in max_x - config.overlap..=max_x {
+                            for direction in
+                                [Direction::UpRight, Direction::Right, Direction::Up].iter()
+                            {
+                                let source_weight =
+                                    PointOrPlaceholder::Point(DirectedPoint::new(x, y, *direction));
+                                let source_index = *node_indices.get(&source_weight).unwrap();
+
+                                graph.add_edge(source_index, target_index, 1.0);
+                            }
                         }
                     }
                 }
                 Direction::UpLeft => {
-                    for y in min_y..=min_y + overlap {
-                        for x in min_x..=min_x + overlap {
-                            let source_weight = PointOrPlaceholder::Point(DirectedPoint::new(
-                                x,
-                                y,
-                                Direction::UpLeft,
-                            ));
-                            let source_index = *node_indices.get(&source_weight).unwrap();
-                            let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
-                            let target_index = *node_indices.get(&target_weight).unwrap();
-                            graph.add_edge(source_index, target_index, 1.0);
+                    let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
+                    let target_index = *node_indices.get(&target_weight).unwrap();
+                    for y in min_y..=min_y + config.overlap {
+                        for x in min_x..=min_x + config.overlap {
+                            for direction in
+                                [Direction::UpLeft, Direction::Left, Direction::Up].iter()
+                            {
+                                let source_weight =
+                                    PointOrPlaceholder::Point(DirectedPoint::new(x, y, *direction));
+                                let source_index = *node_indices.get(&source_weight).unwrap();
+
+                                graph.add_edge(source_index, target_index, 1.0);
+                            }
                         }
                     }
                 }
                 Direction::DownRight => {
-                    for y in max_y - overlap..=max_y {
-                        for x in max_x - overlap..=max_x {
-                            let source_weight = PointOrPlaceholder::Point(DirectedPoint::new(
-                                x,
-                                y,
-                                Direction::DownRight,
-                            ));
-                            let source_index = *node_indices.get(&source_weight).unwrap();
-                            let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
-                            let target_index = *node_indices.get(&target_weight).unwrap();
-                            graph.add_edge(source_index, target_index, 1.0);
+                    let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
+                    let target_index = *node_indices.get(&target_weight).unwrap();
+                    for y in max_y - config.overlap..=max_y {
+                        for x in max_x - config.overlap..=max_x {
+                            for direction in
+                                [Direction::DownRight, Direction::Right, Direction::Down].iter()
+                            {
+                                let source_weight =
+                                    PointOrPlaceholder::Point(DirectedPoint::new(x, y, *direction));
+                                let source_index = *node_indices.get(&source_weight).unwrap();
+
+                                graph.add_edge(source_index, target_index, 1.0);
+                            }
                         }
                     }
                 }
                 Direction::DownLeft => {
-                    for y in max_y - overlap..=max_y {
-                        for x in min_x..=min_x + overlap {
-                            let source_weight = PointOrPlaceholder::Point(DirectedPoint::new(
-                                x,
-                                y,
-                                Direction::DownLeft,
-                            ));
-                            let source_index = *node_indices.get(&source_weight).unwrap();
-                            let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
-                            let target_index = *node_indices.get(&target_weight).unwrap();
-                            graph.add_edge(source_index, target_index, 1.0);
+                    let target_weight = PointOrPlaceholder::SubdivisionPlaceholder;
+                    let target_index = *node_indices.get(&target_weight).unwrap();
+                    for y in max_y - config.overlap..=max_y {
+                        for x in min_x..=min_x + config.overlap {
+                            for direction in
+                                [Direction::DownLeft, Direction::Left, Direction::Down].iter()
+                            {
+                                let source_weight =
+                                    PointOrPlaceholder::Point(DirectedPoint::new(x, y, *direction));
+                                let source_index = *node_indices.get(&source_weight).unwrap();
+                                graph.add_edge(source_index, target_index, 1.0);
+                            }
                         }
                     }
                 }
@@ -880,8 +1024,7 @@ fn route_edge_in_subdivision(
         TargetLocation::Concrete(end_point) => PointOrPlaceholder::Point(end_point),
         TargetLocation::OtherSubdivision(_) => PointOrPlaceholder::SubdivisionPlaceholder,
     };
-    println!("Range: {:?}", range);
-    println!("Start: {:?}", start_weight);
+
     let start_index = *node_indices.get(&start_weight).unwrap();
     let end_index = *node_indices.get(&end_weight).unwrap();
 
@@ -889,10 +1032,8 @@ fn route_edge_in_subdivision(
 
     let mut path = Vec::new();
     let mut current_index = end_index;
-    println!("Finding subdiv path");
     while current_index != start_index {
         path.push(current_index);
-        println!("{:?} pos {:?}", current_index, graph[current_index]);
         let edge = graph
             .edges_directed(current_index, petgraph::Direction::Incoming)
             .min_by(|edge1, edge2| {
@@ -930,6 +1071,8 @@ fn _core(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<Shape>()?;
     m.add_class::<Direction>()?;
     m.add_class::<DirectedPoint>()?;
+    m.add_class::<RoutingConfig>()?;
+    m.add_class::<Neighborhood>()?;
     m.add_function(wrap_pyfunction!(route_edge, m)?)?;
     Ok(())
 }
