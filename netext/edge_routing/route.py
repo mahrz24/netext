@@ -1,4 +1,3 @@
-import time
 import netext._core as core
 from netext._core import Direction
 from netext.edge_routing.edge import EdgeLayout, EdgePath
@@ -68,6 +67,13 @@ def route_edge(
     ]
     lines = [[core.Point(x=point[0].x, y=point[0].y) for point in edge.path.directed_points] for edge in routed_edges]
 
+    hints = []
+
+    if start.x != end.x and start.y != end.y:
+        hints.append(core.Point(x=start.x, y=end.y))
+        hints.append(core.Point(x=end.x, y=start.y))
+        # hints.append(core.Point(x=(start.x + end.x) // 2, y=(start.y + end.y) // 2))
+
     path = core.route_edge(
         start=core.Point(x=start.x, y=start.y),
         end=core.Point(x=end.x, y=end.y),
@@ -75,18 +81,20 @@ def route_edge(
         end_direction=end_direction,
         shapes=shapes,
         lines=lines,
+        hints=hints,
         config=core.RoutingConfig(
             canvas_padding=5,
-            subdivision_size=20,
-            overlap=5,
+            subdivision_size=10,
+            overlap=3,
             shape_margin=1,
             line_margin=1,
             neighborhood=core.Neighborhood.MOORE,
-            corner_cost=1.5,
-            diagonal_cost=1.5,
-            line_cost=1000,
-            shape_cost=1000,
-        )
+            corner_cost=0.1,
+            diagonal_cost=100,
+            line_cost=1,
+            shape_cost=0.5,
+            hint_cost=-1,
+        ),
     )
 
     return EdgePath(

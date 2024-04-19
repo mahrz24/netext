@@ -5,6 +5,7 @@ use petgraph::Graph;
 use pyo3::exceptions::PyIndexError;
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
+use std::cmp::max;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
@@ -21,11 +22,6 @@ struct Point {
 struct Rectangle {
     top_left: Point,
     bottom_right: Point,
-}
-
-struct Size {
-    width: i32,
-    height: i32,
 }
 
 #[pymethods]
@@ -249,6 +245,7 @@ struct RoutingConfig {
     diagonal_cost: f64,
     line_cost: f64,
     shape_cost: f64,
+    hint_cost: f64,
 }
 
 #[pymethods]
@@ -265,6 +262,7 @@ impl RoutingConfig {
         diagonal_cost: f64,
         line_cost: f64,
         shape_cost: f64,
+        hint_cost: f64,
     ) -> Self {
         RoutingConfig {
             canvas_padding,
@@ -277,6 +275,7 @@ impl RoutingConfig {
             diagonal_cost,
             line_cost,
             shape_cost,
+            hint_cost,
         }
     }
 }
@@ -294,6 +293,7 @@ impl Default for RoutingConfig {
             diagonal_cost: 1.0,
             line_cost: 1.0,
             shape_cost: 1.0,
+            hint_cost: -1.0,
         }
     }
 }
@@ -307,6 +307,7 @@ fn route_edge(
     end_direction: Direction,
     shapes: Vec<Shape>,
     lines: Vec<Vec<Point>>,
+    hints: Vec<Point>,
     config: RoutingConfig,
 ) -> PyResult<Vec<DirectedPoint>> {
     // Get the maximum and minimum coordinates
@@ -330,6 +331,7 @@ fn route_edge(
 
     let mut nodes_in_subdivision = HashMap::<(i32, i32), HashSet<&Shape>>::new();
     let mut lines_in_subdivision = HashMap::<(i32, i32), HashSet<&Vec<Point>>>::new();
+    let mut hints_in_subdivision = HashMap::<(i32, i32), HashSet<Point>>::new();
 
     for node in &shapes {
         for (x, y) in node.corner_points() {
@@ -361,6 +363,19 @@ fn route_edge(
         }
     }
 
+    for point in hints {
+        let (subdivision_x, subdivision_y) = directed_point_to_subdivision(
+            DirectedPoint::new(point.x, point.y, Direction::Center),
+            Point::new(min_x, min_y),
+            config.subdivision_size,
+        );
+
+        let subdivision = hints_in_subdivision
+            .entry((subdivision_x, subdivision_y))
+            .or_insert(HashSet::new());
+        subdivision.insert(point);
+    }
+
     // Do a vertical and horizontal subdivision
     // Make sure that each subdivision is at most SUBDIVISION_SIZE units wide and high and at least 1 unit wide and high
     let n_subdivisions_x =
@@ -378,6 +393,8 @@ fn route_edge(
         }
     }
 
+    let diagonal_cost = config.diagonal_cost.max(0.5);
+
     for x in 0..n_subdivisions_x {
         for y in 0..n_subdivisions_y {
             let source_index = *subdivision_node_indices.get(&(x, y)).unwrap();
@@ -394,10 +411,10 @@ fn route_edge(
                     ((x, y + 1), 1.0),
                     ((x - 1, y), 1.0),
                     ((x + 1, y), 1.0),
-                    ((x - 1, y - 1), config.diagonal_cost),
-                    ((x + 1, y - 1), config.diagonal_cost),
-                    ((x - 1, y + 1), config.diagonal_cost),
-                    ((x + 1, y + 1), config.diagonal_cost),
+                    ((x - 1, y - 1), diagonal_cost),
+                    ((x + 1, y - 1), diagonal_cost),
+                    ((x - 1, y + 1), diagonal_cost),
+                    ((x + 1, y + 1), diagonal_cost),
                 ],
             };
 
@@ -421,10 +438,15 @@ fn route_edge(
                         .unwrap_or(&HashSet::new())
                         .len() as f64;
 
+                    let hint_weight = hints_in_subdivision
+                        .get(&(*target_x, *target_y))
+                        .unwrap_or(&HashSet::new())
+                        .len() as f64;
+
                     subdivision_graph.add_edge(
                         source_index,
                         target_index,
-                        weight + config.shape_cost*node_weight + config.line_cost*line_weight,
+                        (weight + config.shape_cost*node_weight + config.line_cost*line_weight + config.hint_cost*hint_weight).max(-0.45),
                     );
                 }
             }
@@ -565,6 +587,9 @@ fn route_edge(
             lines_in_subdivision
                 .get(&(start_subdivision_x, start_subdivision_y))
                 .unwrap_or(&HashSet::new()),
+            hints_in_subdivision
+                .get(&(start_subdivision_x, start_subdivision_y))
+                .unwrap_or(&HashSet::new()),
             &config
         );
 
@@ -605,6 +630,9 @@ fn route_edge(
             .unwrap_or(&HashSet::new()),
         lines_in_subdivision
             .get(&subdivision_graph[last_subdivision_index])
+            .unwrap_or(&HashSet::new()),
+        hints_in_subdivision
+            .get(&(start_subdivision_x, start_subdivision_y))
             .unwrap_or(&HashSet::new()),
         &config
     );
@@ -676,6 +704,7 @@ fn route_edge_in_subdivision(
     end: TargetLocation,
     shapes: &HashSet<&Shape>,
     lines: &HashSet<&Vec<Point>>,
+    hints: &HashSet<Point>,
     config: &RoutingConfig,
 ) -> Vec<DirectedPoint> {
     let mut min_x = range.top_left.x;
@@ -725,11 +754,21 @@ fn route_edge_in_subdivision(
                 }
             }
 
+            for hint in hints {
+                if x == hint.x && y == hint.y {
+                    obstacle_map
+                        .entry((x, y))
+                        .and_modify(|counter| *counter += config.hint_cost)
+                        .or_insert(config.hint_cost);
+                }
+            }
+
             for direction in Direction::all_directions(config.neighborhood) {
                 let node_weight = PointOrPlaceholder::Point(DirectedPoint::new(x, y, direction));
                 let node_index = graph.add_node(node_weight);
                 node_indices.insert(node_weight, node_index);
             }
+
         }
     }
 
@@ -738,6 +777,8 @@ fn route_edge_in_subdivision(
         let node_index = graph.add_node(node_weight);
         node_indices.insert(node_weight, node_index);
     }
+
+    let corner_cost = config.corner_cost.max(0.5);
 
     // Add edges
     for x in min_x..=max_x {
@@ -755,32 +796,34 @@ fn route_edge_in_subdivision(
                     (
                         DirectedPoint::new(x, y, d),
                         match d {
-                            Direction::Up => direction.corner_cost(Direction::Up, config.corner_cost),
+                            Direction::Up => direction.corner_cost(Direction::Up, corner_cost),
                             Direction::Down => {
-                                direction.corner_cost(Direction::Down, config.corner_cost)
+                                direction.corner_cost(Direction::Down, corner_cost)
                             },
                             Direction::Left => {
-                                direction.corner_cost(Direction::Left, config.corner_cost)
+                                direction.corner_cost(Direction::Left, corner_cost)
                             },
                             Direction::Right => {
-                                direction.corner_cost(Direction::Right, config.corner_cost)
+                                direction.corner_cost(Direction::Right, corner_cost)
                             },
                             Direction::UpRight => {
-                                direction.corner_cost(Direction::UpRight, config.corner_cost)
+                                direction.corner_cost(Direction::UpRight, corner_cost)
                             },
                             Direction::UpLeft => {
-                                direction.corner_cost(Direction::UpLeft, config.corner_cost)
+                                direction.corner_cost(Direction::UpLeft, corner_cost)
                             },
                             Direction::DownRight => {
-                                direction.corner_cost(Direction::DownRight, config.corner_cost)
+                                direction.corner_cost(Direction::DownRight, corner_cost)
                             },
                             Direction::DownLeft => {
-                                direction.corner_cost(Direction::DownLeft, config.corner_cost)
+                                direction.corner_cost(Direction::DownLeft, corner_cost)
                             },
                             Direction::Center => 10000.0,
                         },
                     )
                 });
+
+                let diagonal_cost = config.diagonal_cost.max(0.5);
 
                 // Add edges from down to up, right to left, etc.
                 let targets =
@@ -796,17 +839,17 @@ fn route_edge_in_subdivision(
                             .chain([(DirectedPoint::new(x + 1, y, Direction::Left), 1.0)]),
                         Direction::UpRight => self_targets.chain([(
                             DirectedPoint::new(x + 1, y - 1, Direction::DownLeft),
-                            config.diagonal_cost,
+                            diagonal_cost,
                         )]),
                         Direction::UpLeft => self_targets.chain([(
                             DirectedPoint::new(x - 1, y - 1, Direction::DownRight),
-                            config.diagonal_cost,
+                            diagonal_cost,
                         )]),
                         Direction::DownRight => self_targets
-                            .chain([(DirectedPoint::new(x + 1, y + 1, Direction::UpLeft), config.diagonal_cost)]),
+                            .chain([(DirectedPoint::new(x + 1, y + 1, Direction::UpLeft), diagonal_cost)]),
                         Direction::DownLeft => self_targets.chain([(
                             DirectedPoint::new(x - 1, y + 1, Direction::UpRight),
-                            config.diagonal_cost,
+                            diagonal_cost,
                         )]),
                         Direction::Center => self_targets
                             .chain([(DirectedPoint::new(x, y, Direction::Center), 100000.0)]),
@@ -823,13 +866,15 @@ fn route_edge_in_subdivision(
                         None => continue,
                     };
 
+                    let full_weight = (weight + (*obstacle_map.get(&(x, y)).unwrap_or(&0.0))).max(-0.45);
+
                     if source_index != target_index
                         && graph.find_edge(source_index, target_index).is_none()
                     {
                         graph.add_edge(
                             source_index,
                             target_index,
-                            weight + (*obstacle_map.get(&(x, y)).unwrap_or(&0.0)),
+                            full_weight,
                         );
                     }
                 }

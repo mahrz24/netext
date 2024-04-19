@@ -14,6 +14,8 @@ box_character_map = {
         "┘",
         "┌",
         "┐",
+        "/",
+        "\\",
     ],
     EdgeSegmentDrawingMode.BOX_ROUNDED: [
         "│",
@@ -22,6 +24,8 @@ box_character_map = {
         "╯",
         "╭",
         "╮",
+        "/",
+        "\\",
     ],
     EdgeSegmentDrawingMode.BOX_DOUBLE: [
         "║",
@@ -30,6 +34,8 @@ box_character_map = {
         "╝",
         "╔",
         "╗",
+        "/",
+        "\\",
     ],
     EdgeSegmentDrawingMode.BOX_HEAVY: [
         "┃",
@@ -38,6 +44,8 @@ box_character_map = {
         "┛",
         "┏",
         "┓",
+        "/",
+        "\\",
     ],
     EdgeSegmentDrawingMode.ASCII: [
         "|",
@@ -46,6 +54,8 @@ box_character_map = {
         "+",
         "+",
         "+",
+        "/",
+        "\\",
     ],
 }
 
@@ -104,6 +114,10 @@ def rasterize_point(
             and (last == Direction.DOWN or last == Direction.LEFT)
         ):
             return Segment(box_character_map[edge_segment_drawing_mode][5], style=style)
+        elif Direction.UP_RIGHT in directions or Direction.DOWN_LEFT in directions:
+            return Segment(box_character_map[edge_segment_drawing_mode][6], style=style)
+        elif Direction.UP_LEFT in directions or Direction.DOWN_RIGHT in directions:
+            return Segment(box_character_map[edge_segment_drawing_mode][7], style=style)
     print(directions)
     return Segment("*", style=style)
 
