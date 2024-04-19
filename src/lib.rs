@@ -5,11 +5,13 @@ use petgraph::Graph;
 use pyo3::exceptions::PyIndexError;
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
-use std::cmp::max;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::f64::MAX;
+
+mod graph;
+use graph::CoreGraph;
 
 #[pyclass]
 #[derive(Clone, Debug, Hash, Eq, PartialEq)]
@@ -1112,6 +1114,7 @@ fn route_edge_in_subdivision(
 // A module to wrap the Python functions and structs
 #[pymodule]
 fn _core(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_class::<CoreGraph>()?;
     m.add_class::<Point>()?;
     m.add_class::<Shape>()?;
     m.add_class::<Direction>()?;

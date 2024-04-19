@@ -19,6 +19,7 @@ from netext.geometry.magnet import Magnet, ShapeSide
 from netext.geometry.point import FloatPoint
 from netext.properties.edge import EdgeProperties
 from netext.properties.node import NodeProperties
+import netext._core as core
 
 from netext.rendering.segment_buffer import StripBuffer
 
@@ -166,6 +167,12 @@ class ConsoleGraph(Generic[G]):
 
         self.layout_engine: LayoutEngine[G] = layout_engine
         self._nx_graph: G = cast(G, graph.copy())
+
+        self._core_graph = core.CoreGraph.from_edges(
+            self._nx_graph.edges(),
+        )
+
+        print(self._core_graph)
 
         self.node_buffers_for_layout: dict[Hashable, NodeBuffer] = dict()
         self.node_buffers: dict[Hashable, NodeBuffer] = dict()
