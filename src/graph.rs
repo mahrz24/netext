@@ -24,7 +24,7 @@ impl CoreGraph {
     }
 
     #[staticmethod]
-    fn from_edges(py: Python<'_>, edges: Vec<(&PyAny, &PyAny)>) -> PyResult<Self> {
+    fn from_edges(py: Python<'_>, edges: Vec<(Bound<'_, PyAny>, Bound<'_, PyAny>)>) -> PyResult<Self> {
         let mut graph = CoreGraph::new();
         for (a, b) in edges {
             graph.add_node(py, &a, None)?;
@@ -39,7 +39,7 @@ impl CoreGraph {
         format!("{:?}", self.graph)
     }
 
-    fn add_node(&mut self, py: Python<'_>, obj: &PyAny, data: Option<&PyAny>) -> PyResult<()> {
+    fn add_node(&mut self, py: Python<'_>, obj: &Bound<'_, PyAny>, data: Option<&Bound<'_, PyAny>>) -> PyResult<()> {
         let hash = obj.hash()? as usize;
         if !self.graph.contains_node(hash) {
             self.graph.add_node(hash);
@@ -54,9 +54,9 @@ impl CoreGraph {
     fn add_edge(
         &mut self,
         _py: Python<'_>,
-        obj_a: &PyAny,
-        obj_b: &PyAny,
-        data: Option<&PyAny>,
+        obj_a: &Bound<'_, PyAny>,
+        obj_b: &Bound<'_, PyAny>,
+        data: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<()> {
         let hash_a = obj_a.hash()? as usize;
         let hash_b = obj_b.hash()? as usize;
@@ -64,7 +64,7 @@ impl CoreGraph {
         if self.graph.contains_node(hash_a) && self.graph.contains_node(hash_b) {
             self.graph.add_edge(hash_a, hash_b, ());
             if let Some(data) = data {
-                self.edge_data_map.insert((hash_a, hash_b), data.into());
+                self.edge_data_map.insert((hash_a, hash_b), data.as_unbound().clone());
             }
         } else {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -74,7 +74,7 @@ impl CoreGraph {
         Ok(())
     }
 
-    fn remove_node(&mut self, obj: &PyAny) -> PyResult<()> {
+    fn remove_node(&mut self, obj: &Bound<'_, PyAny>) -> PyResult<()> {
         let hash = obj.hash()? as usize;
         if self.graph.contains_node(hash) {
             self.graph.remove_node(hash);
@@ -97,7 +97,7 @@ impl CoreGraph {
         Ok(())
     }
 
-    fn remove_edge(&mut self, obj_a: &PyAny, obj_b: &PyAny) -> PyResult<()> {
+    fn remove_edge(&mut self, obj_a: &Bound<'_, PyAny>, obj_b: &Bound<'_, PyAny>) -> PyResult<()> {
         let hash_a = obj_a.hash()? as usize;
         let hash_b = obj_b.hash()? as usize;
         if self.graph.contains_node(hash_a) && self.graph.contains_node(hash_b) {
@@ -117,28 +117,36 @@ impl CoreGraph {
         Ok(())
     }
 
-    fn contains_node(&self, obj: &PyAny) -> PyResult<bool> {
+    fn contains_node(&self, obj: &Bound<'_, PyAny>) -> PyResult<bool> {
         let hash = obj.hash()? as usize;
         Ok(self.graph.contains_node(hash))
     }
 
-    fn contains_edge(&self, obj_a: &PyAny, obj_b: &PyAny) -> PyResult<bool> {
+    fn contains_edge(&self, obj_a: &Bound<'_, PyAny>, obj_b: &Bound<'_, PyAny>) -> PyResult<bool> {
         let hash_a = obj_a.hash()? as usize;
         let hash_b = obj_b.hash()? as usize;
         Ok(self.graph.contains_edge(hash_a, hash_b))
     }
 
-    fn get_node_data(&self, obj: &PyAny) -> PyResult<Option<&PyObject>> {
+    fn node_data_or_default(&self, obj: &Bound<'_, PyAny>, default: &Bound<'_, PyAny>) -> PyResult<PyObject> {
+        let hash = obj.hash().unwrap() as usize;
+        match self.data_map.get(&hash) {
+            Some(data) => Ok(data.clone()),
+            None => Ok(default.clone().unbind())
+        }
+    }
+
+    fn node_data(&self, obj: &Bound<'_, PyAny>) -> PyResult<Option<&PyObject>> {
         let hash = obj.hash()? as usize;
         match self.data_map.get(&hash) {
             Some(data) => Ok(Some(data)),
             None => Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(
-                "Node does not exist.",
+                format!("Node does {:?} not exist.", obj),
             )),
         }
     }
 
-    fn get_edge_data(&self, obj_a: &PyAny, obj_b: &PyAny) -> PyResult<Option<&PyObject>> {
+    fn edge_data(&self, obj_a: &Bound<'_, PyAny>, obj_b: &Bound<'_, PyAny>) -> PyResult<Option<&PyObject>> {
         let hash_a = obj_a.hash()? as usize;
         let hash_b = obj_b.hash()? as usize;
         match self.edge_data_map.get(&(hash_a, hash_b)) {
@@ -149,19 +157,19 @@ impl CoreGraph {
         }
     }
 
-    fn update_node_data(&mut self, py: Python<'_>, obj: &PyAny, data: &PyAny) -> PyResult<()> {
+    fn update_node_data(&mut self, py: Python<'_>, obj: &Bound<'_, PyAny>, data: &Bound<'_, PyAny>) -> PyResult<()> {
         let hash = obj.hash()? as usize;
         if self.graph.contains_node(hash) {
             self.data_map.insert(hash, data.into_py(py));
         } else {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                "Node does not exist.",
+                format!("Node does {:?} not exist.", obj),
             ));
         }
         Ok(())
     }
 
-    fn update_edge_data(&mut self, py: Python<'_>, obj_a: &PyAny, obj_b: &PyAny, data: &PyAny) -> PyResult<()> {
+    fn update_edge_data(&mut self, py: Python<'_>, obj_a: &Bound<'_, PyAny>, obj_b: &Bound<'_, PyAny>, data: &Bound<'_, PyAny>) -> PyResult<()> {
         let hash_a = obj_a.hash()? as usize;
         let hash_b = obj_b.hash()? as usize;
         if self.graph.contains_node(hash_a) && self.graph.contains_node(hash_b) {
@@ -178,5 +186,38 @@ impl CoreGraph {
             ));
         }
         Ok(())
+    }
+
+    fn all_nodes(&self) -> Vec<&PyObject> {
+        self.object_map.values().collect()
+    }
+
+    fn all_edges(&self) -> Vec<(&PyObject, &PyObject)> {
+        let edges: Vec<(&PyObject, &PyObject)> = self
+            .graph
+            .all_edges()
+            .map(|(a, b, _)| {
+                let obj_a = self.object_map.get(&a).unwrap();
+                let obj_b = self.object_map.get(&b).unwrap();
+                (obj_a, obj_b)
+            })
+            .collect();
+        edges
+    }
+
+    fn neighbors(&self, obj: &Bound<'_, PyAny>) -> PyResult<Vec<&PyObject>> {
+        let hash = obj.hash()? as usize;
+        if self.graph.contains_node(hash) {
+            let neighbours: Vec<&PyObject> = self
+                .graph
+                .neighbors(hash)
+                .filter_map(|neighbour| self.object_map.get(&neighbour))
+                .collect();
+            Ok(neighbours)
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                format!("Node does {:?} not exist.", obj),
+            ))
+        }
     }
 }

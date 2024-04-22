@@ -1113,7 +1113,7 @@ fn route_edge_in_subdivision(
 
 // A module to wrap the Python functions and structs
 #[pymodule]
-fn _core(_py: Python, m: &PyModule) -> PyResult<()> {
+fn _core(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<CoreGraph>()?;
     m.add_class::<Point>()?;
     m.add_class::<Shape>()?;

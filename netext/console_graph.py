@@ -14,7 +14,6 @@ from netext.geometry import Point, Region
 
 from netext.edge_rendering.buffer import EdgeBuffer
 from netext.edge_routing.edge import EdgeLayout
-from netext.geometry.index import BufferIndex
 from netext.geometry.magnet import Magnet, ShapeSide
 from netext.geometry.point import FloatPoint
 from netext.properties.edge import EdgeProperties
@@ -166,13 +165,10 @@ class ConsoleGraph(Generic[G]):
         self._max_height = max_height
 
         self.layout_engine: LayoutEngine[G] = layout_engine
-        self._nx_graph: G = cast(G, graph.copy())
 
         self._core_graph = core.CoreGraph.from_edges(
-            self._nx_graph.edges(),
+            graph.edges(),
         )
-
-        print(self._core_graph)
 
         self.node_buffers_for_layout: dict[Hashable, NodeBuffer] = dict()
         self.node_buffers: dict[Hashable, NodeBuffer] = dict()
@@ -291,7 +287,7 @@ class ConsoleGraph(Generic[G]):
             data = dict()
 
         properties = NodeProperties.from_data_dict(data)
-        self._nx_graph.add_node(node, **dict(data, **{"$properties": properties}))
+        self._core_graph.add_node(node, dict(data, **{"$properties": properties}))
 
         # Add to node buffers for layout
         self.node_buffers_for_layout[node] = rasterize_node(self.console, node, cast(dict[str, Any], data))
@@ -359,18 +355,18 @@ class ConsoleGraph(Generic[G]):
         if self._zoom_factor is None:
             raise RuntimeError("You can only add edges once the zoom factor has been computed")
 
-        if u not in self._nx_graph.nodes:
+        if not self._core_graph.contains_node(u):
             raise ValueError(f"Node {u} does not exist in graph")
-        if v not in self._nx_graph.nodes:
+        if not self._core_graph.contains_node(v):
             raise ValueError(f"Node {v} does not exist in graph")
-        if (u, v) in self._nx_graph.edges:
+        if self._core_graph.contains_edge(u, v):
             return
 
         if data is None:
             data = dict()
 
         properties = EdgeProperties.from_data_dict(data)
-        self._nx_graph.add_edge(u, v, **dict(data, **{"$properties": properties}))
+        self._core_graph.add_edge(u, v, dict(data, **{"$properties": properties}))
 
         edge_lod = properties.lod_map(self._zoom_factor)
 
@@ -409,7 +405,7 @@ class ConsoleGraph(Generic[G]):
 
         self._require(RenderState.EDGES_RENDERED)
 
-        edges = list(self._nx_graph.edges())
+        edges = list(self._core_graph.all_edges())
         for u, v in edges:
             if u == node or v == node:
                 self.remove_edge(u, v)
@@ -421,8 +417,7 @@ class ConsoleGraph(Generic[G]):
         self.port_buffers.pop(node, None)
         self.port_positions.pop(node, None)
         self.port_side_assignments.pop(node, None)
-
-        self._nx_graph.remove_node(node)
+        self._core_graph.remove_node(node)
 
     def remove_edge(self, u: Hashable, v: Hashable) -> None:
         """Removes an edge from the graph.
@@ -439,7 +434,7 @@ class ConsoleGraph(Generic[G]):
         self.node_buffers[v].disconnect(u)
         self.node_buffers[u].disconnect(v)
 
-        self._nx_graph.remove_edge(u, v)
+        self._core_graph.remove_edge(u, v)
 
         self.edge_buffers.pop((u, v))
         self.edge_label_buffers.pop((u, v))
@@ -476,13 +471,13 @@ class ConsoleGraph(Generic[G]):
         if data is not None:
             # Replace the data of the node with the new data
             if update_data:
-                new_data = dict(self._nx_graph.nodes[node], **data)
+                new_data = dict(self._core_graph.node_data(node), **data)
                 properties = NodeProperties.from_data_dict(new_data)
                 new_data["$properties"] = properties
             else:
                 new_data = data
 
-            self._nx_graph.nodes[node].update(new_data)
+            self._core_graph.update_node_data(node, new_data)
             old_position = self.node_buffers[node].center
 
             # Update node buffers for layout
@@ -512,8 +507,8 @@ class ConsoleGraph(Generic[G]):
             if new_node.shape.polygon(new_node) != old_node.shape.polygon(old_node):
                 force_edge_rerender = True
 
-        node_data = cast(dict[Hashable, Any], self._nx_graph.nodes(data=True))
-        data = cast(dict[str, Any], node_data[node])
+        node_data = cast(dict[Hashable, Any], self._core_graph.node_data(node))
+        data = cast(dict[str, Any], node_data)
         properties = NodeProperties.from_data_dict(data)
 
         force_edge_rerender = force_edge_rerender or (position is not None) or "$ports" in data
@@ -565,7 +560,7 @@ class ConsoleGraph(Generic[G]):
         position_view_space = Point(round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y))
         self.node_buffers[node].center = position_view_space
 
-        for v in nx.all_neighbors(self._nx_graph, node):
+        for v in self._core_graph.neighbors(node):
             if (node, v) in self.edge_buffers:
                 affected_edges.append((node, v))
             if (v, node) in self.edge_buffers:
@@ -573,9 +568,7 @@ class ConsoleGraph(Generic[G]):
 
         if affected_edges and force_edge_rerender:
             for u, v in affected_edges:
-                # self.edge_buffers.pop((u, v), None)
-                # self.edge_label_buffers.pop((u, v), None)
-                self.update_edge(u, v, self._nx_graph.edges[u, v], update_data=False)
+                self.update_edge(u, v, self._core_graph.edge_data(u, v), update_data=False)
 
     def to_graph_coordinates(self, p: Point) -> FloatPoint:
         """Converts a point from view coordinates to graph coordinates.
@@ -636,11 +629,11 @@ class ConsoleGraph(Generic[G]):
         if self._zoom_factor is None:
             raise RuntimeError("You can only update edges once the zoom factor has been computed")
 
-        old_data = self._nx_graph.edges[u, v]
+        old_data = self._core_graph.edge_data(u, v)
         data = dict(old_data, **data) if update_data else data
         properties = EdgeProperties.from_data_dict(data)
 
-        self._nx_graph.edges[u, v].update(dict(data, **{"$properties": properties}))
+        self._core_graph.update_edge_data(u, v, dict(data, **{"$properties": properties}))
 
         edge_buffer: EdgeBuffer | None = None
         edge_layout: EdgeLayout | None = None
@@ -690,16 +683,20 @@ class ConsoleGraph(Generic[G]):
         # layout engine. For each node in the graph we generate a node buffer that contains the
         # segments to render the node and metadata where to place the buffer.
         self.node_buffers_for_layout = {
-            node: rasterize_node(self.console, node, cast(dict[str, Any], data))
-            for node, data in self._nx_graph.nodes(data=True)
+            node: rasterize_node(self.console, node, cast(dict[str, Any], self._core_graph.node_data(node)))
+            for node in self._core_graph.all_nodes()
         }
 
     def _transition_compute_node_layout(self) -> None:
         # Store the node buffers in the graph itself
-        nx.set_node_attributes(self._nx_graph, self.node_buffers_for_layout, "_netext_node_buffer")
+        for node, buffer in self.node_buffers_for_layout.items():
+            self._core_graph.update_node_data(node, dict(self._core_graph.node_data(node), _netext_node_buffer=buffer))
 
         # Position the nodes and store these original positions
-        self.node_positions = self.layout_engine(self._nx_graph)
+        graph = nx.Graph()
+        graph.add_nodes_from(self._core_graph.all_nodes())
+        graph.add_edges_from(self._core_graph.all_edges())
+        self.node_positions = self.layout_engine(graph)
         self.offset: FloatPoint = FloatPoint(0, 0)
 
         if self.node_positions:

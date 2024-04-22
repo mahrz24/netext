@@ -93,7 +93,7 @@ def route_edge(
             diagonal_cost=100,
             line_cost=1,
             shape_cost=0.5,
-            hint_cost=-1,
+            hint_cost=0,
         ),
     )
 

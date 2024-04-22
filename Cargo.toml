@@ -13,5 +13,5 @@ petgraph = "0.6.4"
 rand = "0.8.4"
 
 [dependencies.pyo3]
-version = "0.20.0"
+version = "0.21.2"
 features = ["abi3-py39"]
