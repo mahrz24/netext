@@ -166,9 +166,14 @@ class ConsoleGraph(Generic[G]):
 
         self.layout_engine: LayoutEngine[G] = layout_engine
 
+        # Move efficient transformation into the core graph
         self._core_graph = core.CoreGraph.from_edges(
             graph.edges(),
         )
+        for node, data in graph.nodes(data=True):
+            self._core_graph.update_node_data(node, data)
+        for u, v, data in graph.edges(data=True):
+            self._core_graph.update_edge_data(u, v, data)
 
         self.node_buffers_for_layout: dict[Hashable, NodeBuffer] = dict()
         self.node_buffers: dict[Hashable, NodeBuffer] = dict()
@@ -471,7 +476,7 @@ class ConsoleGraph(Generic[G]):
         if data is not None:
             # Replace the data of the node with the new data
             if update_data:
-                new_data = dict(self._core_graph.node_data(node), **data)
+                new_data = dict(self._core_graph.node_data_or_default(node, dict()), **data)
                 properties = NodeProperties.from_data_dict(new_data)
                 new_data["$properties"] = properties
             else:
@@ -507,7 +512,7 @@ class ConsoleGraph(Generic[G]):
             if new_node.shape.polygon(new_node) != old_node.shape.polygon(old_node):
                 force_edge_rerender = True
 
-        node_data = cast(dict[Hashable, Any], self._core_graph.node_data(node))
+        node_data = cast(dict[Hashable, Any], self._core_graph.node_data_or_default(node, dict()))
         data = cast(dict[str, Any], node_data)
         properties = NodeProperties.from_data_dict(data)
 
@@ -683,19 +688,25 @@ class ConsoleGraph(Generic[G]):
         # layout engine. For each node in the graph we generate a node buffer that contains the
         # segments to render the node and metadata where to place the buffer.
         self.node_buffers_for_layout = {
-            node: rasterize_node(self.console, node, cast(dict[str, Any], self._core_graph.node_data(node)))
+            node: rasterize_node(self.console, node, cast(dict[str, Any], self._core_graph.node_data_or_default(node, dict())))
             for node in self._core_graph.all_nodes()
         }
 
     def _transition_compute_node_layout(self) -> None:
         # Store the node buffers in the graph itself
         for node, buffer in self.node_buffers_for_layout.items():
-            self._core_graph.update_node_data(node, dict(self._core_graph.node_data(node), _netext_node_buffer=buffer))
+            self._core_graph.update_node_data(node, dict(self._core_graph.node_data_or_default(node, dict()), _netext_node_buffer=buffer))
 
         # Position the nodes and store these original positions
         graph = nx.Graph()
-        graph.add_nodes_from(self._core_graph.all_nodes())
+        graph.add_nodes_from(reversed(self._core_graph.all_nodes()))
         graph.add_edges_from(self._core_graph.all_edges())
+        node_data = {}
+        for node in self._core_graph.all_nodes():
+            node_data[node] = self._core_graph.node_data_or_default(node, dict())
+        nx.set_node_attributes(graph, node_data)
+        print(graph.nodes(data=True))
+        print(graph.edges(data=True))
         self.node_positions = self.layout_engine(graph)
         self.offset: FloatPoint = FloatPoint(0, 0)
 
@@ -719,20 +730,21 @@ class ConsoleGraph(Generic[G]):
             self.node_buffers_for_layout[node].center = Point(x=round(position.x), y=round(position.y))
 
         # TODO Split off into own step
-        for node, data in self._nx_graph.nodes(data=True):
+        for node in self._core_graph.all_nodes():
+            data = self._core_graph.node_data_or_default(node, dict())
             properties = NodeProperties.from_data_dict(data)
             if properties.ports:
                 for current_port_name, port in sorted(properties.ports.items(), key=lambda x: x[1].key):
                     if port.magnet == Magnet.CENTER or port.magnet == Magnet.CLOSEST or port.magnet is None:
                         # Determine the port magnet
                         port_side = ShapeSide.LEFT
-                        neighbours = self._nx_graph.neighbors(node)
+                        neighbours = self._core_graph.neighbors(node)
                         for v_node in neighbours:
-                            if (node, v_node) in self._nx_graph.edges:
+                            if self._core_graph.contains_edge(node, v_node):
                                 edge_out_properties = EdgeProperties.from_data_dict(
-                                    self._nx_graph.edges[(node, v_node)]
+                                    self._core_graph.edge_data_or_default(node, v_node, dict())
                                 )
-                                edge_in_properties = EdgeProperties.from_data_dict(self._nx_graph.edges[(v_node, node)])
+                                edge_in_properties = EdgeProperties.from_data_dict(self._core_graph.edge_data_or_default(v_node, node, dict()))
                                 if edge_out_properties.start_port == current_port_name:
                                     port_side = ShapeSide(
                                         self.node_buffers_for_layout[node]
@@ -802,7 +814,8 @@ class ConsoleGraph(Generic[G]):
         if self._zoom_factor is None:
             raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
 
-        for node, data in self._nx_graph.nodes(data=True):
+        for node in self._core_graph.all_nodes():
+            data = self._core_graph.node_data_or_default(node, dict())
             properties = NodeProperties.from_data_dict(data)
             lod = properties.lod_map(self._zoom_factor)
             # Get the zoomed position of the node
@@ -846,7 +859,8 @@ class ConsoleGraph(Generic[G]):
         for _, node_buffer in self.node_buffers.items():
             all_node_buffers.append(node_buffer)
 
-        for u, v, data in self._nx_graph.edges(data=True):
+        for u, v in self._core_graph.all_edges():
+            data = self._core_graph.edge_data_or_default(u, v, dict())
             properties = EdgeProperties.from_data_dict(data)
             edge_lod = properties.lod_map(self._zoom_factor)
 
@@ -880,7 +894,7 @@ class ConsoleGraph(Generic[G]):
         if self._zoom_factor is None:
             raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
 
-        for node in self._nx_graph.nodes:
+        for node in self._core_graph.all_nodes():
             self._render_port_buffer_for_node(node)
 
     def _render_port_buffer_for_node(self, node):
@@ -888,7 +902,7 @@ class ConsoleGraph(Generic[G]):
             raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
 
         node_buffer = self.node_buffers[node]
-        properties = NodeProperties.from_data_dict(self._nx_graph.nodes[node])
+        properties = NodeProperties.from_data_dict(self._core_graph.node_data_or_default(node, dict()))
         lod = properties.lod_map(self._zoom_factor)
         self.port_buffers[node] = node_buffer.get_port_buffers(
             self.console,
@@ -900,10 +914,9 @@ class ConsoleGraph(Generic[G]):
     def _all_buffers(self) -> Iterable[StripBuffer]:
         self._require(RenderState.EDGES_RENDERED)
         # Get graph subview
-        visible_nodes = nx.subgraph_view(
-            self._nx_graph,
-            filter_node=lambda n: self._nx_graph.nodes[n].get("$show", True),
-        )
+        visible_nodes = [
+            node for node in self._core_graph.all_nodes() if self._core_graph.node_data_or_default(node, dict()).get("$show", True)
+        ]
 
         node_buffers = [node_buffer for node, node_buffer in self.node_buffers.items() if node in visible_nodes]
 

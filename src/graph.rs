@@ -157,6 +157,15 @@ impl CoreGraph {
         }
     }
 
+    fn edge_data_or_default(&self, obj_a: &Bound<'_, PyAny>, obj_b: &Bound<'_, PyAny>, default: &Bound<'_, PyAny>) -> PyResult<PyObject> {
+        let hash_a = obj_a.hash().unwrap() as usize;
+        let hash_b = obj_b.hash().unwrap() as usize;
+        match self.edge_data_map.get(&(hash_a, hash_b)) {
+            Some(data) => Ok(data.clone()),
+            None => Ok(default.clone().unbind())
+        }
+    }
+
     fn update_node_data(&mut self, py: Python<'_>, obj: &Bound<'_, PyAny>, data: &Bound<'_, PyAny>) -> PyResult<()> {
         let hash = obj.hash()? as usize;
         if self.graph.contains_node(hash) {

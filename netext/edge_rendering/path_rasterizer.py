@@ -118,7 +118,6 @@ def rasterize_point(
             return Segment(box_character_map[edge_segment_drawing_mode][6], style=style)
         elif Direction.UP_LEFT in directions or Direction.DOWN_RIGHT in directions:
             return Segment(box_character_map[edge_segment_drawing_mode][7], style=style)
-    print(directions)
     return Segment("*", style=style)
 
 
