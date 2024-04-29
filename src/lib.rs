@@ -11,14 +11,14 @@ use std::collections::VecDeque;
 use std::f64::MAX;
 
 mod graph;
-use graph::CoreGraph;
+mod geometry;
+mod layout;
 
-#[pyclass]
-#[derive(Clone, Debug, Hash, Eq, PartialEq)]
-struct Point {
-    x: i32,
-    y: i32,
-}
+use graph::CoreGraph;
+use geometry::Point;
+
+
+
 
 #[derive(Debug)]
 struct Rectangle {
@@ -26,13 +26,6 @@ struct Rectangle {
     bottom_right: Point,
 }
 
-#[pymethods]
-impl Point {
-    #[new]
-    fn new(x: i32, y: i32) -> Self {
-        Point { x, y }
-    }
-}
 
 #[pyclass]
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
@@ -1114,6 +1107,10 @@ fn route_edge_in_subdivision(
 // A module to wrap the Python functions and structs
 #[pymodule]
 fn _core(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<layout::sugiyama::SugiyamaLayout>()?;
+    m.add_class::<layout::LayoutEngine>()?;
+    m.add_class::<layout::static_::StaticLayout>()?;
+
     m.add_class::<CoreGraph>()?;
     m.add_class::<Point>()?;
     m.add_class::<Shape>()?;

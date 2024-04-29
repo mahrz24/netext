@@ -5,6 +5,8 @@ from enum import Enum
 from itertools import chain
 import itertools
 from typing import Any, Generic, Iterable, cast
+from typing import TypeVar
+from networkx import Graph, DiGraph  # type: ignore
 
 import networkx as nx  # type: ignore
 from rich.console import Console, ConsoleOptions, RenderResult
@@ -24,8 +26,6 @@ from netext.rendering.segment_buffer import StripBuffer
 
 from netext.buffer_renderer import render_buffers
 from netext.edge_rasterizer import rasterize_edge
-from netext.layout_engines.engine import LayoutEngine, G
-from netext.layout_engines.grandalf import GrandalfSugiyamaLayout
 from netext.node_rasterizer import NodeBuffer, rasterize_node
 
 from rich.traceback import install
@@ -118,13 +118,13 @@ def determine_port_side_assignment(
         port_sides[current_port_name] = port_side
         port_side_assignments[port_side].append(current_port_name)
 
-
+G = TypeVar("G", Graph, DiGraph)
 class ConsoleGraph(Generic[G]):
     def __init__(
         self,
         graph: G,
         # see https://github.com/python/mypy/issues/3737
-        layout_engine: LayoutEngine[G] = GrandalfSugiyamaLayout[G](),  # type: ignore
+        layout_engine: core.LayoutEngine = core.StaticLayout(),
         console: Console = Console(),
         viewport: Region | None = None,
         max_width: int | None = None,
@@ -698,16 +698,7 @@ class ConsoleGraph(Generic[G]):
             self._core_graph.update_node_data(node, dict(self._core_graph.node_data_or_default(node, dict()), _netext_node_buffer=buffer))
 
         # Position the nodes and store these original positions
-        graph = nx.Graph()
-        graph.add_nodes_from(reversed(self._core_graph.all_nodes()))
-        graph.add_edges_from(self._core_graph.all_edges())
-        node_data = {}
-        for node in self._core_graph.all_nodes():
-            node_data[node] = self._core_graph.node_data_or_default(node, dict())
-        nx.set_node_attributes(graph, node_data)
-        print(graph.nodes(data=True))
-        print(graph.edges(data=True))
-        self.node_positions = self.layout_engine(graph)
+        self.node_positions = dict(self.layout_engine.layout(self._core_graph))
         self.offset: FloatPoint = FloatPoint(0, 0)
 
         if self.node_positions:

@@ -136,7 +136,7 @@ impl CoreGraph {
         }
     }
 
-    fn node_data(&self, obj: &Bound<'_, PyAny>) -> PyResult<Option<&PyObject>> {
+    pub fn node_data(&self, obj: &Bound<'_, PyAny>) -> PyResult<Option<&PyObject>> {
         let hash = obj.hash()? as usize;
         match self.data_map.get(&hash) {
             Some(data) => Ok(Some(data)),
@@ -197,7 +197,7 @@ impl CoreGraph {
         Ok(())
     }
 
-    fn all_nodes(&self) -> Vec<&PyObject> {
+    pub fn all_nodes(&self) -> Vec<&PyObject> {
         self.object_map.values().collect()
     }
 
