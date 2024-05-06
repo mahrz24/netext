@@ -118,7 +118,10 @@ def determine_port_side_assignment(
         port_sides[current_port_name] = port_side
         port_side_assignments[port_side].append(current_port_name)
 
+
 G = TypeVar("G", Graph, DiGraph)
+
+
 class ConsoleGraph(Generic[G]):
     def __init__(
         self,
@@ -164,7 +167,7 @@ class ConsoleGraph(Generic[G]):
         self._max_width = max_width
         self._max_height = max_height
 
-        self.layout_engine: LayoutEngine[G] = layout_engine
+        self.layout_engine = layout_engine
 
         # Move efficient transformation into the core graph
         self._core_graph = core.CoreGraph.from_edges(
@@ -688,17 +691,21 @@ class ConsoleGraph(Generic[G]):
         # layout engine. For each node in the graph we generate a node buffer that contains the
         # segments to render the node and metadata where to place the buffer.
         self.node_buffers_for_layout = {
-            node: rasterize_node(self.console, node, cast(dict[str, Any], self._core_graph.node_data_or_default(node, dict())))
+            node: rasterize_node(
+                self.console, node, cast(dict[str, Any], self._core_graph.node_data_or_default(node, dict()))
+            )
             for node in self._core_graph.all_nodes()
         }
 
     def _transition_compute_node_layout(self) -> None:
         # Store the node buffers in the graph itself
         for node, buffer in self.node_buffers_for_layout.items():
-            self._core_graph.update_node_data(node, dict(self._core_graph.node_data_or_default(node, dict()), _netext_node_buffer=buffer))
+            self._core_graph.update_node_data(
+                node, dict(self._core_graph.node_data_or_default(node, dict()), _netext_node_buffer=buffer)
+            )
 
         # Position the nodes and store these original positions
-        self.node_positions = dict(self.layout_engine.layout(self._core_graph))
+        self.node_positions = dict([(n, Point(p.x, p.y)) for (n, p) in self.layout_engine.layout(self._core_graph)])
         self.offset: FloatPoint = FloatPoint(0, 0)
 
         if self.node_positions:
@@ -735,7 +742,9 @@ class ConsoleGraph(Generic[G]):
                                 edge_out_properties = EdgeProperties.from_data_dict(
                                     self._core_graph.edge_data_or_default(node, v_node, dict())
                                 )
-                                edge_in_properties = EdgeProperties.from_data_dict(self._core_graph.edge_data_or_default(v_node, node, dict()))
+                                edge_in_properties = EdgeProperties.from_data_dict(
+                                    self._core_graph.edge_data_or_default(v_node, node, dict())
+                                )
                                 if edge_out_properties.start_port == current_port_name:
                                     port_side = ShapeSide(
                                         self.node_buffers_for_layout[node]
@@ -906,7 +915,9 @@ class ConsoleGraph(Generic[G]):
         self._require(RenderState.EDGES_RENDERED)
         # Get graph subview
         visible_nodes = [
-            node for node in self._core_graph.all_nodes() if self._core_graph.node_data_or_default(node, dict()).get("$show", True)
+            node
+            for node in self._core_graph.all_nodes()
+            if self._core_graph.node_data_or_default(node, dict()).get("$show", True)
         ]
 
         node_buffers = [node_buffer for node, node_buffer in self.node_buffers.items() if node in visible_nodes]

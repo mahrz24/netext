@@ -1,4 +1,4 @@
-use pyo3::{prelude::*, types::PyDict};
+use pyo3::{exceptions, prelude::*, types::PyDict};
 
 use crate::{geometry::Point, graph::CoreGraph};
 
@@ -14,31 +14,39 @@ impl StaticLayout {
         (StaticLayout {}, LayoutEngine {})
     }
 
-    fn layout(&self, py: Python<'_>, graph: &CoreGraph) -> PyResult<Vec<(&PyObject, Point)>> {
+    fn layout(&self, py: Python<'_>, graph: &CoreGraph) -> PyResult<Vec<(PyObject, Point)>> {
         let mut node_positions = Vec::new();
         for node in graph.all_nodes() {
-            let node_ref = node.clone();
-            let node_data = graph
-                .node_data(&node_ref.into_bound(py))?
-                .unwrap()
-                .into_bound(py);
-            if node_data.is_instance_of::<PyDict>() {
-                let dict = node_data.downcast::<PyDict>()?;
-                let x = dict.get_item("$x")?.unwrap();
-                let y = dict.get_item("$y")?.unwrap();
+            let bound_node = node.clone().into_bound(py);
+            let node_data_result = graph.node_data(&bound_node);
+            match node_data_result {
+                Err(_) => continue,
+                Ok(None) => continue,
+                Ok(Some(node_data)) => {
+                    let bound_data = node_data.bind(py);
+                    if bound_data.is_instance_of::<PyDict>() {
+                        let dict_result = bound_data.downcast::<PyDict>();
+                        let dict = match dict_result {
+                            Ok(value) => value,
+                            Err(_) => return Err(PyErr::new::<exceptions::PyTypeError, _>("Data must be a dictionary"))
+                        };
+                        let x = dict.get_item("$x")?.unwrap();
+                        let y = dict.get_item("$y")?.unwrap();
 
-                let x_val = match x.extract::<i32>() {
-                    Ok(value) => value,
-                    Err(_) => 0,
-                };
+                        let x_val = match x.extract::<i32>() {
+                            Ok(value) => value,
+                            Err(_) => 0,
+                        };
 
-                let y_val = match y.extract::<i32>() {
-                    Ok(value) => value,
-                    Err(_) => 0,
-                };
+                        let y_val = match y.extract::<i32>() {
+                            Ok(value) => value,
+                            Err(_) => 0,
+                        };
 
-                let point = Point::new(x_val, y_val);
-                node_positions.push((node, point));
+                        let point = Point::new(x_val, y_val);
+                        node_positions.push((node.clone_ref(py), point));
+                    }
+                }
             }
         }
         Ok(node_positions)

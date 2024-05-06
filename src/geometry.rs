@@ -13,4 +13,14 @@ impl Point {
     pub fn new(x: i32, y: i32) -> Self {
         Point { x, y }
     }
+
+    #[getter]
+    pub fn x(&self) -> i32 {
+        self.x
+    }
+
+    #[getter]
+    pub fn y(&self) -> i32 {
+        self.y
+    }
 }
