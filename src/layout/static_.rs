@@ -17,7 +17,7 @@ impl StaticLayout {
     fn layout(&self, py: Python<'_>, graph: &CoreGraph) -> PyResult<Vec<(PyObject, Point)>> {
         let mut node_positions = Vec::new();
         for node in graph.all_nodes() {
-            let bound_node = node.clone().into_bound(py);
+            let bound_node = node.clone_ref(py).into_bound(py);
             let node_data_result = graph.node_data(&bound_node);
             match node_data_result {
                 Err(_) => continue,
@@ -30,17 +30,23 @@ impl StaticLayout {
                             Ok(value) => value,
                             Err(_) => return Err(PyErr::new::<exceptions::PyTypeError, _>("Data must be a dictionary"))
                         };
-                        let x = dict.get_item("$x")?.unwrap();
-                        let y = dict.get_item("$y")?.unwrap();
+                        let x = dict.get_item("$x");
+                        let y = dict.get_item("$y");
 
-                        let x_val = match x.extract::<i32>() {
-                            Ok(value) => value,
-                            Err(_) => 0,
+                        let x_val = match x {
+                            Ok(Some(value)) => match value.extract::<i32>() {
+                                Ok(value) => value,
+                                Err(_) => 0,
+                            }
+                            _ => 0,
                         };
 
-                        let y_val = match y.extract::<i32>() {
-                            Ok(value) => value,
-                            Err(_) => 0,
+                        let y_val = match y {
+                            Ok(Some(value)) => match value.extract::<i32>() {
+                                Ok(value) => value,
+                                Err(_) => 0,
+                            }
+                            _ => 0,
                         };
 
                         let point = Point::new(x_val, y_val);

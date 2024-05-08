@@ -4,9 +4,8 @@ from dataclasses import dataclass
 from enum import Enum
 from itertools import chain
 import itertools
-from typing import Any, Generic, Iterable, cast
-from typing import TypeVar
-from networkx import Graph, DiGraph  # type: ignore
+from typing import Any, Iterable, cast
+from networkx import DiGraph  # type: ignore
 
 import networkx as nx  # type: ignore
 from rich.console import Console, ConsoleOptions, RenderResult
@@ -119,13 +118,10 @@ def determine_port_side_assignment(
         port_side_assignments[port_side].append(current_port_name)
 
 
-G = TypeVar("G", Graph, DiGraph)
-
-
-class ConsoleGraph(Generic[G]):
+class ConsoleGraph:
     def __init__(
         self,
-        graph: G,
+        graph: DiGraph,
         # see https://github.com/python/mypy/issues/3737
         layout_engine: core.LayoutEngine = core.StaticLayout(),
         console: Console = Console(),

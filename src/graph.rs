@@ -1,11 +1,11 @@
-use petgraph::graphmap::UnGraphMap;
+use petgraph::graphmap::DiGraphMap;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 use std::collections::HashMap;
 
 #[pyclass]
 pub struct CoreGraph {
-    graph: UnGraphMap<usize, ()>,
+    graph: DiGraphMap<usize, ()>,
     object_map: HashMap<usize, PyObject>,
     data_map: HashMap<usize, PyObject>,
     edge_data_map: HashMap<(usize, usize), PyObject>,
@@ -16,7 +16,7 @@ impl CoreGraph {
     #[new]
     fn new() -> Self {
         CoreGraph {
-            graph: UnGraphMap::new(),
+            graph: DiGraphMap::new(),
             object_map: HashMap::new(),
             data_map: HashMap::new(),
             edge_data_map: HashMap::new(),
