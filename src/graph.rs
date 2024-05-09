@@ -5,8 +5,8 @@ use std::collections::HashMap;
 
 #[pyclass]
 pub struct CoreGraph {
-    graph: DiGraphMap<usize, ()>,
-    object_map: HashMap<usize, PyObject>,
+    pub graph: DiGraphMap<usize, ()>,
+    pub object_map: HashMap<usize, PyObject>,
     data_map: HashMap<usize, PyObject>,
     edge_data_map: HashMap<(usize, usize), PyObject>,
 }
