@@ -27,24 +27,41 @@ impl SugiyamaLayout {
         self.remove_cycles(&mut raw_graph);
         let layer_map = self.layer_disconnected_components(&raw_graph);
 
+        println!("{:?}", layer_map);
         // Convert layers from a node to layer index mapping to a list of nodes per layer
-        let layers: Vec<Vec<usize>> = layer_map
+        let mut int_layers: Vec<(usize, Vec<usize>)> = layer_map
             .into_iter()
             .fold(HashMap::new(), |mut acc, (node, layer)| {
                 acc.entry(layer).or_insert_with(Vec::new).push(node);
                 acc
             })
             .into_iter()
-            .map(|(_, nodes)| nodes)
+            .collect();
+
+        int_layers.sort_by_key(|(k, _v)| *k);
+
+        let layers = int_layers
+            .into_iter()
+            .map(|(_, mut v)| {
+                 v.sort_by_key(|&x| x);
+                v
+            })
             .collect();
 
         let ordered_layers = self.barycenter_ordering(&raw_graph, &layers);
-        let coordinates = self.brandes_koepf_coordinates(&ordered_layers, 100.0, 100.0);
+        let coordinates = self.brandes_koepf_coordinates(&ordered_layers, 10.0, 10.0);
 
+        println!("{:?}", graph.graph);
+        println!("{:?}", layers);
 
         Ok(coordinates
             .into_iter()
-            .map(|(node, point)| (graph.object_map[&node].clone_ref(py), point))
+            .map(|(node, point)| {
+                (
+                    graph.object_map[&graph.graph.from_index(node)].clone_ref(py),
+                    point,
+                )
+            })
             .collect())
     }
 }
@@ -107,7 +124,7 @@ impl SugiyamaLayout {
             for &node in &layer {
                 let neighbors = graph.neighbors_directed(node, petgraph::Incoming);
                 let neighbor_positions: Vec<_> = neighbors
-                    .map(|n| layers[i - 1].iter().position(|&x| x == n).unwrap())
+                    .map(|n| layers[i - 1].iter().position(|&x| x == n).unwrap_or(0))
                     .collect();
 
                 let barycenter = if neighbor_positions.is_empty() {
@@ -163,6 +180,8 @@ impl SugiyamaLayout {
                         subgraph.add_edge(edge.0, edge.1, ());
                     }
                 }
+
+                println!("Layering subgraph {:?}", subgraph);
 
                 let component_layers = self.longest_path_layering(&subgraph); // Assuming a function that can handle a subgraph
                 layers.extend(component_layers);
