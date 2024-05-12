@@ -9,6 +9,8 @@ name = "netext_core"
 crate-type = ["cdylib"]
 
 [dependencies]
+hashbrown = { version = "0.14.5", default-features = false, features = ["allocator-api2", "inline-more"] }
+indexmap = "2.2.6"
 petgraph = "0.6.4"
 rand = "0.8.4"
 

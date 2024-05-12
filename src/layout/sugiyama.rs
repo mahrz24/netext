@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
-use petgraph::algo::tarjan_scc;
-use petgraph::graphmap::{DiGraphMap, GraphMap};
+use petgraph::algo::{greedy_feedback_arc_set};
+use petgraph::graph::NodeIndex;
+use petgraph::graphmap::{DiGraphMap};
 use petgraph::visit::VisitMap;
 use petgraph::visit::{Dfs, Visitable, Walker};
 use petgraph::visit::{NodeIndexable, Topo};
@@ -24,10 +25,9 @@ impl SugiyamaLayout {
 
     fn layout(&self, py: Python<'_>, graph: &CoreGraph) -> PyResult<Vec<(PyObject, Point)>> {
         let mut raw_graph = graph.graph.clone();
-        self.remove_cycles(&mut raw_graph);
+        self.remove_cycles(&mut raw_graph, &graph.graph);
         let layer_map = self.layer_disconnected_components(&raw_graph);
 
-        println!("{:?}", layer_map);
         // Convert layers from a node to layer index mapping to a list of nodes per layer
         let mut int_layers: Vec<(usize, Vec<usize>)> = layer_map
             .into_iter()
@@ -43,7 +43,7 @@ impl SugiyamaLayout {
         let layers = int_layers
             .into_iter()
             .map(|(_, mut v)| {
-                 v.sort_by_key(|&x| x);
+                v.sort_by_key(|&x| x);
                 v
             })
             .collect();
@@ -51,16 +51,11 @@ impl SugiyamaLayout {
         let ordered_layers = self.barycenter_ordering(&raw_graph, &layers);
         let coordinates = self.brandes_koepf_coordinates(&ordered_layers, 10.0, 10.0);
 
-        println!("{:?}", graph.graph);
-        println!("{:?}", layers);
-
         Ok(coordinates
             .into_iter()
-            .map(|(node, point)| {
-                (
-                    graph.object_map[&graph.graph.from_index(node)].clone_ref(py),
-                    point,
-                )
+            .filter_map(|(node, point)| {
+                let object = graph.object_map.get_index(graph.graph.from_index(node).index());
+                object.map(|object| (object.clone_ref(py), point))
             })
             .collect())
     }
@@ -112,7 +107,7 @@ impl SugiyamaLayout {
 
     fn barycenter_ordering(
         &self,
-        graph: &DiGraphMap<usize, ()>,
+        graph: &DiGraphMap<NodeIndex, ()>,
         layers: &Vec<Vec<usize>>,
     ) -> Vec<Vec<usize>> {
         let mut ordered_layers = layers.clone();
@@ -122,9 +117,9 @@ impl SugiyamaLayout {
             let mut barycenters = Vec::new();
 
             for &node in &layer {
-                let neighbors = graph.neighbors_directed(node, petgraph::Incoming);
+                let neighbors = graph.neighbors_directed(graph.from_index(node), petgraph::Incoming);
                 let neighbor_positions: Vec<_> = neighbors
-                    .map(|n| layers[i - 1].iter().position(|&x| x == n).unwrap_or(0))
+                    .map(|n| layers[i - 1].iter().position(|&x| x == graph.to_index(n)).unwrap_or(0))
                     .collect();
 
                 let barycenter = if neighbor_positions.is_empty() {
@@ -144,23 +139,18 @@ impl SugiyamaLayout {
         ordered_layers
     }
 
-    fn remove_cycles(&self, graph: &mut DiGraphMap<usize, ()>) {
-        let sccs = tarjan_scc(&*graph);
-        for scc in sccs {
-            if scc.len() > 1 {
-                // It's a cycle
-                // Remove an edge or handle the cycle
-                // Example: remove the first edge that completes the cycle
-                for window in scc.windows(2) {
-                    graph.remove_edge(window[0], window[1]);
-                }
-            }
+    fn remove_cycles(&self, tgt_graph: &mut DiGraphMap<NodeIndex, ()>, src_graph: &DiGraphMap<NodeIndex, ()>) {
+        let edges_to_remove = greedy_feedback_arc_set(src_graph);
+        for edge in edges_to_remove {
+            println!("Removing edge {:?}", edge);
+            tgt_graph.remove_edge(edge.0, edge.1);
+            tgt_graph.add_edge(edge.1, edge.0, ());
         }
     }
 
     fn layer_disconnected_components(
         &self,
-        graph: &DiGraphMap<usize, ()>,
+        graph: &DiGraphMap<NodeIndex, ()>,
     ) -> HashMap<usize, usize> {
         let visited = graph.visit_map();
         let mut dfs = Dfs::empty(graph);
@@ -181,8 +171,6 @@ impl SugiyamaLayout {
                     }
                 }
 
-                println!("Layering subgraph {:?}", subgraph);
-
                 let component_layers = self.longest_path_layering(&subgraph); // Assuming a function that can handle a subgraph
                 layers.extend(component_layers);
             }
@@ -190,9 +178,18 @@ impl SugiyamaLayout {
         layers
     }
 
-    fn longest_path_layering(&self, graph: &DiGraphMap<usize, ()>) -> HashMap<usize, usize> {
+    fn longest_path_layering(&self, graph: &DiGraphMap<NodeIndex, ()>) -> HashMap<usize, usize> {
         let mut layers = HashMap::new();
         let mut topo = Topo::new(graph);
+
+        if graph.node_count() == 0 {
+            return layers;
+        }
+
+        if graph.node_count() == 1 {
+            layers.insert(graph.to_index(graph.nodes().next().unwrap()), 0);
+            return layers;
+        }
 
         // Initialize layering from the source nodes
         for node in graph.nodes() {

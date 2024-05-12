@@ -169,8 +169,13 @@ class ConsoleGraph:
         self._core_graph = core.CoreGraph.from_edges(
             graph.edges(),
         )
+
         for node, data in graph.nodes(data=True):
-            self._core_graph.update_node_data(node, data)
+            if not self._core_graph.contains_node(node):
+                self._core_graph.add_node(node, data)
+            else:
+                self._core_graph.update_node_data(node, data)
+
         for u, v, data in graph.edges(data=True):
             self._core_graph.update_edge_data(u, v, data)
 
@@ -702,6 +707,12 @@ class ConsoleGraph:
 
         # Position the nodes and store these original positions
         self.node_positions = dict([(n, Point(p.x, p.y)) for (n, p) in self.layout_engine.layout(self._core_graph)])
+
+        # Add 0,0 for nodes that were not positioned
+        for node in self._core_graph.all_nodes():
+            if node not in self.node_positions:
+                self.node_positions[node] = Point(-25, -10)
+
         self.offset: FloatPoint = FloatPoint(0, 0)
 
         if self.node_positions:
@@ -815,6 +826,8 @@ class ConsoleGraph:
             properties = NodeProperties.from_data_dict(data)
             lod = properties.lod_map(self._zoom_factor)
             # Get the zoomed position of the node
+            print(node)
+            print(self.node_positions)
             position = self.node_positions[node]
             position_view_space = Point(round(position.x * self.zoom_x), round(position.y * self.zoom_y))
 

@@ -147,3 +147,5 @@ tests/snapshot_tests/output/
 
 _version.py
 .screenshot_cache
+
+/target

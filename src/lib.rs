@@ -13,6 +13,7 @@ use std::f64::MAX;
 mod graph;
 mod geometry;
 mod layout;
+mod pyindexset;
 
 use graph::CoreGraph;
 use geometry::Point;

@@ -51,5 +51,4 @@ nx.set_node_attributes(ast_graph, _render, "$content-renderer")
 nx.set_node_attributes(ast_graph, JustContent(), "$shape")
 
 nx.set_edge_attributes(ast_graph, EdgeSegmentDrawingMode.BOX_HEAVY, "$edge-segment-drawing-mode")
-
 print(ConsoleGraph(ast_graph))
