@@ -38,6 +38,8 @@ impl SugiyamaLayout {
             .into_iter()
             .collect();
 
+        println!("Layers: {:?}", int_layers);
+
         int_layers.sort_by_key(|(k, _v)| *k);
 
         let layers = int_layers
@@ -152,30 +154,36 @@ impl SugiyamaLayout {
         &self,
         graph: &DiGraphMap<NodeIndex, ()>,
     ) -> HashMap<usize, usize> {
-        let visited = graph.visit_map();
-        let mut dfs = Dfs::empty(graph);
-        let mut layers = HashMap::new();
+        // let visited = graph.visit_map();
+        // let mut dfs = Dfs::empty(graph);
+        // let mut layers = HashMap::new();
 
-        for node in graph.nodes() {
-            if !visited.is_visited(&node) {
-                let dfs_ref = &mut dfs;
-                dfs_ref.move_to(node);
-                let subgraph_nodes = dfs_ref.iter(graph).collect::<Vec<_>>();
-                // Now layer this subgraph
-                let mut subgraph = DiGraphMap::new();
+        // for node in graph.nodes() {
+        //     println!("Checking node {:?}", node);
+        //     if !visited.is_visited(&node) {
+        //         println!("Node not visited: {:?}", node);
+        //         let dfs_ref = &mut dfs;
+        //         dfs_ref.move_to(node);
+        //         let subgraph_nodes = dfs_ref.iter(graph).collect::<Vec<_>>();
+        //         // Now layer this subgraph
+        //         let mut subgraph = DiGraphMap::new();
 
-                for sub_node in &subgraph_nodes {
-                    subgraph.add_node(*sub_node);
-                    for edge in graph.edges(*sub_node) {
-                        subgraph.add_edge(edge.0, edge.1, ());
-                    }
-                }
+        //         for sub_node in &subgraph_nodes {
+        //             subgraph.add_node(*sub_node);
+        //             for edge in graph.edges(*sub_node) {
+        //                 subgraph.add_edge(edge.0, edge.1, ());
+        //             }
+        //         }
 
-                let component_layers = self.longest_path_layering(&subgraph); // Assuming a function that can handle a subgraph
-                layers.extend(component_layers);
-            }
-        }
-        layers
+        //         println!("Subgraph: {:?}", subgraph);
+
+        //         let component_layers = self.longest_path_layering(&subgraph); // Assuming a function that can handle a subgraph
+        //         println!("Component layers: {:?}", component_layers);
+        //         layers.extend(component_layers);
+        //     }
+        // }
+        // layers
+        self.longest_path_layering(graph)
     }
 
     fn longest_path_layering(&self, graph: &DiGraphMap<NodeIndex, ()>) -> HashMap<usize, usize> {
