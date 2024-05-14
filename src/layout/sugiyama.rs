@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use petgraph::algo::{greedy_feedback_arc_set};
 use petgraph::graph::NodeIndex;
 use petgraph::graphmap::{DiGraphMap};
-use petgraph::visit::VisitMap;
+use petgraph::unionfind::UnionFind;
+use petgraph::visit::{IntoEdgeReferences, VisitMap};
 use petgraph::visit::{Dfs, Visitable, Walker};
 use petgraph::visit::{NodeIndexable, Topo};
 
@@ -154,6 +155,23 @@ impl SugiyamaLayout {
         &self,
         graph: &DiGraphMap<NodeIndex, ()>,
     ) -> HashMap<usize, usize> {
+        let mut vertex_sets = UnionFind::new(graph.node_bound());
+        for edge in graph.edge_references() {
+            let (a, b) = (edge.0, edge.1);
+
+            // union the two vertices of the edge
+            vertex_sets.union(graph.to_index(a), graph.to_index(b));
+        }
+        let labels = vertex_sets.into_labeling();
+        let subgraphs = HashMap::new();
+        for node in graph.nodes() {
+            println!("Node: {:?}, Label: {:?}", node, labels[graph.to_index(node)]);
+            subgraphs
+                .entry(labels[graph.to_index(node)])
+                .or_insert_with(DiGraphMap::new())
+                .add_node(node);
+        }
+
         // let visited = graph.visit_map();
         // let mut dfs = Dfs::empty(graph);
         // let mut layers = HashMap::new();
