@@ -1,3 +1,4 @@
+use petgraph::algo::astar;
 use petgraph::algo::dijkstra;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
@@ -10,23 +11,19 @@ use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::f64::MAX;
 
-mod graph;
 mod geometry;
+mod graph;
 mod layout;
 mod pyindexset;
 
-use graph::CoreGraph;
 use geometry::Point;
-
-
-
+use graph::CoreGraph;
 
 #[derive(Debug)]
 struct Rectangle {
     top_left: Point,
     bottom_right: Point,
 }
-
 
 #[pyclass]
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
@@ -442,7 +439,11 @@ fn route_edge(
                     subdivision_graph.add_edge(
                         source_index,
                         target_index,
-                        (weight + config.shape_cost*node_weight + config.line_cost*line_weight + config.hint_cost*hint_weight).max(-0.45),
+                        (weight
+                            + config.shape_cost * node_weight
+                            + config.line_cost * line_weight
+                            + config.hint_cost * hint_weight)
+                            .max(-0.45),
                     );
                 }
             }
@@ -586,7 +587,7 @@ fn route_edge(
             hints_in_subdivision
                 .get(&(start_subdivision_x, start_subdivision_y))
                 .unwrap_or(&HashSet::new()),
-            &config
+            &config,
         );
 
         let mut last_point: DirectedPoint = current_start_point;
@@ -630,7 +631,7 @@ fn route_edge(
         hints_in_subdivision
             .get(&(start_subdivision_x, start_subdivision_y))
             .unwrap_or(&HashSet::new()),
-        &config
+        &config,
     );
 
     let fwd_index = directed_path_fwd
@@ -692,6 +693,36 @@ enum PointOrPlaceholder {
     SubdivisionPlaceholder,
     StartPlaceholder,
     EndPlaceholder,
+}
+
+impl PointOrPlaceholder {
+    fn distance_to(&self, other: &TargetLocation, min_x: i32, min_y: i32, max_x: i32, max_y: i32) -> f64 {
+        match (self, other) {
+            (PointOrPlaceholder::Point(p1), TargetLocation::Concrete(p2)) => {
+                ((p1.x - p2.x).pow(2) as f64 + (p1.y - p2.y).pow(2) as f64).sqrt()
+            },
+            (PointOrPlaceholder::Point(p1), TargetLocation::Multiple(ps)) => {
+                ps.iter()
+                    .map(|p2| ((p1.x - p2.x).pow(2) as f64 + (p1.y - p2.y).pow(2) as f64).sqrt())
+                    .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .unwrap_or(0.0)
+            },
+            (PointOrPlaceholder::Point(p1), TargetLocation::OtherSubdivision(dir)) => {
+                match dir {
+                    Direction::Up => (p1.y - min_y).max(0) as f64,
+                    Direction::Down => (max_y - p1.y).max(0) as f64,
+                    Direction::Left => (p1.x - min_x).max(0) as f64,
+                    Direction::Right => (max_x - p1.x).max(0) as f64,
+                    Direction::UpRight => ((p1.y - min_y).max(0).pow(2) + (max_x - p1.x).max(0).pow(2)) as f64,
+                    Direction::UpLeft => ((p1.y - min_y).max(0).pow(2) + (p1.x - min_x).max(0).pow(2)) as f64,
+                    Direction::DownRight => ((max_y - p1.y).max(0).pow(2) + (max_x - p1.x).max(0).pow(2)) as f64,
+                    Direction::DownLeft => ((max_y - p1.y).max(0).pow(2) + (p1.x - min_x).max(0).pow(2)) as f64,
+                    _ => 0.0,
+                }
+            },
+            _ => 0.0,
+        }
+    }
 }
 
 fn route_edge_in_subdivision(
@@ -764,7 +795,6 @@ fn route_edge_in_subdivision(
                 let node_index = graph.add_node(node_weight);
                 node_indices.insert(node_weight, node_index);
             }
-
         }
     }
 
@@ -793,27 +823,23 @@ fn route_edge_in_subdivision(
                         DirectedPoint::new(x, y, d),
                         match d {
                             Direction::Up => direction.corner_cost(Direction::Up, corner_cost),
-                            Direction::Down => {
-                                direction.corner_cost(Direction::Down, corner_cost)
-                            },
-                            Direction::Left => {
-                                direction.corner_cost(Direction::Left, corner_cost)
-                            },
+                            Direction::Down => direction.corner_cost(Direction::Down, corner_cost),
+                            Direction::Left => direction.corner_cost(Direction::Left, corner_cost),
                             Direction::Right => {
                                 direction.corner_cost(Direction::Right, corner_cost)
-                            },
+                            }
                             Direction::UpRight => {
                                 direction.corner_cost(Direction::UpRight, corner_cost)
-                            },
+                            }
                             Direction::UpLeft => {
                                 direction.corner_cost(Direction::UpLeft, corner_cost)
-                            },
+                            }
                             Direction::DownRight => {
                                 direction.corner_cost(Direction::DownRight, corner_cost)
-                            },
+                            }
                             Direction::DownLeft => {
                                 direction.corner_cost(Direction::DownLeft, corner_cost)
-                            },
+                            }
                             Direction::Center => 10000.0,
                         },
                     )
@@ -841,8 +867,10 @@ fn route_edge_in_subdivision(
                             DirectedPoint::new(x - 1, y - 1, Direction::DownRight),
                             diagonal_cost,
                         )]),
-                        Direction::DownRight => self_targets
-                            .chain([(DirectedPoint::new(x + 1, y + 1, Direction::UpLeft), diagonal_cost)]),
+                        Direction::DownRight => self_targets.chain([(
+                            DirectedPoint::new(x + 1, y + 1, Direction::UpLeft),
+                            diagonal_cost,
+                        )]),
                         Direction::DownLeft => self_targets.chain([(
                             DirectedPoint::new(x - 1, y + 1, Direction::UpRight),
                             diagonal_cost,
@@ -862,16 +890,13 @@ fn route_edge_in_subdivision(
                         None => continue,
                     };
 
-                    let full_weight = (weight + (*obstacle_map.get(&(x, y)).unwrap_or(&0.0))).max(-0.45);
+                    let full_weight =
+                        (weight + (*obstacle_map.get(&(x, y)).unwrap_or(&0.0))).max(-0.45);
 
                     if source_index != target_index
                         && graph.find_edge(source_index, target_index).is_none()
                     {
-                        graph.add_edge(
-                            source_index,
-                            target_index,
-                            full_weight,
-                        );
+                        graph.add_edge(source_index, target_index, full_weight);
                     }
                 }
             }
@@ -1069,27 +1094,34 @@ fn route_edge_in_subdivision(
     let start_index = *node_indices.get(&start_weight).unwrap();
     let end_index = *node_indices.get(&end_weight).unwrap();
 
-    let path_weights = dijkstra(&graph, start_index, Some(end_index), |e| *e.weight());
+    let path = astar(
+        &graph,
+        start_index,
+        |n| n == end_index,
+        |e| *e.weight(),
+        |n| graph[n].distance_to(&end, min_x, min_y, max_x, max_y),
+    );
 
-    let mut path = Vec::new();
-    let mut current_index = end_index;
-    while current_index != start_index {
-        path.push(current_index);
-        let edge = graph
-            .edges_directed(current_index, petgraph::Direction::Incoming)
-            .min_by(|edge1, edge2| {
-                path_weights
-                    .get(&edge1.source())
-                    .unwrap_or(&MAX)
-                    .partial_cmp(path_weights.get(&edge2.source()).unwrap_or(&MAX))
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
-            .unwrap();
-        current_index = edge.source();
-    }
+    let mut path = path.unwrap().1.clone();
 
-    path.push(start_index);
-    path.reverse();
+    // let mut current_index = end_index;
+    // while current_index != start_index {
+    //     path.push(current_index);
+    //     let edge = graph
+    //         .edges_directed(current_index, petgraph::Direction::Incoming)
+    //         .min_by(|edge1, edge2| {
+    //             path_weights
+    //                 .get(&edge1.source())
+    //                 .unwrap_or(&MAX)
+    //                 .partial_cmp(path_weights.get(&edge2.source()).unwrap_or(&MAX))
+    //                 .unwrap_or(std::cmp::Ordering::Equal)
+    //         })
+    //         .unwrap();
+    //     current_index = edge.source();
+    // }
+
+    // path.push(start_index);
+    // path.reverse();
 
     // Convert NodeIndex to DirectedPoint
     let directed_path: Vec<DirectedPoint> = path

@@ -84,8 +84,8 @@ def route_edge(
         hints=hints,
         config=core.RoutingConfig(
             canvas_padding=5,
-            subdivision_size=10,
-            overlap=3,
+            subdivision_size=7,
+            overlap=7,
             shape_margin=1,
             line_margin=1,
             neighborhood=core.Neighborhood.MOORE,

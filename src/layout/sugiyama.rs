@@ -25,6 +25,7 @@ impl SugiyamaLayout {
     }
 
     fn layout(&self, py: Python<'_>, graph: &CoreGraph) -> PyResult<Vec<(PyObject, Point)>> {
+        println!("Graph: {:?}", graph.graph);
         let mut raw_graph = graph.graph.clone();
         self.remove_cycles(&mut raw_graph, &graph.graph);
         let layer_map = self.layer_disconnected_components(&raw_graph);
@@ -155,53 +156,54 @@ impl SugiyamaLayout {
         &self,
         graph: &DiGraphMap<NodeIndex, ()>,
     ) -> HashMap<usize, usize> {
+        println!("Graph: {:?}", graph);
+        println!("Graph nodes: {:?}", graph.node_count());
+
+        let mut layers = HashMap::new();
         let mut vertex_sets = UnionFind::new(graph.node_bound());
+
         for edge in graph.edge_references() {
             let (a, b) = (edge.0, edge.1);
 
             // union the two vertices of the edge
             vertex_sets.union(graph.to_index(a), graph.to_index(b));
         }
+
         let labels = vertex_sets.into_labeling();
-        let subgraphs = HashMap::new();
+        let mut subgraphs = HashMap::<usize, DiGraphMap<NodeIndex, ()>>::new();
+
+        // Add nodes to subgraphs
         for node in graph.nodes() {
             println!("Node: {:?}, Label: {:?}", node, labels[graph.to_index(node)]);
             subgraphs
                 .entry(labels[graph.to_index(node)])
-                .or_insert_with(DiGraphMap::new())
+                .or_insert_with(|| DiGraphMap::new())
                 .add_node(node);
         }
 
-        // let visited = graph.visit_map();
-        // let mut dfs = Dfs::empty(graph);
-        // let mut layers = HashMap::new();
+        // Add edges to subgraphs
+        for edge in graph.edge_references() {
+            let (a, b) = (edge.0, edge.1);
+            let a_label = labels[graph.to_index(a)];
+            let b_label = labels[graph.to_index(b)];
 
-        // for node in graph.nodes() {
-        //     println!("Checking node {:?}", node);
-        //     if !visited.is_visited(&node) {
-        //         println!("Node not visited: {:?}", node);
-        //         let dfs_ref = &mut dfs;
-        //         dfs_ref.move_to(node);
-        //         let subgraph_nodes = dfs_ref.iter(graph).collect::<Vec<_>>();
-        //         // Now layer this subgraph
-        //         let mut subgraph = DiGraphMap::new();
+            // This should always be the case.
+            if a_label == b_label {
+                subgraphs
+                    .get_mut(&a_label)
+                    .unwrap()
+                    .add_edge(a, b, ());
+            }
+        }
 
-        //         for sub_node in &subgraph_nodes {
-        //             subgraph.add_node(*sub_node);
-        //             for edge in graph.edges(*sub_node) {
-        //                 subgraph.add_edge(edge.0, edge.1, ());
-        //             }
-        //         }
+        for (_, subgraph) in subgraphs {
+            let component_layers = self.longest_path_layering(&subgraph); // Assuming a function that can handle a subgraph
+            layers.extend(component_layers.into_iter().map(|(node, layer)| {
+                (graph.to_index(subgraph.from_index(node)), layer)
+            }));
+        }
 
-        //         println!("Subgraph: {:?}", subgraph);
-
-        //         let component_layers = self.longest_path_layering(&subgraph); // Assuming a function that can handle a subgraph
-        //         println!("Component layers: {:?}", component_layers);
-        //         layers.extend(component_layers);
-        //     }
-        // }
-        // layers
-        self.longest_path_layering(graph)
+        layers
     }
 
     fn longest_path_layering(&self, graph: &DiGraphMap<NodeIndex, ()>) -> HashMap<usize, usize> {

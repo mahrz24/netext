@@ -172,10 +172,12 @@ class ConsoleGraph:
 
         for node, data in graph.nodes(data=True):
             if not self._core_graph.contains_node(node):
+                print("Adding node", node)
                 self._core_graph.add_node(node, data)
             else:
                 self._core_graph.update_node_data(node, data)
-
+        print(graph)
+        print(self._core_graph.all_nodes())
         for u, v, data in graph.edges(data=True):
             self._core_graph.update_edge_data(u, v, data)
 

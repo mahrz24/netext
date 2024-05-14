@@ -51,10 +51,10 @@ impl CoreGraph {
         obj: &Bound<'_, PyAny>,
         data: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<()> {
-        let (index, exists) = self.object_map.insert_full(obj)?;
+        let (index, is_new) = self.object_map.insert_full(obj)?;
         let index = NodeIndex::new(index);
 
-        if !exists {
+        if is_new {
             self.graph.add_node(index);
             if let Some(data) = data {
                 self.data_map.insert(index, data.into_py(py));
