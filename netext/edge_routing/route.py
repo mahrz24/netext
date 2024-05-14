@@ -89,10 +89,10 @@ def route_edge(
             shape_margin=1,
             line_margin=1,
             neighborhood=core.Neighborhood.MOORE,
-            corner_cost=0.1,
+            corner_cost=2,
             diagonal_cost=100,
-            line_cost=1,
-            shape_cost=0.5,
+            line_cost=10,
+            shape_cost=10,
             hint_cost=0,
         ),
     )
