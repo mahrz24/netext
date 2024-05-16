@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use petgraph::algo::{greedy_feedback_arc_set};
+use petgraph::algo::greedy_feedback_arc_set;
 use petgraph::graph::NodeIndex;
-use petgraph::graphmap::{DiGraphMap};
+use petgraph::graphmap::DiGraphMap;
 use petgraph::unionfind::UnionFind;
-use petgraph::visit::{IntoEdgeReferences, VisitMap};
 use petgraph::visit::{Dfs, Visitable, Walker};
+use petgraph::visit::{IntoEdgeReferences, VisitMap};
 use petgraph::visit::{NodeIndexable, Topo};
 
 use pyo3::prelude::*;
@@ -25,7 +25,6 @@ impl SugiyamaLayout {
     }
 
     fn layout(&self, py: Python<'_>, graph: &CoreGraph) -> PyResult<Vec<(PyObject, Point)>> {
-        println!("Graph: {:?}", graph.graph);
         let mut raw_graph = graph.graph.clone();
         self.remove_cycles(&mut raw_graph, &graph.graph);
         let layer_map = self.layer_disconnected_components(&raw_graph);
@@ -39,8 +38,6 @@ impl SugiyamaLayout {
             })
             .into_iter()
             .collect();
-
-        println!("Layers: {:?}", int_layers);
 
         int_layers.sort_by_key(|(k, _v)| *k);
 
@@ -58,7 +55,9 @@ impl SugiyamaLayout {
         Ok(coordinates
             .into_iter()
             .filter_map(|(node, point)| {
-                let object = graph.object_map.get_index(graph.graph.from_index(node).index());
+                let object = graph
+                    .object_map
+                    .get_index(graph.graph.from_index(node).index());
                 object.map(|object| (object.clone_ref(py), point))
             })
             .collect())
@@ -121,9 +120,15 @@ impl SugiyamaLayout {
             let mut barycenters = Vec::new();
 
             for &node in &layer {
-                let neighbors = graph.neighbors_directed(graph.from_index(node), petgraph::Incoming);
+                let neighbors =
+                    graph.neighbors_directed(graph.from_index(node), petgraph::Incoming);
                 let neighbor_positions: Vec<_> = neighbors
-                    .map(|n| layers[i - 1].iter().position(|&x| x == graph.to_index(n)).unwrap_or(0))
+                    .map(|n| {
+                        layers[i - 1]
+                            .iter()
+                            .position(|&x| x == graph.to_index(n))
+                            .unwrap_or(0)
+                    })
                     .collect();
 
                 let barycenter = if neighbor_positions.is_empty() {
@@ -143,10 +148,13 @@ impl SugiyamaLayout {
         ordered_layers
     }
 
-    fn remove_cycles(&self, tgt_graph: &mut DiGraphMap<NodeIndex, ()>, src_graph: &DiGraphMap<NodeIndex, ()>) {
+    fn remove_cycles(
+        &self,
+        tgt_graph: &mut DiGraphMap<NodeIndex, ()>,
+        src_graph: &DiGraphMap<NodeIndex, ()>,
+    ) {
         let edges_to_remove = greedy_feedback_arc_set(src_graph);
         for edge in edges_to_remove {
-            println!("Removing edge {:?}", edge);
             tgt_graph.remove_edge(edge.0, edge.1);
             tgt_graph.add_edge(edge.1, edge.0, ());
         }
@@ -156,9 +164,6 @@ impl SugiyamaLayout {
         &self,
         graph: &DiGraphMap<NodeIndex, ()>,
     ) -> HashMap<usize, usize> {
-        println!("Graph: {:?}", graph);
-        println!("Graph nodes: {:?}", graph.node_count());
-
         let mut layers = HashMap::new();
         let mut vertex_sets = UnionFind::new(graph.node_bound());
 
@@ -174,7 +179,6 @@ impl SugiyamaLayout {
 
         // Add nodes to subgraphs
         for node in graph.nodes() {
-            println!("Node: {:?}, Label: {:?}", node, labels[graph.to_index(node)]);
             subgraphs
                 .entry(labels[graph.to_index(node)])
                 .or_insert_with(|| DiGraphMap::new())
@@ -189,18 +193,17 @@ impl SugiyamaLayout {
 
             // This should always be the case.
             if a_label == b_label {
-                subgraphs
-                    .get_mut(&a_label)
-                    .unwrap()
-                    .add_edge(a, b, ());
+                subgraphs.get_mut(&a_label).unwrap().add_edge(a, b, ());
             }
         }
 
         for (_, subgraph) in subgraphs {
             let component_layers = self.longest_path_layering(&subgraph); // Assuming a function that can handle a subgraph
-            layers.extend(component_layers.into_iter().map(|(node, layer)| {
-                (graph.to_index(subgraph.from_index(node)), layer)
-            }));
+            layers.extend(
+                component_layers
+                    .into_iter()
+                    .map(|(node, layer)| (graph.to_index(subgraph.from_index(node)), layer)),
+            );
         }
 
         layers

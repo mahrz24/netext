@@ -6,6 +6,7 @@ use petgraph::Graph;
 use pyo3::exceptions::PyIndexError;
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
+use tracing::event;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
@@ -15,9 +16,29 @@ mod geometry;
 mod graph;
 mod layout;
 mod pyindexset;
+mod lib_tracing;
 
+use lib_tracing::LibTracer;
 use geometry::Point;
 use graph::CoreGraph;
+use tracing::{span, Level};
+
+// use std::{fs::File, io::BufWriter};
+// use tracing_flame::FlameLayer;
+// use tracing_subscriber::{registry::Registry, prelude::*, fmt};
+
+// fn setup_global_subscriber() -> impl Drop {
+//     let fmt_layer = fmt::Layer::default();
+
+//     let (flame_layer, _guard) = FlameLayer::with_file("./tracing.folded").unwrap();
+
+//     let subscriber = Registry::default()
+//         .with(fmt_layer)
+//         .with(flame_layer);
+
+//     tracing::subscriber::set_global_default(subscriber).expect("Could not set global default");
+//     _guard
+// }
 
 #[derive(Debug)]
 struct Rectangle {
@@ -303,6 +324,9 @@ fn route_edge(
     hints: Vec<Point>,
     config: RoutingConfig,
 ) -> PyResult<Vec<DirectedPoint>> {
+    let span = span!(Level::INFO, "route_edge");
+    let _enter = span.enter();
+    event!(Level::INFO, "Routing edge from {:?} to {:?}", start, end);
     // Get the maximum and minimum coordinates
     let mut min_x = start.x.min(end.x);
     let mut min_y = start.y.min(end.y);
@@ -1140,6 +1164,8 @@ fn route_edge_in_subdivision(
 // A module to wrap the Python functions and structs
 #[pymodule]
 fn _core(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+
+
     m.add_class::<layout::sugiyama::SugiyamaLayout>()?;
     m.add_class::<layout::LayoutEngine>()?;
     m.add_class::<layout::static_::StaticLayout>()?;
@@ -1151,6 +1177,7 @@ fn _core(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<DirectedPoint>()?;
     m.add_class::<RoutingConfig>()?;
     m.add_class::<Neighborhood>()?;
+    m.add_class::<LibTracer>()?;
     m.add_function(wrap_pyfunction!(route_edge, m)?)?;
     Ok(())
 }

@@ -31,6 +31,8 @@ from rich.traceback import install
 
 install(show_locals=False)
 
+lib_tracer = core.LibTracer()
+
 
 class RenderState(Enum):
     INITIAL = "initial"
@@ -172,12 +174,9 @@ class ConsoleGraph:
 
         for node, data in graph.nodes(data=True):
             if not self._core_graph.contains_node(node):
-                print("Adding node", node)
                 self._core_graph.add_node(node, data)
             else:
                 self._core_graph.update_node_data(node, data)
-        print(graph)
-        print(self._core_graph.all_nodes())
         for u, v, data in graph.edges(data=True):
             self._core_graph.update_edge_data(u, v, data)
 
@@ -828,8 +827,6 @@ class ConsoleGraph:
             properties = NodeProperties.from_data_dict(data)
             lod = properties.lod_map(self._zoom_factor)
             # Get the zoomed position of the node
-            print(node)
-            print(self.node_positions)
             position = self.node_positions[node]
             position_view_space = Point(round(position.x * self.zoom_x), round(position.y * self.zoom_y))
 
