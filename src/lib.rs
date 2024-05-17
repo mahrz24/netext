@@ -6,21 +6,21 @@ use petgraph::Graph;
 use pyo3::exceptions::PyIndexError;
 use pyo3::prelude::*;
 use pyo3::wrap_pyfunction;
-use tracing::event;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::f64::MAX;
+use tracing::event;
 
 mod geometry;
 mod graph;
 mod layout;
-mod pyindexset;
 mod lib_tracing;
+mod pyindexset;
 
-use lib_tracing::LibTracer;
 use geometry::Point;
 use graph::CoreGraph;
+use lib_tracing::LibTracer;
 use tracing::{span, Level};
 
 // use std::{fs::File, io::BufWriter};
@@ -325,8 +325,8 @@ fn route_edge(
     config: RoutingConfig,
 ) -> PyResult<Vec<DirectedPoint>> {
     let span = span!(Level::INFO, "route_edge");
-    let _enter = span.enter();
     event!(Level::INFO, "Routing edge from {:?} to {:?}", start, end);
+    let _enter = span.enter();
     // Get the maximum and minimum coordinates
     let mut min_x = start.x.min(end.x);
     let mut min_y = start.y.min(end.y);
@@ -350,6 +350,8 @@ fn route_edge(
     let mut lines_in_subdivision = HashMap::<(i32, i32), HashSet<&Vec<Point>>>::new();
     let mut hints_in_subdivision = HashMap::<(i32, i32), HashSet<Point>>::new();
 
+    let gen_span = span!(Level::INFO, "generating graph");
+    let _gen_enter = gen_span.enter();
     for node in &shapes {
         for (x, y) in node.corner_points() {
             let (subdivision_x, subdivision_y) = directed_point_to_subdivision(
@@ -494,6 +496,10 @@ fn route_edge(
         .get(&(end_subdivision_x, end_subdivision_y))
         .unwrap();
 
+    drop(_gen_enter);
+
+    let path_span = span!(Level::INFO, "finding path");
+    let _path_enter = path_span.enter();
     let subdivision_path_weights = dijkstra(
         &subdivision_graph,
         start_subdivision_index,
@@ -524,6 +530,8 @@ fn route_edge(
     }
 
     subdivision_path.push_front(start_subdivision_index);
+
+    drop(_path_enter);
 
     // Add the last subdivision twice, as we need to route the endpoint within in the same subdivision
     // Or in the case of two subdivisions, we need to connect the routes coming from two sides
@@ -720,29 +728,41 @@ enum PointOrPlaceholder {
 }
 
 impl PointOrPlaceholder {
-    fn distance_to(&self, other: &TargetLocation, min_x: i32, min_y: i32, max_x: i32, max_y: i32) -> f64 {
+    fn distance_to(
+        &self,
+        other: &TargetLocation,
+        min_x: i32,
+        min_y: i32,
+        max_x: i32,
+        max_y: i32,
+    ) -> f64 {
         match (self, other) {
             (PointOrPlaceholder::Point(p1), TargetLocation::Concrete(p2)) => {
                 ((p1.x - p2.x).pow(2) as f64 + (p1.y - p2.y).pow(2) as f64).sqrt()
-            },
-            (PointOrPlaceholder::Point(p1), TargetLocation::Multiple(ps)) => {
-                ps.iter()
-                    .map(|p2| ((p1.x - p2.x).pow(2) as f64 + (p1.y - p2.y).pow(2) as f64).sqrt())
-                    .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                    .unwrap_or(0.0)
-            },
-            (PointOrPlaceholder::Point(p1), TargetLocation::OtherSubdivision(dir)) => {
-                match dir {
-                    Direction::Up => (p1.y - min_y).max(0) as f64,
-                    Direction::Down => (max_y - p1.y).max(0) as f64,
-                    Direction::Left => (p1.x - min_x).max(0) as f64,
-                    Direction::Right => (max_x - p1.x).max(0) as f64,
-                    Direction::UpRight => ((p1.y - min_y).max(0).pow(2) + (max_x - p1.x).max(0).pow(2)) as f64,
-                    Direction::UpLeft => ((p1.y - min_y).max(0).pow(2) + (p1.x - min_x).max(0).pow(2)) as f64,
-                    Direction::DownRight => ((max_y - p1.y).max(0).pow(2) + (max_x - p1.x).max(0).pow(2)) as f64,
-                    Direction::DownLeft => ((max_y - p1.y).max(0).pow(2) + (p1.x - min_x).max(0).pow(2)) as f64,
-                    _ => 0.0,
+            }
+            (PointOrPlaceholder::Point(p1), TargetLocation::Multiple(ps)) => ps
+                .iter()
+                .map(|p2| ((p1.x - p2.x).pow(2) as f64 + (p1.y - p2.y).pow(2) as f64).sqrt())
+                .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                .unwrap_or(0.0),
+            (PointOrPlaceholder::Point(p1), TargetLocation::OtherSubdivision(dir)) => match dir {
+                Direction::Up => (p1.y - min_y).max(0) as f64,
+                Direction::Down => (max_y - p1.y).max(0) as f64,
+                Direction::Left => (p1.x - min_x).max(0) as f64,
+                Direction::Right => (max_x - p1.x).max(0) as f64,
+                Direction::UpRight => {
+                    ((p1.y - min_y).max(0).pow(2) + (max_x - p1.x).max(0).pow(2)) as f64
                 }
+                Direction::UpLeft => {
+                    ((p1.y - min_y).max(0).pow(2) + (p1.x - min_x).max(0).pow(2)) as f64
+                }
+                Direction::DownRight => {
+                    ((max_y - p1.y).max(0).pow(2) + (max_x - p1.x).max(0).pow(2)) as f64
+                }
+                Direction::DownLeft => {
+                    ((max_y - p1.y).max(0).pow(2) + (p1.x - min_x).max(0).pow(2)) as f64
+                }
+                _ => 0.0,
             },
             _ => 0.0,
         }
@@ -758,6 +778,9 @@ fn route_edge_in_subdivision(
     hints: &HashSet<Point>,
     config: &RoutingConfig,
 ) -> Vec<DirectedPoint> {
+    let span = span!(Level::INFO, "route_edge_in_subdivision");
+    let _enter = span.enter();
+
     let mut min_x = range.top_left.x;
     let mut min_y = range.top_left.y;
     let mut max_x = range.bottom_right.x;
@@ -767,6 +790,9 @@ fn route_edge_in_subdivision(
     min_y -= config.overlap;
     max_x += config.overlap;
     max_y += config.overlap;
+
+    let gen_span = span!(Level::INFO, "generating graph");
+    let _gen_enter = gen_span.enter();
 
     // Create a graph
     let mut graph = Graph::<PointOrPlaceholder, f64>::new();
@@ -1109,6 +1135,8 @@ fn route_edge_in_subdivision(
         )),
     };
 
+    drop(_gen_enter);
+
     let end_weight: PointOrPlaceholder = match end {
         TargetLocation::Multiple(_) => PointOrPlaceholder::EndPlaceholder,
         TargetLocation::Concrete(end_point) => PointOrPlaceholder::Point(end_point),
@@ -1164,8 +1192,6 @@ fn route_edge_in_subdivision(
 // A module to wrap the Python functions and structs
 #[pymodule]
 fn _core(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
-
-
     m.add_class::<layout::sugiyama::SugiyamaLayout>()?;
     m.add_class::<layout::LayoutEngine>()?;
     m.add_class::<layout::static_::StaticLayout>()?;
