@@ -15,10 +15,11 @@ from netext.properties.edge import EdgeProperties
 from netext.properties.shape import JustContent
 from netext.shapes.shape import JustContentShape
 from netext.rendering.segment_buffer import Layer, StripBuffer, ZIndex
-
+import netext._core as core
 
 def rasterize_edge(
     console: Console,
+    edge_router: core.EdgeRouter,
     u_buffer: NodeBuffer,
     v_buffer: NodeBuffer,
     all_nodes: list[NodeBuffer],
@@ -61,10 +62,9 @@ def rasterize_edge(
         edge_path = route_edge(
             start=start,
             end=end,
+            edge_router=edge_router,
             start_helper=start_helper,
             end_helper=end_helper,
-            all_nodes=non_start_end_nodes,
-            routed_edges=routed_edges,
         )
 
         # We cut the edge segments with the nodes to get rid of the

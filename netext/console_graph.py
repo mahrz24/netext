@@ -166,6 +166,7 @@ class ConsoleGraph:
         self._max_height = max_height
 
         self.layout_engine = layout_engine
+        self.edge_router = core.EdgeRouter()
 
         # Move efficient transformation into the core graph
         self._core_graph = core.CoreGraph.from_edges(
@@ -382,6 +383,7 @@ class ConsoleGraph:
 
         result = rasterize_edge(
             self.console,
+            self.edge_router,
             self.node_buffers[u],
             self.node_buffers[v],
             list(self.node_buffers.values()),
@@ -664,6 +666,7 @@ class ConsoleGraph:
 
         result = rasterize_edge(
             self.console,
+            self.edge_router,
             self.node_buffers[u],
             self.node_buffers[v],
             list(self.node_buffers.values()),
@@ -837,6 +840,19 @@ class ConsoleGraph:
                 lod=lod,
                 port_side_assignments=self.port_side_assignments[node],
             )
+
+            self.edge_router.add_node(
+                node,
+                core.Shape(
+                    top_left=core.Point(x=node_buffer.left_x, y=node_buffer.top_y),
+                    bottom_right=core.Point(x=node_buffer.right_x, y=node_buffer.bottom_y),
+                ),
+                # core.Shape(
+                #     top_left = core.Point(node_buffer.center.x - node_buffer.width // 2, node_buffer.center.y - node_buffer.height // 2),
+                #     bottom_right = core.Point(node_buffer.center.x + node_buffer.width // 2, node_buffer.center.y + node_buffer.height // 2),
+                # ),
+            )
+
             node_buffer.center = position_view_space
             self.node_buffers[node] = node_buffer
 
@@ -874,6 +890,7 @@ class ConsoleGraph:
 
             result = rasterize_edge(
                 self.console,
+                self.edge_router,
                 self.node_buffers[u],
                 self.node_buffers[v],
                 all_node_buffers,

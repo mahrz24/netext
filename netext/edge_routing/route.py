@@ -8,8 +8,7 @@ from netext.node_rasterizer import NodeBuffer
 def route_edge(
     start: Point,
     end: Point,
-    all_nodes: list[NodeBuffer],
-    routed_edges: list[EdgeLayout],
+    edge_router: core.EdgeRouter,
     start_helper: Point | None = None,
     end_helper: Point | None = None,
 ) -> EdgePath:
@@ -59,29 +58,16 @@ def route_edge(
         else:
             end_direction = Direction.DOWN
 
-    shapes = [
-        core.Shape(
-            top_left=core.Point(x=node.left_x, y=node.top_y), bottom_right=core.Point(x=node.right_x, y=node.bottom_y)
-        )
-        for node in all_nodes
-    ]
-    lines = [[core.Point(x=point[0].x, y=point[0].y) for point in edge.path.directed_points] for edge in routed_edges]
-
-    hints = []
-
-    if start.x != end.x and start.y != end.y:
-        hints.append(core.Point(x=start.x, y=end.y))
-        hints.append(core.Point(x=end.x, y=start.y))
+    # if start.x != end.x and start.y != end.y:
+    #     hints.append(core.Point(x=start.x, y=end.y))
+    #     hints.append(core.Point(x=end.x, y=start.y))
         # hints.append(core.Point(x=(start.x + end.x) // 2, y=(start.y + end.y) // 2))
 
-    path = core.route_edge(
+    path = edge_router.route_edge(
         start=core.Point(x=start.x, y=start.y),
         end=core.Point(x=end.x, y=end.y),
         start_direction=start_direction,
         end_direction=end_direction,
-        shapes=shapes,
-        lines=lines,
-        hints=hints,
         config=core.RoutingConfig(
             canvas_padding=5,
             subdivision_size=7,
