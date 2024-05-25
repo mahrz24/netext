@@ -715,7 +715,7 @@ class ConsoleGraph:
         # Add 0,0 for nodes that were not positioned
         for node in self._core_graph.all_nodes():
             if node not in self.node_positions:
-                self.node_positions[node] = Point(-25, -10)
+                self.node_positions[node] = Point(25, -10)
 
         self.offset: FloatPoint = FloatPoint(0, 0)
 

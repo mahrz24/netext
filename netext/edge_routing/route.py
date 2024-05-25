@@ -69,17 +69,13 @@ def route_edge(
         start_direction=start_direction,
         end_direction=end_direction,
         config=core.RoutingConfig(
-            canvas_padding=5,
-            subdivision_size=7,
-            overlap=7,
-            shape_margin=1,
-            line_margin=1,
             neighborhood=core.Neighborhood.MOORE,
-            corner_cost=2,
-            diagonal_cost=100,
+            corner_cost=1,
+            diagonal_cost=10,
             line_cost=10,
             shape_cost=10,
-            hint_cost=0,
+            shape_distance_cost=0,
+            line_distance_cost=0
         ),
     )
 

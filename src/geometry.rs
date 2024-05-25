@@ -1,4 +1,4 @@
-use pyo3::{exceptions::PyIndexError, prelude::*};
+use pyo3::{class, exceptions::PyIndexError, prelude::*};
 
 #[pyclass]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Copy)]
@@ -92,6 +92,30 @@ pub enum Direction {
 }
 
 impl Direction {
+    pub fn opposite(&self) -> Direction {
+        match self {
+            Direction::Up => Direction::Down,
+            Direction::Down => Direction::Up,
+            Direction::Left => Direction::Right,
+            Direction::Right => Direction::Left,
+            Direction::UpRight => Direction::DownLeft,
+            Direction::DownLeft => Direction::UpRight,
+            Direction::UpLeft => Direction::DownRight,
+            Direction::DownRight => Direction::UpLeft,
+            Direction::Center => Direction::Center,
+        }
+    }
+
+    pub fn is_diagonal(&self) -> bool {
+        match self {
+            Direction::UpRight
+            | Direction::UpLeft
+            | Direction::DownRight
+            | Direction::DownLeft => true,
+            _ => false,
+        }
+    }
+
     fn corner_cost(&self, other: Direction, corner_cost: f64) -> f64 {
         match (self, other) {
             (Direction::Up, Direction::Down) => 1.0,
@@ -106,7 +130,7 @@ impl Direction {
         }
     }
 
-    fn all_directions(neighborhood: Neighborhood) -> Vec<Direction> {
+    pub fn all_directions(neighborhood: Neighborhood) -> Vec<Direction> {
         match neighborhood {
             Neighborhood::Orthogonal => vec![
                 Direction::Center,
@@ -129,7 +153,7 @@ impl Direction {
         }
     }
 
-    fn other_directions(&self, neighborhood: Neighborhood) -> Vec<Direction> {
+    pub fn other_directions(&self, neighborhood: Neighborhood) -> Vec<Direction> {
         Direction::all_directions(neighborhood)
             .iter()
             .filter(|&d| *d != *self)
@@ -141,15 +165,15 @@ impl Direction {
 #[pyclass]
 #[derive(Clone, Eq, PartialEq, Hash, Copy, Debug)]
 pub struct DirectedPoint {
-    x: i32,
-    y: i32,
-    direction: Direction,
+    pub x: i32,
+    pub y: i32,
+    pub direction: Direction,
 }
 
 #[pymethods]
 impl DirectedPoint {
     #[new]
-    fn new(x: i32, y: i32, direction: Direction) -> Self {
+    pub fn new(x: i32, y: i32, direction: Direction) -> Self {
         DirectedPoint { x, y, direction }
     }
 
