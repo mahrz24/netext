@@ -3,12 +3,13 @@ from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.geometry import Magnet
+from netext.layout_engines import StaticLayout
 from rich import print
 from rich.style import Style
 
+
 import networkx as nx
 
-from netext.layout_engines.static import StaticLayout
 
 for routing, drawing in [
     (EdgeRoutingMode.ORTHOGONAL, EdgeSegmentDrawingMode.BOX),

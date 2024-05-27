@@ -1,7 +1,7 @@
 from netext import ConsoleGraph
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
-from netext.layout_engines.static import StaticLayout
+from netext.layout_engines import StaticLayout
 from rich import print
 from rich.style import Style
 
@@ -9,10 +9,10 @@ import networkx as nx
 
 g = nx.Graph()
 g.add_node(1, **{"$x": 1, "$y": 1})
-g.add_node(2, **{"$x": 1, "$y": 30})
-g.add_node(3, **{"$x": 30, "$y": 30})
-g.add_node(4, **{"$x": 30, "$y": 1})
-#g.add_node(5, **{"$x": 5, "$y": 7})
+g.add_node(2, **{"$x": 1, "$y": 10})
+g.add_node(3, **{"$x": 10, "$y": 10})
+g.add_node(4, **{"$x": 10, "$y": 1})
+
 
 g.add_edge(
     1,

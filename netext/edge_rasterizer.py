@@ -17,13 +17,12 @@ from netext.shapes.shape import JustContentShape
 from netext.rendering.segment_buffer import Layer, StripBuffer, ZIndex
 import netext._core as core
 
+
 def rasterize_edge(
     console: Console,
     edge_router: core.EdgeRouter,
     u_buffer: NodeBuffer,
     v_buffer: NodeBuffer,
-    all_nodes: list[NodeBuffer],
-    routed_edges: list[EdgeLayout],
     properties: EdgeProperties,
     lod: int = 1,
     edge_layout: EdgeLayout | None = None,
@@ -56,8 +55,6 @@ def rasterize_edge(
         routing_hints=[],  # TODO: If doing relayout, the edge input should contain the existing segments
     )
 
-    non_start_end_nodes = [node for node in all_nodes if node not in [u_buffer, v_buffer]]
-
     if edge_layout is None:
         edge_path = route_edge(
             start=start,
@@ -76,12 +73,15 @@ def rasterize_edge(
     else:
         edge_path = edge_layout.path
 
-    strips = rasterize_edge_path(edge_path, style=properties.style, edge_segment_drawing_mode=properties.segment_drawing_mode)
+    strips = rasterize_edge_path(
+        edge_path, style=properties.style, edge_segment_drawing_mode=properties.segment_drawing_mode
+    )
 
     z_index = ZIndex(layer=Layer.EDGES)
 
-    if routed_edges:
-        z_index.layer_index += len(routed_edges)
+    # TODO Need to add this back in
+    # if routed_edges:
+    #     z_index.layer_index += len(routed_edges)
 
     edge_layout = EdgeLayout(input=edge_input, path=edge_path, z_index=z_index)
 

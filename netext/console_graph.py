@@ -386,8 +386,6 @@ class ConsoleGraph:
             self._edge_router,
             self.node_buffers[u],
             self.node_buffers[v],
-            list(self.node_buffers.values()),
-            list(self.edge_layouts.values()),
             properties,
             edge_lod,
             port_positions=self.port_positions,
@@ -669,8 +667,6 @@ class ConsoleGraph:
             self._edge_router,
             self.node_buffers[u],
             self.node_buffers[v],
-            list(self.node_buffers.values()),
-            list(self.edge_layouts.values()),
             properties,
             edge_lod,
             edge_layout=old_edge_layout,
@@ -705,8 +701,8 @@ class ConsoleGraph:
             self._core_graph.update_node_size(
                 node,
                 core.Size(
-                    self.node_buffers_for_layout[node].layout_width + 4,
-                    self.node_buffers_for_layout[node].layout_height + 2,
+                    self.node_buffers_for_layout[node].layout_width + 10,
+                    self.node_buffers_for_layout[node].layout_height + 5,
                 ),
             )
 
@@ -719,11 +715,6 @@ class ConsoleGraph:
 
         # Position the nodes and store these original positions
         self.node_positions = dict([(n, Point(p.x, p.y)) for (n, p) in self._layout_engine.layout(self._core_graph)])
-
-        # Add 0,0 for nodes that were not positioned
-        for node in self._core_graph.all_nodes():
-            if node not in self.node_positions:
-                self.node_positions[node] = Point(25, -10)
 
         self.offset: FloatPoint = FloatPoint(0, 0)
 
@@ -849,17 +840,17 @@ class ConsoleGraph:
                 port_side_assignments=self.port_side_assignments[node],
             )
 
+            node_buffer.center = position_view_space
+            self.node_buffers[node] = node_buffer
+
+            # Pass on the exact node positions to the edge router
             placed_node = core.PlacedRectangularNode(
                 center=core.Point(node_buffer.center.x, node_buffer.center.y),
                 node=core.RectangularNode(
                     size=core.Size(node_buffer.width, node_buffer.height),
                 ),
             )
-
             self._edge_router.add_node(node, placed_node)
-
-            node_buffer.center = position_view_space
-            self.node_buffers[node] = node_buffer
 
             self._determine_port_positions(node, lod, properties)
 
@@ -898,8 +889,6 @@ class ConsoleGraph:
                 self._edge_router,
                 self.node_buffers[u],
                 self.node_buffers[v],
-                all_node_buffers,
-                edge_layouts,
                 properties,
                 edge_lod,
                 port_positions=self.port_positions,

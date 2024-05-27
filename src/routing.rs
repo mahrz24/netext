@@ -6,7 +6,10 @@ use std::collections::HashMap;
 use pyo3::prelude::*;
 
 use crate::{
-    geometry::{BoundingBox, DirectedPoint, Direction, Neighborhood, PlacedNode, PlacedRectangularNode, Point},
+    geometry::{
+        BoundingBox, DirectedPoint, Direction, Neighborhood, PlacedNode, PlacedRectangularNode,
+        Point,
+    },
     pyindexset::PyIndexSet,
 };
 
@@ -14,12 +17,12 @@ use crate::{
 #[derive(Clone, PartialEq, Debug)]
 pub struct RoutingConfig {
     neighborhood: Neighborhood,
-    corner_cost: f64,
-    diagonal_cost: f64,
-    line_cost: f64,
-    shape_cost: f64,
-    shape_distance_cost: f64,
-    line_distance_cost: f64,
+    corner_cost: i32,
+    diagonal_cost: i32,
+    line_cost: i32,
+    shape_cost: i32,
+    shape_distance_cost: i32,
+    line_distance_cost: i32,
 }
 
 #[pymethods]
@@ -27,12 +30,12 @@ impl RoutingConfig {
     #[new]
     fn new(
         neighborhood: Neighborhood,
-        corner_cost: f64,
-        diagonal_cost: f64,
-        line_cost: f64,
-        shape_cost: f64,
-        shape_distance_cost: f64,
-        line_distance_cost: f64,
+        corner_cost: i32,
+        diagonal_cost: i32,
+        line_cost: i32,
+        shape_cost: i32,
+        shape_distance_cost: i32,
+        line_distance_cost: i32,
     ) -> Self {
         RoutingConfig {
             neighborhood,
@@ -50,18 +53,18 @@ impl Default for RoutingConfig {
     fn default() -> Self {
         RoutingConfig {
             neighborhood: Neighborhood::Orthogonal,
-            corner_cost: 1.0,
-            diagonal_cost: 1.0,
-            line_cost: 1.0,
-            shape_cost: 1.0,
-            shape_distance_cost: 0.0,
-            line_distance_cost: 0.0,
+            corner_cost: 1,
+            diagonal_cost: 1,
+            line_cost: 1,
+            shape_cost: 1,
+            shape_distance_cost: 0,
+            line_distance_cost: 0,
         }
     }
 }
 
 fn heuristic(a: &DirectedPoint, b: &DirectedPoint) -> i32 {
-    (a.x - b.x).abs() + (a.y - b.y).abs()
+    ((((a.x - b.x).pow(2) + (a.y - b.y).pow(2)) as f64).sqrt() as i32) * 10
 }
 
 fn get_neighbors(node: &DirectedPoint, neighborhood: Neighborhood) -> Vec<DirectedPoint> {
@@ -127,7 +130,10 @@ impl RTreeObject for PlacedRectangularNode {
     fn envelope(&self) -> Self::Envelope {
         let top_left = self.top_left();
         let bottom_right = self.bottom_right();
-        rstar::AABB::from_corners([top_left.x as f32, top_left.y as f32], [bottom_right.x as f32, bottom_right.y as f32])
+        rstar::AABB::from_corners(
+            [top_left.x as f32, top_left.y as f32],
+            [bottom_right.x as f32, bottom_right.y as f32],
+        )
     }
 }
 
@@ -135,7 +141,10 @@ impl RTreeObject for DirectedPoint {
     type Envelope = rstar::AABB<[f32; 2]>;
 
     fn envelope(&self) -> Self::Envelope {
-        rstar::AABB::from_corners([self.x as f32, self.y as f32], [self.x as f32, self.y as f32])
+        rstar::AABB::from_corners(
+            [self.x as f32, self.y as f32],
+            [self.x as f32, self.y as f32],
+        )
     }
 }
 
@@ -151,7 +160,11 @@ impl EdgeRouter {
         }
     }
 
-    fn add_node(&mut self, node: &Bound<PyAny>, placed_node: PlacedRectangularNode) -> PyResult<()> {
+    fn add_node(
+        &mut self,
+        node: &Bound<PyAny>,
+        placed_node: PlacedRectangularNode,
+    ) -> PyResult<()> {
         // TODO check for inserting twice
         let node_index = self.object_map.insert_full(node)?.0;
         self.placed_nodes.insert(node_index, placed_node);
@@ -201,10 +214,14 @@ impl EdgeRouter {
         config: &RoutingConfig,
     ) -> i32 {
         // TODO Use rtrees to find shapes
-        let mut cost = 0.0;
+        let mut cost: i32 = 0;
 
         if src.x != dst.x || src.y != dst.y {
-            cost += 1.0;
+            if src.direction.is_diagonal() {
+                cost += 14+config.diagonal_cost;
+            } else {
+                cost += 10;
+            }
         }
 
         // Add corner cost if the direction turns (going from left to right is not a corner)
@@ -212,19 +229,19 @@ impl EdgeRouter {
             cost += config.corner_cost;
         }
 
-        // Add diagonal cost if the direction is diagonal
-        if src.direction.is_diagonal() {
-            cost += config.diagonal_cost;
-        }
-
         // Add shape cost if the edge intersects a shape
-        for node in self.placed_node_tree.locate_in_envelope_intersecting(&dst.envelope()) {
-            if node.contains_point(dst) {
-                cost += config.shape_cost;
+        if config.shape_cost > 0 {
+            for node in self
+                .placed_node_tree
+                .locate_in_envelope_intersecting(&dst.envelope())
+            {
+                if node.contains_point(dst) {
+                    cost += config.shape_cost;
+                }
             }
         }
 
-        cost.round() as i32
+        cost
     }
 
     fn route_edge(

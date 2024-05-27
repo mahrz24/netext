@@ -4,13 +4,12 @@ use petgraph::algo::greedy_feedback_arc_set;
 use petgraph::graph::NodeIndex;
 use petgraph::graphmap::DiGraphMap;
 use petgraph::unionfind::UnionFind;
-use petgraph::visit::{IntoEdgeReferences};
+use petgraph::visit::IntoEdgeReferences;
 use petgraph::visit::{NodeIndexable, Topo};
 
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 
-use crate::geometry::{Layoutable, Size};
+use crate::geometry::Size;
 use crate::{geometry::Point, graph::CoreGraph};
 
 use super::LayoutEngine;
@@ -27,7 +26,7 @@ impl SugiyamaLayout {
 
     fn layout(&self, py: Python<'_>, graph: &CoreGraph) -> PyResult<Vec<(PyObject, Point)>> {
         let mut raw_graph = graph.graph.clone();
-        println!("{:?}", raw_graph);
+
         self.remove_cycles(&mut raw_graph, &graph.graph);
         let layer_map = self.layer_disconnected_components(&raw_graph);
 
@@ -78,10 +77,12 @@ impl SugiyamaLayout {
         let mut layer_widths = HashMap::new();
 
         for (layer_index, layer) in layers.iter().enumerate() {
-            let node_sizes: Vec<Option<&Size>> = layer.into_iter().map(|&node|
+            let node_sizes: Vec<Option<&Size>> = layer
+                .into_iter()
+                .map(|&node|
                 // TODO Access pattern is not nice here, this should be private for the core graph
-                graph.size_map.get(&graph.graph.from_index(node))
-            ).collect();
+                graph.size_map.get(&graph.graph.from_index(node)))
+                .collect();
 
             let layer_height = node_sizes.iter().fold(0, |acc, size| {
                 acc.max(size.unwrap_or(&Size::new(0, 0)).height())
@@ -182,8 +183,6 @@ impl SugiyamaLayout {
         let mut layers = HashMap::new();
         let mut vertex_sets = UnionFind::new(graph.node_bound());
 
-        println!("{:?}", graph.nodes().count());
-
         for edge in graph.edge_references() {
             let (a, b) = (edge.0, edge.1);
 
@@ -192,7 +191,7 @@ impl SugiyamaLayout {
         }
 
         let labels = vertex_sets.into_labeling();
-        println!("{:?}", labels.len());
+
         let mut subgraphs = HashMap::<usize, DiGraphMap<NodeIndex, ()>>::new();
 
         // Add nodes to subgraphs
@@ -240,14 +239,15 @@ impl SugiyamaLayout {
             return layers;
         }
 
-        println!("{:?}", graph);
-
         // Initialize layering from the source nodes
-        for node in graph.nodes().filter(|n| graph.neighbors_directed(*n, petgraph::Incoming).next().is_none()) {
+        for node in graph.nodes().filter(|n| {
+            graph
+                .neighbors_directed(*n, petgraph::Incoming)
+                .next()
+                .is_none()
+        }) {
             layers.insert(graph.to_index(node), 0);
-            println!("{:?}", node);
         }
-        println!("{:?}", layers.keys().len());
 
         // Process nodes in topological order
         while let Some(node_idx) = topo.next(graph) {
@@ -257,11 +257,9 @@ impl SugiyamaLayout {
                 .max()
                 .unwrap_or(0); // Use 0 if no predecessors (source node)
 
-                println!("{:?}", node_idx);
-
             layers.insert(graph.to_index(node_idx), node_layer);
         }
-        println!("{:?}", layers.keys().len());
+
         layers
     }
 }
