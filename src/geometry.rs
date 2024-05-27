@@ -1,4 +1,4 @@
-use pyo3::{exceptions::PyIndexError, prelude::*};
+use pyo3::{exceptions::PyIndexError, prelude::*, PyClass};
 
 pub trait PointLike {
     fn x(&self) -> i32;
@@ -6,8 +6,8 @@ pub trait PointLike {
 }
 
 pub trait BoundingBox {
-    fn top_left(&self) -> &Point;
-    fn bottom_right(&self) -> &Point;
+    fn top_left(&self) -> Point;
+    fn bottom_right(&self) -> Point;
 
     fn bounding_box(&self) -> Rectangle {
         Rectangle {
@@ -17,13 +17,12 @@ pub trait BoundingBox {
     }
 }
 
-
-pub trait Layoutable {
-    fn size(&self) -> Size;
+pub trait PlacedNode: BoundingBox {
+    fn contains_point(&self, point: &impl PointLike) -> bool;
 }
 
-pub trait Shape: BoundingBox + Layoutable {
-    fn contains_point(&self, point: &impl PointLike) -> bool;
+pub trait Layoutable: PyClass {
+    fn size(&self) -> Size;
 }
 
 #[pyclass]
@@ -87,7 +86,7 @@ impl PointLike for Point {
 }
 
 #[derive(Debug)]
-struct Rectangle {
+pub struct Rectangle {
     top_left: Point,
     bottom_right: Point,
 }
@@ -95,49 +94,66 @@ struct Rectangle {
 
 #[pyclass]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Copy)]
-pub struct NodeShape {
-    pub top_left: Point,
-    pub bottom_right: Point,
+pub struct RectangularNode {
+    pub size: Size,
 }
 
-impl BoundingBox for NodeShape {
-    fn top_left(&self) -> &Point {
-        &self.top_left
-    }
 
-    fn bottom_right(&self) -> &Point {
-        &self.bottom_right
-    }
-}
-
-impl Layoutable for NodeShape {
+impl Layoutable for RectangularNode {
     fn size(&self) -> Size {
-        Size {
-            width: self.bottom_right.x - self.top_left.x,
-            height: self.bottom_right.y - self.top_left.y,
+        self.size
+    }
+}
+
+#[pymethods]
+impl RectangularNode {
+    #[new]
+    fn new(size: Size) -> Self {
+        RectangularNode {
+            size
         }
     }
 }
 
-impl Shape for NodeShape {
-    fn contains_point(&self, point: &impl PointLike) -> bool {
-        point.x() >= self.top_left.x
-            && point.x() <= self.bottom_right.x
-            && point.y() >= self.top_left.y
-            && point.y() <= self.bottom_right.y
+#[pyclass]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Copy)]
+pub struct PlacedRectangularNode {
+    pub node: RectangularNode,
+    pub center: Point,
+}
+
+impl BoundingBox for PlacedRectangularNode {
+    fn top_left(&self) -> Point {
+        Point {
+            x: self.center.x - self.node.size.width / 2,
+            y: self.center.y - self.node.size.height / 2,
+        }
+    }
+
+    fn bottom_right(&self) -> Point {
+        Point {
+            x: self.center.x + self.node.size.width / 2,
+            y: self.center.y + self.node.size.height / 2,
+        }
     }
 }
 
 
-
+impl PlacedNode for PlacedRectangularNode {
+    fn contains_point(&self, point: &impl PointLike) -> bool {
+        point.x() >= self.top_left().x
+            && point.x() <= self.bottom_right().x
+            && point.y() >= self.top_left().y
+            && point.y() <= self.bottom_right().y
+    }
+}
 
 #[pymethods]
-impl NodeShape {
+impl PlacedRectangularNode {
     #[new]
-    fn new(top_left: Point, bottom_right: Point) -> Self {
-        NodeShape {
-            top_left,
-            bottom_right,
+    fn new(center: Point, node: RectangularNode) -> Self {
+        PlacedRectangularNode {
+            center, node
         }
     }
 }

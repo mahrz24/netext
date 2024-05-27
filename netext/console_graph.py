@@ -165,8 +165,8 @@ class ConsoleGraph:
         self._max_width = max_width
         self._max_height = max_height
 
-        self.layout_engine = layout_engine
-        self.edge_router = core.EdgeRouter()
+        self._layout_engine = layout_engine
+        self._edge_router = core.EdgeRouter()
 
         # Move efficient transformation into the core graph
         self._core_graph = core.CoreGraph.from_edges(
@@ -383,7 +383,7 @@ class ConsoleGraph:
 
         result = rasterize_edge(
             self.console,
-            self.edge_router,
+            self._edge_router,
             self.node_buffers[u],
             self.node_buffers[v],
             list(self.node_buffers.values()),
@@ -666,7 +666,7 @@ class ConsoleGraph:
 
         result = rasterize_edge(
             self.console,
-            self.edge_router,
+            self._edge_router,
             self.node_buffers[u],
             self.node_buffers[v],
             list(self.node_buffers.values()),
@@ -701,6 +701,14 @@ class ConsoleGraph:
             )
             for node in self._core_graph.all_nodes()
         }
+        for node in self._core_graph.all_nodes():
+            self._core_graph.update_node_size(
+                node,
+                core.Size(
+                    self.node_buffers_for_layout[node].layout_width + 4,
+                    self.node_buffers_for_layout[node].layout_height + 2,
+                ),
+            )
 
     def _transition_compute_node_layout(self) -> None:
         # Store the node buffers in the graph itself
@@ -710,7 +718,7 @@ class ConsoleGraph:
             )
 
         # Position the nodes and store these original positions
-        self.node_positions = dict([(n, Point(p.x, p.y)) for (n, p) in self.layout_engine.layout(self._core_graph)])
+        self.node_positions = dict([(n, Point(p.x, p.y)) for (n, p) in self._layout_engine.layout(self._core_graph)])
 
         # Add 0,0 for nodes that were not positioned
         for node in self._core_graph.all_nodes():
@@ -841,15 +849,14 @@ class ConsoleGraph:
                 port_side_assignments=self.port_side_assignments[node],
             )
 
-            core_shape = core.NodeShape(
-                top_left=core.Point(x=node_buffer.left_x, y=node_buffer.top_y),
-                bottom_right=core.Point(x=node_buffer.right_x, y=node_buffer.bottom_y),
+            placed_node = core.PlacedRectangularNode(
+                center=core.Point(node_buffer.center.x, node_buffer.center.y),
+                node=core.RectangularNode(
+                    size=core.Size(node_buffer.width, node_buffer.height),
+                ),
             )
-            print(node_buffer.left_x, node_buffer.top_y, node_buffer.right_x, node_buffer.bottom_y)
-            print(core_shape)
 
-            self._core_graph.update_node_shape(node, core_shape)
-            self.edge_router.add_node(node, core_shape)
+            self._edge_router.add_node(node, placed_node)
 
             node_buffer.center = position_view_space
             self.node_buffers[node] = node_buffer
@@ -888,7 +895,7 @@ class ConsoleGraph:
 
             result = rasterize_edge(
                 self.console,
-                self.edge_router,
+                self._edge_router,
                 self.node_buffers[u],
                 self.node_buffers[v],
                 all_node_buffers,

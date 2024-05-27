@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyAny;
 use std::collections::HashMap;
 
-use crate::geometry::NodeShape;
+use crate::geometry::{Layoutable, Size};
 use crate::pyindexset::PyIndexSet;
 
 #[pyclass]
@@ -12,7 +12,7 @@ pub struct CoreGraph {
     pub graph: DiGraphMap<NodeIndex, ()>,
     pub object_map: PyIndexSet,
     data_map: HashMap<NodeIndex, PyObject>,
-    pub node_shape_map: HashMap<NodeIndex, NodeShape>,
+    pub size_map: HashMap<NodeIndex, Size>,
     edge_data_map: HashMap<(NodeIndex, NodeIndex), PyObject>,
 }
 
@@ -25,7 +25,7 @@ impl CoreGraph {
             object_map: PyIndexSet::default(),
             data_map: HashMap::default(),
             edge_data_map: HashMap::default(),
-            node_shape_map: HashMap::default(),
+            size_map: HashMap::default(),
         }
     }
 
@@ -53,18 +53,19 @@ impl CoreGraph {
         py: Python<'_>,
         obj: &Bound<'_, PyAny>,
         data: Option<&Bound<'_, PyAny>>,
-        node_shape: Option<&NodeShape>,
+        size: Option<Size>,
     ) -> PyResult<()> {
         let (index, is_new) = self.object_map.insert_full(obj)?;
         let index = NodeIndex::new(index);
+
 
         if is_new {
             self.graph.add_node(index);
             if let Some(data) = data {
                 self.data_map.insert(index, data.into_py(py));
             }
-            if let Some(node_shape) = node_shape {
-                self.node_shape_map.insert(index, node_shape.clone());
+            if let Some(size) = size {
+                self.size_map.insert(index, size);
             }
         }
         Ok(())
@@ -290,16 +291,16 @@ impl CoreGraph {
         Ok(())
     }
 
-    pub fn node_shape_or_default(
+    pub fn node_size_or_default(
         &self,
         obj: &Bound<'_, PyAny>,
-        default: &NodeShape,
-    ) -> PyResult<NodeShape> {
+        default: &Size,
+    ) -> PyResult<Size> {
         let index = self.object_map.get_full(obj)?;
         match index {
             Some((index, _)) => {
                 let index = NodeIndex::new(index);
-                match self.node_shape_map.get(&index) {
+                match self.size_map.get(&index) {
                     Some(shape) => Ok(shape.clone()),
                     None => Ok(default.clone()),
                 }
@@ -308,13 +309,13 @@ impl CoreGraph {
         }
     }
 
-    pub fn node_shape(&self, obj: &Bound<'_, PyAny>) -> PyResult<Option<NodeShape>> {
+    pub fn node_size(&self, obj: &Bound<'_, PyAny>) -> PyResult<Option<Size>> {
         let index = self.object_map.get_full(obj)?;
         match index {
             Some((index, _)) => {
                 let index = NodeIndex::new(index);
-                match self.node_shape_map.get(&index) {
-                    Some(shape) => Ok(Some(shape.clone())),
+                match self.size_map.get(&index) {
+                    Some(size) => Ok(Some(size.clone())),
                     None => Ok(None),
                 }
             }
@@ -325,16 +326,16 @@ impl CoreGraph {
         }
     }
 
-    pub fn update_node_shape(
+    pub fn update_node_size(
         &mut self,
         obj: &Bound<'_, PyAny>,
-        shape: &NodeShape,
+        size: &Size,
     ) -> PyResult<()> {
         let index = self.object_map.get_full(obj)?;
         match index {
             Some((index, _)) => {
                 let index = NodeIndex::new(index);
-                self.node_shape_map.insert(index, shape.clone());
+                self.size_map.insert(index, size.clone());
                 Ok(())
             }
             None => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(

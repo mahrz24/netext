@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use pyo3::prelude::*;
 
 use crate::{
-    geometry::{DirectedPoint, Direction, Neighborhood, NodeShape, Point, Shape},
+    geometry::{BoundingBox, DirectedPoint, Direction, Neighborhood, PlacedNode, PlacedRectangularNode, Point},
     pyindexset::PyIndexSet,
 };
 
@@ -115,17 +115,19 @@ fn reconstruct_path(
 
 #[pyclass]
 pub struct EdgeRouter {
-    pub shapes: HashMap<usize, NodeShape>,
-    pub shape_tree: rstar::RTree<NodeShape>,
+    pub placed_nodes: HashMap<usize, PlacedRectangularNode>,
+    pub placed_node_tree: rstar::RTree<PlacedRectangularNode>,
     pub object_map: PyIndexSet,
     pub lines: HashMap<(usize, usize), Vec<Point>>,
 }
 
-impl RTreeObject for NodeShape {
+impl RTreeObject for PlacedRectangularNode {
     type Envelope = rstar::AABB<[f32; 2]>;
 
     fn envelope(&self) -> Self::Envelope {
-        rstar::AABB::from_corners([self.top_left.x as f32, self.top_left.y as f32], [self.bottom_right.x as f32, self.bottom_right.y as f32])
+        let top_left = self.top_left();
+        let bottom_right = self.bottom_right();
+        rstar::AABB::from_corners([top_left.x as f32, top_left.y as f32], [bottom_right.x as f32, bottom_right.y as f32])
     }
 }
 
@@ -142,18 +144,18 @@ impl EdgeRouter {
     #[new]
     pub fn new() -> Self {
         EdgeRouter {
-            shapes: HashMap::default(),
-            shape_tree: rstar::RTree::new(),
+            placed_nodes: HashMap::default(),
+            placed_node_tree: rstar::RTree::new(),
             lines: HashMap::default(),
             object_map: PyIndexSet::default(),
         }
     }
 
-    fn add_node(&mut self, node: &Bound<PyAny>, core_node: NodeShape) -> PyResult<()> {
+    fn add_node(&mut self, node: &Bound<PyAny>, placed_node: PlacedRectangularNode) -> PyResult<()> {
         // TODO check for inserting twice
         let node_index = self.object_map.insert_full(node)?.0;
-        self.shapes.insert(node_index, core_node);
-        self.shape_tree.insert(core_node);
+        self.placed_nodes.insert(node_index, placed_node);
+        self.placed_node_tree.insert(placed_node);
         Ok(())
     }
 
@@ -172,7 +174,7 @@ impl EdgeRouter {
     fn remove_node(&mut self, node: &Bound<PyAny>) -> PyResult<()> {
         let index = self.object_map.get_full(node)?.map(|(index, _)| index);
         if let Some(index) = index {
-            self.shapes.remove(&index);
+            self.placed_nodes.remove(&index);
             // TODO: Needs some cleanup of the object map at some point.
         }
         Ok(())
@@ -216,7 +218,7 @@ impl EdgeRouter {
         }
 
         // Add shape cost if the edge intersects a shape
-        for node in self.shape_tree.locate_in_envelope_intersecting(&dst.envelope()) {
+        for node in self.placed_node_tree.locate_in_envelope_intersecting(&dst.envelope()) {
             if node.contains_point(dst) {
                 cost += config.shape_cost;
             }

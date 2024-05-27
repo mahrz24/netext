@@ -1,14 +1,10 @@
 use pyo3::prelude::*;
 use tracing_flame::{FlameLayer, FlushGuard};
-use std::{fs::File, io::BufWriter, sync::Arc};
-use tracing::level_filters::LevelFilter;
+use std::{fs::File, io::BufWriter};
 use tracing_subscriber::{
-    field::debug,
-    filter::{self, Filtered},
     fmt::{
-        self, format::{DefaultFields, FmtSpan, Format, Pretty}, Layer
+        self, format::{FmtSpan}
     },
-    layer::Layered,
     prelude::*,
     Registry,
 };
