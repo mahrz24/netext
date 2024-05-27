@@ -1,11 +1,12 @@
 use priority_queue::PriorityQueue;
+use rstar::RTreeObject;
 use std::cmp::Reverse;
 use std::collections::HashMap;
 
 use pyo3::prelude::*;
 
 use crate::{
-    geometry::{DirectedPoint, Direction, Neighborhood, Point, Shape},
+    geometry::{DirectedPoint, Direction, Neighborhood, NodeShape, Point, Shape},
     pyindexset::PyIndexSet,
 };
 
@@ -63,7 +64,7 @@ fn heuristic(a: &DirectedPoint, b: &DirectedPoint) -> i32 {
     (a.x - b.x).abs() + (a.y - b.y).abs()
 }
 
-fn get_neighbors(node: &DirectedPoint) -> Vec<DirectedPoint> {
+fn get_neighbors(node: &DirectedPoint, neighborhood: Neighborhood) -> Vec<DirectedPoint> {
     let mut neighbors = vec![];
     let x = node.x;
     let y = node.y;
@@ -82,7 +83,7 @@ fn get_neighbors(node: &DirectedPoint) -> Vec<DirectedPoint> {
     }
 
     // Changing direction
-    for d in node.direction.other_directions(Neighborhood::Moore) {
+    for d in node.direction.other_directions(neighborhood) {
         match d {
             Direction::Up => neighbors.push(DirectedPoint::new(x, y, Direction::Up)),
             Direction::UpRight => neighbors.push(DirectedPoint::new(x, y, Direction::UpRight)),
@@ -114,9 +115,26 @@ fn reconstruct_path(
 
 #[pyclass]
 pub struct EdgeRouter {
-    pub shapes: HashMap<usize, Shape>,
+    pub shapes: HashMap<usize, NodeShape>,
+    pub shape_tree: rstar::RTree<NodeShape>,
     pub object_map: PyIndexSet,
     pub lines: HashMap<(usize, usize), Vec<Point>>,
+}
+
+impl RTreeObject for NodeShape {
+    type Envelope = rstar::AABB<[f32; 2]>;
+
+    fn envelope(&self) -> Self::Envelope {
+        rstar::AABB::from_corners([self.top_left.x as f32, self.top_left.y as f32], [self.bottom_right.x as f32, self.bottom_right.y as f32])
+    }
+}
+
+impl RTreeObject for DirectedPoint {
+    type Envelope = rstar::AABB<[f32; 2]>;
+
+    fn envelope(&self) -> Self::Envelope {
+        rstar::AABB::from_corners([self.x as f32, self.y as f32], [self.x as f32, self.y as f32])
+    }
 }
 
 #[pymethods]
@@ -125,14 +143,17 @@ impl EdgeRouter {
     pub fn new() -> Self {
         EdgeRouter {
             shapes: HashMap::default(),
+            shape_tree: rstar::RTree::new(),
             lines: HashMap::default(),
             object_map: PyIndexSet::default(),
         }
     }
 
-    fn add_node(&mut self, node: &Bound<PyAny>, shape: Shape) -> PyResult<()> {
+    fn add_node(&mut self, node: &Bound<PyAny>, core_node: NodeShape) -> PyResult<()> {
+        // TODO check for inserting twice
         let node_index = self.object_map.insert_full(node)?.0;
-        self.shapes.insert(node_index, shape);
+        self.shapes.insert(node_index, core_node);
+        self.shape_tree.insert(core_node);
         Ok(())
     }
 
@@ -177,10 +198,12 @@ impl EdgeRouter {
         dst: &DirectedPoint,
         config: &RoutingConfig,
     ) -> i32 {
-        // TODO Node to DirectedPoint,
-        // Routing configuration passed in to route_edge
-        // Use rtrees to find shapes
-        let mut cost = 1.0;
+        // TODO Use rtrees to find shapes
+        let mut cost = 0.0;
+
+        if src.x != dst.x || src.y != dst.y {
+            cost += 1.0;
+        }
 
         // Add corner cost if the direction turns (going from left to right is not a corner)
         if src.direction != dst.direction.opposite() {
@@ -190,6 +213,13 @@ impl EdgeRouter {
         // Add diagonal cost if the direction is diagonal
         if src.direction.is_diagonal() {
             cost += config.diagonal_cost;
+        }
+
+        // Add shape cost if the edge intersects a shape
+        for node in self.shape_tree.locate_in_envelope_intersecting(&dst.envelope()) {
+            if node.contains_point(dst) {
+                cost += config.shape_cost;
+            }
         }
 
         cost.round() as i32
@@ -221,7 +251,7 @@ impl EdgeRouter {
                 return Ok(reconstruct_path(&came_from, current));
             }
 
-            for neighbor in get_neighbors(&current) {
+            for neighbor in get_neighbors(&current, config.neighborhood) {
                 let tentative_g_score = g_score.get(&current).unwrap_or(&(i32::MAX - 100))
                     + self.transition_cost(&current, &neighbor, &config);
 

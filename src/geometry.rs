@@ -1,4 +1,55 @@
-use pyo3::{class, exceptions::PyIndexError, prelude::*};
+use pyo3::{exceptions::PyIndexError, prelude::*};
+
+pub trait PointLike {
+    fn x(&self) -> i32;
+    fn y(&self) -> i32;
+}
+
+pub trait BoundingBox {
+    fn top_left(&self) -> &Point;
+    fn bottom_right(&self) -> &Point;
+
+    fn bounding_box(&self) -> Rectangle {
+        Rectangle {
+            top_left: self.top_left().clone(),
+            bottom_right: self.bottom_right().clone(),
+        }
+    }
+}
+
+
+pub trait Layoutable {
+    fn size(&self) -> Size;
+}
+
+pub trait Shape: BoundingBox + Layoutable {
+    fn contains_point(&self, point: &impl PointLike) -> bool;
+}
+
+#[pyclass]
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Copy)]
+pub struct Size {
+    pub width: i32,
+    pub height: i32,
+}
+
+#[pymethods]
+impl Size {
+    #[new]
+    pub fn new(width: i32, height: i32) -> Self {
+        Size { width, height }
+    }
+
+    #[getter]
+    pub fn width(&self) -> i32 {
+        self.width
+    }
+
+    #[getter]
+    pub fn height(&self) -> i32 {
+        self.height
+    }
+}
 
 #[pyclass]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Copy)]
@@ -25,37 +76,69 @@ impl Point {
     }
 }
 
+impl PointLike for Point {
+    fn x(&self) -> i32 {
+        self.x
+    }
+
+    fn y(&self) -> i32 {
+        self.y
+    }
+}
+
 #[derive(Debug)]
 struct Rectangle {
     top_left: Point,
     bottom_right: Point,
 }
 
+
 #[pyclass]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Copy)]
-pub struct Shape {
-    top_left: Point,
-    bottom_right: Point,
+pub struct NodeShape {
+    pub top_left: Point,
+    pub bottom_right: Point,
 }
 
+impl BoundingBox for NodeShape {
+    fn top_left(&self) -> &Point {
+        &self.top_left
+    }
+
+    fn bottom_right(&self) -> &Point {
+        &self.bottom_right
+    }
+}
+
+impl Layoutable for NodeShape {
+    fn size(&self) -> Size {
+        Size {
+            width: self.bottom_right.x - self.top_left.x,
+            height: self.bottom_right.y - self.top_left.y,
+        }
+    }
+}
+
+impl Shape for NodeShape {
+    fn contains_point(&self, point: &impl PointLike) -> bool {
+        point.x() >= self.top_left.x
+            && point.x() <= self.bottom_right.x
+            && point.y() >= self.top_left.y
+            && point.y() <= self.bottom_right.y
+    }
+}
+
+
+
+
 #[pymethods]
-impl Shape {
+impl NodeShape {
     #[new]
     fn new(top_left: Point, bottom_right: Point) -> Self {
-        Shape {
+        NodeShape {
             top_left,
             bottom_right,
         }
-    }
-
-    fn corner_points(&self) -> Vec<(i32, i32)> {
-        let mut points = Vec::new();
-        for x in [self.top_left.x, self.bottom_right.x].iter() {
-            for y in [self.top_left.y, self.bottom_right.y].iter() {
-                points.push((*x, *y));
-            }
-        }
-        points
     }
 }
 
@@ -116,20 +199,6 @@ impl Direction {
         }
     }
 
-    fn corner_cost(&self, other: Direction, corner_cost: f64) -> f64 {
-        match (self, other) {
-            (Direction::Up, Direction::Down) => 1.0,
-            (Direction::Down, Direction::Up) => 1.0,
-            (Direction::Left, Direction::Right) => 1.0,
-            (Direction::Right, Direction::Left) => 1.0,
-            (Direction::UpRight, Direction::DownLeft) => 1.0,
-            (Direction::DownLeft, Direction::UpRight) => 1.0,
-            (Direction::UpLeft, Direction::DownRight) => 1.0,
-            (Direction::DownRight, Direction::UpLeft) => 1.0,
-            _ => corner_cost,
-        }
-    }
-
     pub fn all_directions(neighborhood: Neighborhood) -> Vec<Direction> {
         match neighborhood {
             Neighborhood::Orthogonal => vec![
@@ -168,6 +237,16 @@ pub struct DirectedPoint {
     pub x: i32,
     pub y: i32,
     pub direction: Direction,
+}
+
+impl PointLike for DirectedPoint {
+    fn x(&self) -> i32 {
+        self.x
+    }
+
+    fn y(&self) -> i32 {
+        self.y
+    }
 }
 
 #[pymethods]

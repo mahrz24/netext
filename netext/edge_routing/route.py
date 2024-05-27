@@ -1,9 +1,7 @@
 import netext._core as core
 from netext._core import Direction
-from netext.edge_routing.edge import EdgeLayout, EdgePath
+from netext.edge_routing.edge import EdgePath
 from netext.geometry import Point
-from netext.node_rasterizer import NodeBuffer
-
 
 def route_edge(
     start: Point,
@@ -58,22 +56,17 @@ def route_edge(
         else:
             end_direction = Direction.DOWN
 
-    # if start.x != end.x and start.y != end.y:
-    #     hints.append(core.Point(x=start.x, y=end.y))
-    #     hints.append(core.Point(x=end.x, y=start.y))
-        # hints.append(core.Point(x=(start.x + end.x) // 2, y=(start.y + end.y) // 2))
-
     path = edge_router.route_edge(
         start=core.Point(x=start.x, y=start.y),
         end=core.Point(x=end.x, y=end.y),
         start_direction=start_direction,
         end_direction=end_direction,
         config=core.RoutingConfig(
-            neighborhood=core.Neighborhood.MOORE,
+            neighborhood=core.Neighborhood.ORTHOGONAL,
             corner_cost=1,
-            diagonal_cost=10,
+            diagonal_cost=0,
             line_cost=10,
-            shape_cost=10,
+            shape_cost=2,
             shape_distance_cost=0,
             line_distance_cost=0
         ),

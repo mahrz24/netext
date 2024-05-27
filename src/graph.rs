@@ -4,6 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyAny;
 use std::collections::HashMap;
 
+use crate::geometry::NodeShape;
 use crate::pyindexset::PyIndexSet;
 
 #[pyclass]
@@ -11,6 +12,7 @@ pub struct CoreGraph {
     pub graph: DiGraphMap<NodeIndex, ()>,
     pub object_map: PyIndexSet,
     data_map: HashMap<NodeIndex, PyObject>,
+    pub node_shape_map: HashMap<NodeIndex, NodeShape>,
     edge_data_map: HashMap<(NodeIndex, NodeIndex), PyObject>,
 }
 
@@ -23,6 +25,7 @@ impl CoreGraph {
             object_map: PyIndexSet::default(),
             data_map: HashMap::default(),
             edge_data_map: HashMap::default(),
+            node_shape_map: HashMap::default(),
         }
     }
 
@@ -33,8 +36,8 @@ impl CoreGraph {
     ) -> PyResult<Self> {
         let mut graph = CoreGraph::new();
         for (a, b) in edges {
-            graph.add_node(py, &a, None)?;
-            graph.add_node(py, &b, None)?;
+            graph.add_node(py, &a, None, None)?;
+            graph.add_node(py, &b, None, None)?;
             graph.add_edge(py, &a, &b, None)?;
         }
         Ok(graph)
@@ -50,6 +53,7 @@ impl CoreGraph {
         py: Python<'_>,
         obj: &Bound<'_, PyAny>,
         data: Option<&Bound<'_, PyAny>>,
+        node_shape: Option<&NodeShape>,
     ) -> PyResult<()> {
         let (index, is_new) = self.object_map.insert_full(obj)?;
         let index = NodeIndex::new(index);
@@ -58,6 +62,9 @@ impl CoreGraph {
             self.graph.add_node(index);
             if let Some(data) = data {
                 self.data_map.insert(index, data.into_py(py));
+            }
+            if let Some(node_shape) = node_shape {
+                self.node_shape_map.insert(index, node_shape.clone());
             }
         }
         Ok(())
@@ -281,6 +288,60 @@ impl CoreGraph {
             ));
         }
         Ok(())
+    }
+
+    pub fn node_shape_or_default(
+        &self,
+        obj: &Bound<'_, PyAny>,
+        default: &NodeShape,
+    ) -> PyResult<NodeShape> {
+        let index = self.object_map.get_full(obj)?;
+        match index {
+            Some((index, _)) => {
+                let index = NodeIndex::new(index);
+                match self.node_shape_map.get(&index) {
+                    Some(shape) => Ok(shape.clone()),
+                    None => Ok(default.clone()),
+                }
+            }
+            None => Ok(default.clone()),
+        }
+    }
+
+    pub fn node_shape(&self, obj: &Bound<'_, PyAny>) -> PyResult<Option<NodeShape>> {
+        let index = self.object_map.get_full(obj)?;
+        match index {
+            Some((index, _)) => {
+                let index = NodeIndex::new(index);
+                match self.node_shape_map.get(&index) {
+                    Some(shape) => Ok(Some(shape.clone())),
+                    None => Ok(None),
+                }
+            }
+            None => Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "Node does {:?} not exist.",
+                obj
+            ))),
+        }
+    }
+
+    pub fn update_node_shape(
+        &mut self,
+        obj: &Bound<'_, PyAny>,
+        shape: &NodeShape,
+    ) -> PyResult<()> {
+        let index = self.object_map.get_full(obj)?;
+        match index {
+            Some((index, _)) => {
+                let index = NodeIndex::new(index);
+                self.node_shape_map.insert(index, shape.clone());
+                Ok(())
+            }
+            None => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Node does {:?} not exist.",
+                obj
+            ))),
+        }
     }
 
     pub fn all_nodes(&self) -> Vec<&PyObject> {

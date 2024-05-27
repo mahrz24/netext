@@ -841,17 +841,15 @@ class ConsoleGraph:
                 port_side_assignments=self.port_side_assignments[node],
             )
 
-            self.edge_router.add_node(
-                node,
-                core.Shape(
-                    top_left=core.Point(x=node_buffer.left_x, y=node_buffer.top_y),
-                    bottom_right=core.Point(x=node_buffer.right_x, y=node_buffer.bottom_y),
-                ),
-                # core.Shape(
-                #     top_left = core.Point(node_buffer.center.x - node_buffer.width // 2, node_buffer.center.y - node_buffer.height // 2),
-                #     bottom_right = core.Point(node_buffer.center.x + node_buffer.width // 2, node_buffer.center.y + node_buffer.height // 2),
-                # ),
+            core_shape = core.NodeShape(
+                top_left=core.Point(x=node_buffer.left_x, y=node_buffer.top_y),
+                bottom_right=core.Point(x=node_buffer.right_x, y=node_buffer.bottom_y),
             )
+            print(node_buffer.left_x, node_buffer.top_y, node_buffer.right_x, node_buffer.bottom_y)
+            print(core_shape)
+
+            self._core_graph.update_node_shape(node, core_shape)
+            self.edge_router.add_node(node, core_shape)
 
             node_buffer.center = position_view_space
             self.node_buffers[node] = node_buffer

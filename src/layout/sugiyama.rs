@@ -9,7 +9,9 @@ use petgraph::visit::{IntoEdgeReferences, VisitMap};
 use petgraph::visit::{NodeIndexable, Topo};
 
 use pyo3::prelude::*;
+use pyo3::types::PyDict;
 
+use crate::geometry::{Layoutable, Size};
 use crate::{geometry::Point, graph::CoreGraph};
 
 use super::LayoutEngine;
@@ -50,7 +52,7 @@ impl SugiyamaLayout {
             .collect();
 
         let ordered_layers = self.barycenter_ordering(&raw_graph, &layers);
-        let coordinates = self.brandes_koepf_coordinates(&ordered_layers, 10.0, 10.0);
+        let coordinates = self.brandes_koepf_coordinates(py, &ordered_layers, graph);
 
         Ok(coordinates
             .into_iter()
@@ -68,30 +70,46 @@ impl SugiyamaLayout {
     // Function to assign coordinates using the Brandes-Köpf algorithm
     fn brandes_koepf_coordinates(
         &self,
+        py: Python<'_>,
         layers: &Vec<Vec<usize>>,
-        node_width: f32,
-        layer_height: f32,
+        graph: &CoreGraph,
     ) -> HashMap<usize, Point> {
         let mut positions = HashMap::new();
         let mut max_width = 0.0;
+        let mut layer_widths = HashMap::new();
 
         for (layer_index, layer) in layers.iter().enumerate() {
-            let y = layer_index as f32 * layer_height;
+            let node_sizes: Vec<Option<Size>> = layer.into_iter().map(|&node|
+                // TODO Access pattern is not nice here, this should be private for the core graph
+                graph.node_shape_map.get(&graph.graph.from_index(node)).map(
+                 |ns| {
+                    ns.size()
+                })
+            ).collect();
+
+            let layer_height = node_sizes.iter().fold(0, |acc, size| {
+                acc.max(size.unwrap_or(Size::new(0, 0)).height())
+            });
+
+            let y = layer_index as f32 * layer_height as f32;
             let mut x = 0.0;
 
-            for &node in layer {
+            for (&node, size) in layer.into_iter().zip(node_sizes) {
                 positions.insert(node, (x, y));
-                x += node_width;
+                println!("Node size: {:?}", size);
+                x += size.unwrap_or(Size::new(0, 0)).width() as f32;
             }
 
             if x > max_width {
                 max_width = x;
             }
+
+            layer_widths.insert(layer_index, x);
         }
 
         // Adjust nodes to center layers
-        for layer in layers {
-            let layer_width = layer.len() as f32 * node_width;
+        for (layer_index, layer) in layers.iter().enumerate() {
+            let layer_width = layer_widths[&layer_index];
             let offset = (max_width - layer_width) / 2.0;
 
             for &node in layer {
