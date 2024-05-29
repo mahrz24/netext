@@ -1,7 +1,7 @@
 use priority_queue::PriorityQueue;
 use rstar::RTreeObject;
-use std::cmp::Reverse;
-use std::collections::HashMap;
+use std::{cmp::Reverse, hash::Hash};
+use std::collections::{HashMap, HashSet};
 
 use pyo3::prelude::*;
 
@@ -21,8 +21,6 @@ pub struct RoutingConfig {
     diagonal_cost: i32,
     line_cost: i32,
     shape_cost: i32,
-    shape_distance_cost: i32,
-    line_distance_cost: i32,
 }
 
 #[pymethods]
@@ -34,8 +32,6 @@ impl RoutingConfig {
         diagonal_cost: i32,
         line_cost: i32,
         shape_cost: i32,
-        shape_distance_cost: i32,
-        line_distance_cost: i32,
     ) -> Self {
         RoutingConfig {
             neighborhood,
@@ -43,8 +39,6 @@ impl RoutingConfig {
             diagonal_cost,
             line_cost,
             shape_cost,
-            shape_distance_cost,
-            line_distance_cost,
         }
     }
 }
@@ -57,8 +51,6 @@ impl Default for RoutingConfig {
             diagonal_cost: 1,
             line_cost: 1,
             shape_cost: 1,
-            shape_distance_cost: 0,
-            line_distance_cost: 0,
         }
     }
 }
@@ -121,7 +113,8 @@ pub struct EdgeRouter {
     pub placed_nodes: HashMap<usize, PlacedRectangularNode>,
     pub placed_node_tree: rstar::RTree<PlacedRectangularNode>,
     pub object_map: PyIndexSet,
-    pub lines: HashMap<(usize, usize), Vec<Point>>,
+    pub shape_occlusion: HashSet<(i32, i32)>,
+    pub line_occlusion: HashSet<(i32, i32)>,
 }
 
 impl RTreeObject for PlacedRectangularNode {
@@ -155,8 +148,9 @@ impl EdgeRouter {
         EdgeRouter {
             placed_nodes: HashMap::default(),
             placed_node_tree: rstar::RTree::new(),
-            lines: HashMap::default(),
             object_map: PyIndexSet::default(),
+            shape_occlusion: HashSet::default(),
+            line_occlusion: HashSet::default(),
         }
     }
 
@@ -169,6 +163,11 @@ impl EdgeRouter {
         let node_index = self.object_map.insert_full(node)?.0;
         self.placed_nodes.insert(node_index, placed_node);
         self.placed_node_tree.insert(placed_node);
+        for x in placed_node.top_left().x..=placed_node.bottom_right().x {
+            for y in placed_node.top_left().y..=placed_node.bottom_right().y {
+                self.shape_occlusion.insert((x, y));
+            }
+        }
         Ok(())
     }
 
@@ -180,16 +179,20 @@ impl EdgeRouter {
     ) -> PyResult<()> {
         let start_index = self.object_map.insert_full(start)?.0;
         let end_index = self.object_map.insert_full(end)?.0;
-        self.lines.insert((start_index, end_index), line);
+
+        for point in line {
+            self.line_occlusion.insert((point.x, point.y));
+        }
+
         Ok(())
     }
 
     fn remove_node(&mut self, node: &Bound<PyAny>) -> PyResult<()> {
-        let index = self.object_map.get_full(node)?.map(|(index, _)| index);
-        if let Some(index) = index {
-            self.placed_nodes.remove(&index);
-            // TODO: Needs some cleanup of the object map at some point.
-        }
+        // let index = self.object_map.get_full(node)?.map(|(index, _)| index);
+        // if let Some(index) = index {
+        //     self.placed_nodes.remove(&index);
+        //     // TODO: Needs some cleanup of the object map at some point.
+        // }
         Ok(())
     }
 
@@ -199,11 +202,11 @@ impl EdgeRouter {
         start: &Bound<'_, PyAny>,
         end: &Bound<'_, PyAny>,
     ) -> PyResult<()> {
-        let index_start = self.object_map.get_full(start)?;
-        let index_end = self.object_map.get_full(end)?;
-        if let (Some((index_start, _)), Some((index_end, _))) = (index_start, index_end) {
-            self.lines.remove(&(index_start, index_end));
-        }
+        // let index_start = self.object_map.get_full(start)?;
+        // let index_end = self.object_map.get_full(end)?;
+        // if let (Some((index_start, _)), Some((index_end, _))) = (index_start, index_end) {
+        //     self.lines.remove(&(index_start, index_end));
+        // }
         Ok(())
     }
 
@@ -231,13 +234,14 @@ impl EdgeRouter {
 
         // Add shape cost if the edge intersects a shape
         if config.shape_cost > 0 {
-            for node in self
-                .placed_node_tree
-                .locate_in_envelope_intersecting(&dst.envelope())
-            {
-                if node.contains_point(dst) {
+            if self.shape_occlusion.contains(&(dst.x, dst.y)) {
                     cost += config.shape_cost;
-                }
+            }
+        }
+
+        if config.line_cost > 0 {
+            if self.line_occlusion.contains(&(dst.x, dst.y)) {
+                cost += config.line_cost;
             }
         }
 

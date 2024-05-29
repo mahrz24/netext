@@ -1,4 +1,3 @@
-import time
 import netext._core as core
 from netext._core import Direction
 from netext.edge_routing.edge import EdgePath
@@ -58,7 +57,6 @@ def route_edge(
         else:
             end_direction = Direction.DOWN
 
-    start_time = time.time()
     path = edge_router.route_edge(
         start=core.Point(x=start.x, y=start.y),
         end=core.Point(x=end.x, y=end.y),
@@ -67,15 +65,11 @@ def route_edge(
         config=core.RoutingConfig(
             neighborhood=core.Neighborhood.MOORE,
             corner_cost=1,
-            diagonal_cost=10,
+            diagonal_cost=100,
             line_cost=10,
             shape_cost=5,
-            shape_distance_cost=0,
-            line_distance_cost=0,
         ),
     )
-    end_time = time.time()
-    print(f"Routing took {end_time - start_time} seconds")
 
     return EdgePath(
         start=start,

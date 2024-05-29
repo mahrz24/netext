@@ -898,6 +898,7 @@ class ConsoleGraph:
                 continue
 
             edge_buffer, edge_layout, label_nodes = result
+            self._edge_router.add_edge(u, v, [core.Point(p.x, p.y) for p in edge_layout.path.points])
 
             if edge_buffer is not None:
                 self.edge_buffers[(u, v)] = edge_buffer
