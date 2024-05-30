@@ -1,5 +1,6 @@
-from typing import Any, Generic, Hashable, TypeGuard, cast
+from typing import Any, Hashable, TypeGuard, cast
 
+from networkx import DiGraph
 from textual.events import Resize
 from textual import events
 from textual.reactive import reactive
@@ -10,7 +11,7 @@ from textual.widget import Widget
 
 from netext import ConsoleGraph
 from netext.buffer_renderer import render_buffers
-from netext.console_graph import G, AutoZoom, ZoomSpec
+from netext.console_graph import AutoZoom, ZoomSpec
 from rich.segment import Segment
 from netext.geometry.region import Region as NetextRegion
 from netext.geometry.point import FloatPoint, Point
@@ -19,7 +20,7 @@ from textual.message import Message
 from netext.rendering.segment_buffer import Reference
 
 
-def _setup_console_graph(graph: "GraphView[G]") -> TypeGuard["InitializedGraphView[G]"]:
+def _setup_console_graph(graph: "GraphView") -> TypeGuard["InitializedGraphView"]:
     if graph._console_graph is None and graph.size.width != 0 and graph.size.height != 0:
         graph._console_graph = ConsoleGraph(
             graph.graph,
@@ -32,7 +33,7 @@ def _setup_console_graph(graph: "GraphView[G]") -> TypeGuard["InitializedGraphVi
     return graph._console_graph is not None
 
 
-class GraphView(ScrollView, Generic[G]):
+class GraphView(ScrollView):
     zoom: reactive[float | tuple[float, float] | ZoomSpec | AutoZoom] = reactive(
         cast(float | tuple[float, float] | ZoomSpec | AutoZoom, 1.0)
     )
@@ -66,7 +67,7 @@ class GraphView(ScrollView, Generic[G]):
 
     def __init__(
         self,
-        graph: G,
+        graph: DiGraph,
         name: str | None = None,
         id: str | None = None,
         classes: str | None = None,
@@ -97,29 +98,29 @@ class GraphView(ScrollView, Generic[G]):
         self._reverse_click_map: dict[tuple[int, int], Reference] = dict()
         self._last_hover: Reference | None = None
         self._console_graph_kwargs = console_graph_kwargs
-        self._console_graph: ConsoleGraph[G] | None = None
+        self._console_graph: ConsoleGraph | None = None
         self._scroll_via_viewport = scroll_via_viewport
         self._attached_widgets: dict[Hashable, tuple[Widget, bool]] = dict()
         self._attached_widgets_lookup: dict[Widget, Hashable] = dict()
         if scroll_via_viewport and viewport is not None:
             raise ValueError("Cannot specify both viewport and scroll_via_viewport=True")
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
-        self._graph: G = graph
+        self._graph: DiGraph = graph
         self._strip_segments: list[list[Segment]] = list()
         self._timer = self.set_timer(0, self._resized)
         self.zoom = zoom
 
     @property
-    def graph(self) -> G:
+    def graph(self) -> DiGraph:
         """Returns and sets the graph object associated with this widget.
 
         Returns:
-            G: The graph object associated with this widget.
+            DiGraph: The graph object associated with this widget.
         """
         return self._graph
 
     @graph.setter
-    def graph(self, graph: G) -> None:
+    def graph(self, graph: DiGraph) -> None:
         self._graph = graph
         self._console_graph = None
         self._graph_was_updated()
@@ -526,5 +527,5 @@ class GraphView(ScrollView, Generic[G]):
                 self.post_message(GraphView.ElementMouseUp(ref, event))
 
 
-class InitializedGraphView(GraphView[G]):
-    _console_graph: ConsoleGraph[G]  # type: ignore
+class InitializedGraphView:
+    _console_graph: ConsoleGraph  # type: ignore
