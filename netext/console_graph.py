@@ -574,7 +574,6 @@ class ConsoleGraph:
         position_view_space = Point(round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y))
         self.node_buffers[node].center = position_view_space
         self._core_graph.update_node_data(node, dict(data, **{"$properties": properties}))
-
         for v in self._core_graph.neighbors(node):
             if (node, v) in self.edge_buffers:
                 affected_edges.append((node, v))
@@ -639,7 +638,6 @@ class ConsoleGraph:
 
         """
         self._require(RenderState.EDGES_RENDERED)
-
         # This should not happen as we require the render state to have zoomed positions computed.
         if self._zoom_factor is None:
             raise RuntimeError("You can only update edges once the zoom factor has been computed")

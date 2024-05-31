@@ -451,7 +451,6 @@ class GraphArea(Widget):
             style = Style(color="red")
         else:
             style = Style(color="white")
-        print(f"Updating node to style {style}")
         g.update_node(node, data={"$style": style})
 
     def watch_hover_element(self, old_value: Reference | None, new_value: Reference | None) -> None:

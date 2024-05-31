@@ -58,7 +58,6 @@ impl CoreGraph {
         let (index, is_new) = self.object_map.insert_full(obj)?;
         let index = NodeIndex::new(index);
 
-
         if is_new {
             self.graph.add_node(index);
             if let Some(data) = data {
@@ -97,48 +96,36 @@ impl CoreGraph {
         Ok(())
     }
 
-    // fn remove_node(&mut self, obj: &Bound<'_, PyAny>) -> PyResult<()> {
-    //     let hash = obj.hash()? as usize;
-    //     if self.graph.contains_node(hash) {
-    //         self.graph.remove_node(hash);
-    //         self.object_map.remove(&hash);
-    //         self.data_map.remove(&hash);
-    //         let edges_to_remove: Vec<(usize, usize)> = self
-    //             .edge_data_map
-    //             .keys()
-    //             .filter(|(a, b)| *a == hash || *b == hash)
-    //             .cloned()
-    //             .collect();
-    //         for edge in edges_to_remove {
-    //             self.edge_data_map.remove(&edge);
-    //         }
-    //     } else {
-    //         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-    //             "Node does not exist.",
-    //         ));
-    //     }
-    //     Ok(())
-    // }
+    fn remove_node(&mut self, py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<()> {
+        let index = self.object_map.get_full(obj)?;
 
-    // fn remove_edge(&mut self, obj_a: &Bound<'_, PyAny>, obj_b: &Bound<'_, PyAny>) -> PyResult<()> {
-    //     let hash_a = obj_a.hash()? as usize;
-    //     let hash_b = obj_b.hash()? as usize;
-    //     if self.graph.contains_node(hash_a) && self.graph.contains_node(hash_b) {
-    //         if self.graph.contains_edge(hash_a, hash_b) {
-    //             self.graph.remove_edge(hash_a, hash_b);
-    //             self.edge_data_map.remove(&(hash_a, hash_b));
-    //         } else {
-    //             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-    //                 "Edge does not exist.",
-    //             ));
-    //         }
-    //     } else {
-    //         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-    //             "Both nodes must exist.",
-    //         ));
-    //     }
-    //     Ok(())
-    // }
+        match index {
+            Some((index, _)) => {
+                let index: NodeIndex = NodeIndex::new(index);
+
+                self.graph.remove_node(index);
+                self.data_map.remove(&index);
+                self.object_map.remove(obj)
+            }
+            None => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                "Node does not exist.",
+            )),
+        }
+    }
+
+    fn remove_edge(&mut self, obj_a: &Bound<'_, PyAny>, obj_b: &Bound<'_, PyAny>) -> PyResult<()> {
+        let index_a = self.object_map.get_full(obj_a)?;
+        let index_b = self.object_map.get_full(obj_b)?;
+
+        if let (Some((index_a, _)), Some((index_b, _))) = (index_a, index_b) {
+            let index_a = NodeIndex::new(index_a);
+            let index_b = NodeIndex::new(index_b);
+            self.graph.remove_edge(index_a, index_b);
+            self.edge_data_map.remove(&(index_a, index_b));
+        }
+
+        Ok(())
+    }
 
     fn contains_node(&self, obj: &Bound<'_, PyAny>) -> PyResult<bool> {
         let index_a = self.object_map.get_full(obj)?;
@@ -291,11 +278,7 @@ impl CoreGraph {
         Ok(())
     }
 
-    pub fn node_size_or_default(
-        &self,
-        obj: &Bound<'_, PyAny>,
-        default: &Size,
-    ) -> PyResult<Size> {
+    pub fn node_size_or_default(&self, obj: &Bound<'_, PyAny>, default: &Size) -> PyResult<Size> {
         let index = self.object_map.get_full(obj)?;
         match index {
             Some((index, _)) => {
@@ -326,11 +309,7 @@ impl CoreGraph {
         }
     }
 
-    pub fn update_node_size(
-        &mut self,
-        obj: &Bound<'_, PyAny>,
-        size: &Size,
-    ) -> PyResult<()> {
+    pub fn update_node_size(&mut self, obj: &Bound<'_, PyAny>, size: &Size) -> PyResult<()> {
         let index = self.object_map.get_full(obj)?;
         match index {
             Some((index, _)) => {
@@ -376,7 +355,11 @@ impl CoreGraph {
                 let index = NodeIndex::new(index);
                 let neighbours: Vec<&PyObject> = self
                     .graph
-                    .neighbors(index)
+                    .neighbors_directed(index, petgraph::Direction::Incoming)
+                    .chain(
+                        self.graph
+                            .neighbors_directed(index, petgraph::Direction::Outgoing),
+                    )
                     .filter_map(|neighbour| self.object_map.get_index(neighbour.index()))
                     .collect();
                 Ok(neighbours)

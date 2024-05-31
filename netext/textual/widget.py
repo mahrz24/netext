@@ -218,6 +218,7 @@ class GraphView(ScrollView):
         """
 
         self._console_graph.add_edge(u, v, data)
+        self._graph.add_edge(u, v, **(data or {}))
         self._graph_was_updated()
 
     def remove_node(self, node: Hashable) -> None:
@@ -230,6 +231,7 @@ class GraphView(ScrollView):
             None
         """
         self._console_graph.remove_node(node)
+        self._graph.remove_node(node)
         self._graph_was_updated()
 
     def remove_edge(self, u: Hashable, v: Hashable) -> None:
@@ -244,6 +246,7 @@ class GraphView(ScrollView):
             None
         """
         self._console_graph.remove_edge(u, v)
+        self._graph.remove_edge(u, v)
         self._graph_was_updated()
 
     def update_node(
@@ -270,6 +273,7 @@ class GraphView(ScrollView):
         else:
             node_position = None
         self._console_graph.update_node(node, node_position, data, update_data=update_data)
+        self._graph.nodes[node].update(data or {})
         self._graph_was_updated()
 
     def update_edge(
@@ -295,10 +299,9 @@ class GraphView(ScrollView):
         Returns:
             None
         """
-
-        if self._console_graph is not None:
-            self._console_graph.update_edge(u, v, data, update_data=update_data, update_layout=update_layout)
-            self._graph_was_updated()
+        self._console_graph.update_edge(u, v, data, update_data=update_data, update_layout=update_layout)
+        self._graph.edges[u, v].update(data)
+        self._graph_was_updated()
 
     def _resized(self):
         self._console_graph.max_width = self.size.width
@@ -403,7 +406,6 @@ class GraphView(ScrollView):
 
     def _graph_was_updated(self):
         self._strip_segments = self.pre_render_strips()
-        print(self._strip_segments)
         self.refresh()
 
     def refresh(
