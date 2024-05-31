@@ -7,7 +7,7 @@ from netext import ConsoleGraph
 from netext.console_graph import AutoZoom
 from netext.geometry.point import FloatPoint
 from netext.geometry.region import Region
-from netext.layout_engines.static import StaticLayout
+from netext.layout_engines import StaticLayout
 
 
 @pytest.fixture

@@ -1,5 +1,5 @@
 from netext.geometry.magnet import Magnet
-from netext.layout_engines.static import StaticLayout
+from netext.layout_engines import StaticLayout
 from netext.textual.widget import GraphView
 from textual.app import App, ComposeResult
 from rich.style import Style
