@@ -479,13 +479,16 @@ class ConsoleGraph:
         connected_ports = self.node_buffers[node].connected_ports
         properties = NodeProperties.from_data_dict({})
         if data is not None:
-            # Replace the data of the node with the new data
+            # Replace or update the data of the node with the new data
             if update_data:
                 new_data = dict(self._core_graph.node_data_or_default(node, dict()), **data)
-                properties = NodeProperties.from_data_dict(new_data)
-                new_data["$properties"] = properties
             else:
                 new_data = data
+
+            if "$properties" in new_data:
+                del new_data["$properties"]
+            properties = NodeProperties.from_data_dict(new_data)
+            new_data["$properties"] = properties
 
             self._core_graph.update_node_data(node, new_data)
             old_position = self.node_buffers[node].center
@@ -519,6 +522,7 @@ class ConsoleGraph:
 
         node_data = cast(dict[Hashable, Any], self._core_graph.node_data_or_default(node, dict()))
         data = cast(dict[str, Any], node_data)
+
         properties = NodeProperties.from_data_dict(data)
 
         force_edge_rerender = force_edge_rerender or (position is not None) or "$ports" in data
@@ -569,6 +573,7 @@ class ConsoleGraph:
 
         position_view_space = Point(round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y))
         self.node_buffers[node].center = position_view_space
+        self._core_graph.update_node_data(node, dict(data, **{"$properties": properties}))
 
         for v in self._core_graph.neighbors(node):
             if (node, v) in self.edge_buffers:
@@ -641,6 +646,10 @@ class ConsoleGraph:
 
         old_data = self._core_graph.edge_data(u, v)
         data = dict(old_data, **data) if update_data else data
+
+        if "$properties" in data:
+            del data["$properties"]
+
         properties = EdgeProperties.from_data_dict(data)
 
         self._core_graph.update_edge_data(u, v, dict(data, **{"$properties": properties}))
@@ -707,12 +716,6 @@ class ConsoleGraph:
             )
 
     def _transition_compute_node_layout(self) -> None:
-        # Store the node buffers in the graph itself
-        for node, buffer in self.node_buffers_for_layout.items():
-            self._core_graph.update_node_data(
-                node, dict(self._core_graph.node_data_or_default(node, dict()), _netext_node_buffer=buffer)
-            )
-
         # Position the nodes and store these original positions
         self.node_positions = dict([(n, Point(p.x, p.y)) for (n, p) in self._layout_engine.layout(self._core_graph)])
 

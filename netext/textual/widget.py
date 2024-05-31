@@ -403,6 +403,7 @@ class GraphView(ScrollView):
 
     def _graph_was_updated(self):
         self._strip_segments = self.pre_render_strips()
+        print(self._strip_segments)
         self.refresh()
 
     def refresh(
