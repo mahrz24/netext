@@ -18,6 +18,7 @@ dev-dependencies = [
     "textual>=0.40",
     "pyinstrument>=4.6.2",
     "pip>=24.0",
+    "textual-dev>=1.5.1",
 ]
 
 [build-system]
