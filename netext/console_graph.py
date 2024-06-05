@@ -124,7 +124,6 @@ class ConsoleGraph:
     def __init__(
         self,
         graph: DiGraph,
-        # see https://github.com/python/mypy/issues/3737
         layout_engine: core.LayoutEngine = core.SugiyamaLayout(),
         console: Console = Console(),
         viewport: Region | None = None,
