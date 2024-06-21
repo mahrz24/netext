@@ -6,6 +6,8 @@ from netext.geometry.point import Point
 from netext.node_rasterizer import rasterize_node
 from netext.properties.edge import EdgeProperties
 
+import netext._core as core
+
 
 @pytest.fixture
 def console() -> Console:
@@ -19,16 +21,17 @@ def test_trivial_edge(console: Console) -> None:
     node_buffer_u.center = Point(1, 1)
     node_buffer_v.center = Point(9, 9)
 
+    edge_router = core.EdgeRouter()
+
     result = rasterize_edge(
         console,
+        edge_router,
         node_buffer_u,
         node_buffer_v,
-        [node_buffer_u, node_buffer_u],
-        [],
         properties=EdgeProperties(),
     )
     assert result is not None
     edge, _, _ = result
 
-    assert edge.width == 5
-    assert edge.height == 5
+    assert edge.width == 6
+    assert edge.height == 7

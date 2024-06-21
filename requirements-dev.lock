@@ -6,6 +6,7 @@
 #   features: []
 #   all-features: true
 #   with-sources: false
+#   generate-hashes: false
 
 -e file:.
 aiohttp==3.9.5
@@ -214,6 +215,7 @@ syrupy==4.6.1
 tabulate==0.9.0
     # via asv
 textual==0.63.6
+    # via netext
     # via textual-dev
 textual-dev==1.5.1
 tomli==2.0.1
@@ -222,6 +224,7 @@ tomli==2.0.1
     # via coverage
     # via pytest
 typing-extensions==4.12.0
+    # via plum-dispatch
     # via textual
     # via textual-dev
 tzdata==2024.1

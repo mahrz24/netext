@@ -907,5 +907,5 @@ def test_render_buffer_with_overflow_segment_fails(console):
         ),
     ]
 
-    with pytest.raises(AssertionError, match="Segment overflow"):
+    with pytest.raises(RuntimeError, match="Segment overflow"):
         list(render_buffers(test_buffers, Region(0, 0, 3, 1))[0])

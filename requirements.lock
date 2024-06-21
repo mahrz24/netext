@@ -6,6 +6,7 @@
 #   features: []
 #   all-features: true
 #   with-sources: false
+#   generate-hashes: false
 
 -e file:.
 beartype==0.18.5
@@ -22,10 +23,16 @@ grandalf==0.8
     # via netext
 kiwisolver==1.4.5
     # via matplotlib
+linkify-it-py==2.0.3
+    # via markdown-it-py
 markdown-it-py==3.0.0
+    # via mdit-py-plugins
     # via rich
+    # via textual
 matplotlib==3.9.0
     # via networkx
+mdit-py-plugins==0.4.1
+    # via markdown-it-py
 mdurl==0.1.2
     # via markdown-it-py
 networkx==3.3
@@ -58,6 +65,7 @@ pytz==2024.1
 rich==13.7.1
     # via netext
     # via plum-dispatch
+    # via textual
 rtree==1.2.0
     # via netext
 scipy==1.13.1
@@ -66,5 +74,12 @@ shapely==2.0.4
     # via netext
 six==1.16.0
     # via python-dateutil
+textual==0.70.0
+    # via netext
+typing-extensions==4.12.2
+    # via plum-dispatch
+    # via textual
 tzdata==2024.1
     # via pandas
+uc-micro-py==1.0.3
+    # via linkify-it-py

@@ -79,7 +79,7 @@ def test_render_graph_with_mutations_remove_and_add(console):
     graph.add_node(2, **{"$x": 10, "$y": 1})
     graph.add_edge(1, 2)
 
-    console_graph = ConsoleGraph[DiGraph](graph, layout_engine=StaticLayout())
+    console_graph = ConsoleGraph(graph, layout_engine=StaticLayout())
 
     with console.capture() as capture:
         console.print(console_graph)
@@ -103,7 +103,7 @@ def test_render_graph_with_mutations_update_positions(console):
     graph.add_node(2, **{"$x": 10, "$y": 1})
     graph.add_edge(1, 2)
 
-    console_graph = ConsoleGraph[DiGraph](graph, layout_engine=StaticLayout())
+    console_graph = ConsoleGraph(graph, layout_engine=StaticLayout())
 
     with console.capture() as capture:
         console.print(console_graph)
@@ -120,7 +120,7 @@ def test_render_graph_with_mutations_update_positions(console):
     graph.add_node(2, **{"$x": 10, "$y": 1})
     graph.add_edge(1, 2)
 
-    expected_console_graph = ConsoleGraph[DiGraph](graph, layout_engine=StaticLayout())
+    expected_console_graph = ConsoleGraph(graph, layout_engine=StaticLayout())
 
     with console.capture() as capture:
         console.print(expected_console_graph)
@@ -137,7 +137,7 @@ def test_render_graph_with_mutations_update_positions_and_zoom(console, zoom: Au
     graph.add_node(2, **{"$x": 10, "$y": 1})
     graph.add_edge(1, 2)
 
-    console_graph = ConsoleGraph[DiGraph](graph, layout_engine=StaticLayout(), zoom=zoom)
+    console_graph = ConsoleGraph(graph, layout_engine=StaticLayout(), zoom=zoom)
 
     with console.capture() as capture:
         console.print(console_graph)
@@ -176,7 +176,7 @@ def test_render_graph_with_mutations_update_positions_and_data(console):
 
     graph.add_edge(1, 2)
 
-    console_graph = ConsoleGraph[DiGraph](graph, layout_engine=StaticLayout())
+    console_graph = ConsoleGraph(graph, layout_engine=StaticLayout())
 
     with console.capture() as capture:
         console.print(console_graph)
@@ -209,7 +209,7 @@ def test_render_graph_with_mutations_update_positions_and_data(console):
     )
     graph.add_edge(1, 2)
 
-    expected_console_graph = ConsoleGraph[DiGraph](graph, layout_engine=StaticLayout())
+    expected_console_graph = ConsoleGraph(graph, layout_engine=StaticLayout())
 
     with console.capture() as capture:
         console.print(expected_console_graph)
