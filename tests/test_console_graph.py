@@ -8,6 +8,7 @@ from netext.console_graph import AutoZoom
 from netext.geometry.point import FloatPoint
 from netext.geometry.region import Region
 from netext.layout_engines import StaticLayout
+from netext.testing.assertions import assert_output_equal
 
 
 @pytest.fixture
@@ -94,7 +95,7 @@ def test_render_graph_with_mutations_remove_and_add(console):
         console.print(console_graph)
     mutated = capture.get()
 
-    assert original == mutated
+    assert_output_equal(original, mutated)
 
 
 def test_render_graph_with_mutations_update_positions(console):
@@ -127,7 +128,7 @@ def test_render_graph_with_mutations_update_positions(console):
     expected = capture.get()
 
     assert original != mutated
-    assert expected == mutated
+    assert_output_equal(expected, mutated)
 
 
 @pytest.mark.parametrize("zoom", [AutoZoom.FIT, AutoZoom.FIT_PROPORTIONAL])
@@ -150,7 +151,7 @@ def test_render_graph_with_mutations_update_positions_and_zoom(console, zoom: Au
         console.print(console_graph)
     mutated = capture.get()
 
-    assert original == mutated
+    assert_output_equal(original, mutated)
 
 
 def test_render_graph_with_mutations_update_positions_and_data(console):
@@ -216,4 +217,4 @@ def test_render_graph_with_mutations_update_positions_and_data(console):
     expected = capture.get()
 
     assert original != mutated
-    assert expected == mutated
+    assert_output_equal(expected, mutated)

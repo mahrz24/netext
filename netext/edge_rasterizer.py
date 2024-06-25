@@ -46,6 +46,7 @@ def rasterize_edge(
     else:
         end, end_helper = v_buffer.get_magnet_position(u_buffer.center, properties.end_magnet)
 
+
     edge_input = EdgeInput(
         start=start,
         end=end,
@@ -56,6 +57,7 @@ def rasterize_edge(
     )
 
     if edge_layout is None:
+        print(f"Start: {start}, End: {end}, Start Helper: {start_helper}, End Helper: {end_helper}")
         edge_path = route_edge(
             start=start,
             end=end,
@@ -63,6 +65,7 @@ def rasterize_edge(
             start_helper=start_helper,
             end_helper=end_helper,
         )
+        print(edge_path.points)
 
         # We cut the edge segments with the nodes to get rid of the
         # parts hidden behind the nodes to draw correct arrow tips

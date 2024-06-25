@@ -428,6 +428,7 @@ class ConsoleGraph:
         self.port_positions.pop(node, None)
         self.port_side_assignments.pop(node, None)
         self._core_graph.remove_node(node)
+        self._edge_router.remove_node(node)
 
     def remove_edge(self, u: Hashable, v: Hashable) -> None:
         """Removes an edge from the graph.
@@ -445,6 +446,7 @@ class ConsoleGraph:
         self.node_buffers[u].disconnect(v)
 
         self._core_graph.remove_edge(u, v)
+        self._edge_router.remove_edge(u, v)
 
         self.edge_buffers.pop((u, v))
         self.edge_label_buffers.pop((u, v))
@@ -574,11 +576,14 @@ class ConsoleGraph:
         position_view_space = Point(round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y))
         self.node_buffers[node].center = position_view_space
         self._core_graph.update_node_data(node, dict(data, **{"$properties": properties}))
+        self._edge_router.remove_node(node)
+
         for v in self._core_graph.neighbors(node):
             if (node, v) in self.edge_buffers:
                 affected_edges.append((node, v))
             if (v, node) in self.edge_buffers:
                 affected_edges.append((v, node))
+
 
         if affected_edges and force_edge_rerender:
             for u, v in affected_edges:
@@ -651,6 +656,7 @@ class ConsoleGraph:
         properties = EdgeProperties.from_data_dict(data)
 
         self._core_graph.update_edge_data(u, v, dict(data, **{"$properties": properties}))
+        self._edge_router.remove_edge(u, v)
 
         edge_buffer: EdgeBuffer | None = None
         edge_layout: EdgeLayout | None = None
