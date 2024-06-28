@@ -139,6 +139,8 @@ class ConsoleGraph:
         as any other rich renderable. You can pass a layout engine and a
         specific console that will be used for rendering.
 
+
+
         Rendering of nodes and edges happens on object creation and the
         object size is determined by the graph (no reactive rendering).
 
@@ -529,6 +531,9 @@ class ConsoleGraph:
 
         force_edge_rerender = force_edge_rerender or (position is not None) or "$ports" in data
 
+        # We need to remove the node from the edge router before we recompute any kind of zoom
+        self._edge_router.remove_node(node)
+
         if position is None:
             node_position = self.node_positions[node]
             zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
@@ -576,7 +581,16 @@ class ConsoleGraph:
         position_view_space = Point(round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y))
         self.node_buffers[node].center = position_view_space
         self._core_graph.update_node_data(node, dict(data, **{"$properties": properties}))
-        self._edge_router.remove_node(node)
+
+
+        node_buffer = self.node_buffers[node]
+        placed_node = core.PlacedRectangularNode(
+                center=core.Point(node_buffer.center.x, node_buffer.center.y),
+                node=core.RectangularNode(
+                    size=core.Size(node_buffer.width, node_buffer.height),
+                ),
+            )
+        self._edge_router.add_node(node, placed_node)
 
         for v in self._core_graph.neighbors(node):
             if (node, v) in self.edge_buffers:
@@ -662,10 +676,6 @@ class ConsoleGraph:
         edge_layout: EdgeLayout | None = None
         label_nodes: list[StripBuffer] | None = None
 
-        old_edge_layout = None
-        if not update_layout:
-            old_edge_layout = self.edge_layouts.get((u, v))
-
         self.node_buffers[v].disconnect(u)
         self.node_buffers[u].disconnect(v)
 
@@ -682,7 +692,6 @@ class ConsoleGraph:
             self.node_buffers[v],
             properties,
             edge_lod,
-            edge_layout=old_edge_layout,
             port_positions=self.port_positions,
         )
         self._render_port_buffer_for_node(u)
@@ -782,6 +791,9 @@ class ConsoleGraph:
                     self.port_side_assignments[node][port_side].append(current_port_name)
 
     def _transition_compute_zoomed_positions(self) -> None:
+        # Reset the edge router, a change of zoom factor requires a new routing
+        self._edge_router = core.EdgeRouter()
+
         zoom_x, zoom_y = self._compute_current_zoom()
         self.zoom_x = zoom_x
         self.zoom_y = zoom_y

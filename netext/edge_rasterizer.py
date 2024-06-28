@@ -1,3 +1,4 @@
+from dataclasses import dataclass, field
 from typing import Hashable
 
 from rich.console import Console
@@ -17,6 +18,20 @@ from netext.shapes.shape import JustContentShape
 from netext.rendering.segment_buffer import Layer, StripBuffer, ZIndex
 import netext._core as core
 
+@dataclass
+class EdgeRoutingRequest:
+    u_buffer: NodeBuffer
+    v_buffer: NodeBuffer
+    properties: EdgeProperties
+    lod: int = 1
+    port_positions: dict[Hashable, dict[str, tuple[Point, Point | None]]] = field(default_factory=dict)
+
+def rasterize_edges(
+    console: Console,
+    edge_router: core.EdgeRouter,
+    edge_route_requests: list[EdgeRoutingRequest],
+) -> tuple[list[EdgeBuffer], list[EdgeLayout], list[StripBuffer]]:
+    pass
 
 def rasterize_edge(
     console: Console,
@@ -25,7 +40,6 @@ def rasterize_edge(
     v_buffer: NodeBuffer,
     properties: EdgeProperties,
     lod: int = 1,
-    edge_layout: EdgeLayout | None = None,
     port_positions: dict[Hashable, dict[str, tuple[Point, Point | None]]] = dict(),
 ) -> tuple[EdgeBuffer, EdgeLayout, list[StripBuffer]] | None:
     if not properties.show:
@@ -56,25 +70,21 @@ def rasterize_edge(
         routing_hints=[],  # TODO: If doing relayout, the edge input should contain the existing segments
     )
 
-    if edge_layout is None:
-        print(f"Start: {start}, End: {end}, Start Helper: {start_helper}, End Helper: {end_helper}")
-        edge_path = route_edge(
-            start=start,
-            end=end,
-            edge_router=edge_router,
-            start_helper=start_helper,
-            end_helper=end_helper,
-        )
-        print(edge_path.points)
+    edge_path = route_edge(
+        start=start,
+        end=end,
+        edge_router=edge_router,
+        start_helper=start_helper,
+        end_helper=end_helper,
+    )
 
-        # We cut the edge segments with the nodes to get rid of the
-        # parts hidden behind the nodes to draw correct arrow tips
-        edge_path = edge_path.cut_with_nodes([u_buffer, v_buffer])
+    # We cut the edge segments with the nodes to get rid of the
+    # parts hidden behind the nodes to draw correct arrow tips
+    edge_path = edge_path.cut_with_nodes([u_buffer, v_buffer])
 
-        if not edge_path.directed_points or edge_path.start == edge_path.end:
-            return None
-    else:
-        edge_path = edge_layout.path
+    if not edge_path.directed_points or edge_path.start == edge_path.end:
+        return None
+
 
     strips = rasterize_edge_path(
         edge_path, style=properties.style, edge_segment_drawing_mode=properties.segment_drawing_mode

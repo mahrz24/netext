@@ -272,7 +272,8 @@ impl EdgeRouter {
         end_direction: Direction,
         config: RoutingConfig,
     ) -> PyResult<Vec<DirectedPoint>> {
-        println!("Line occlusion: {:?}", self.line_occlusion);
+        // println!("Line occlusion:\n{:}", occlusion_map_as_string(&self.line_occlusion));
+        // println!("Shape occlusion:\n{:}", occlusion_map_as_string(&self.shape_occlusion));
 
         let start = DirectedPoint::new(start.x, start.y, start_direction);
         let end = DirectedPoint::new(end.x, end.y, end_direction);
@@ -310,4 +311,19 @@ impl EdgeRouter {
             "Goal not found.",
         ))
     }
+}
+
+fn occlusion_map_as_string(occlusion_map: &HashMap<(i32, i32), i32>) -> String {
+    let mut occlusion_map_string = String::new();
+    let x_min = occlusion_map.keys().map(|(x, _)| x).min().unwrap_or(&0);
+    let x_max = occlusion_map.keys().map(|(x, _)| x).max().unwrap_or(&0);
+    let y_min = occlusion_map.keys().map(|(_, y)| y).min().unwrap_or(&0);
+    let y_max = occlusion_map.keys().map(|(_, y)| y).max().unwrap_or(&0);
+    for y in *y_min..=*y_max {
+        for x in *x_min..=*x_max{
+            occlusion_map_string.push_str(&occlusion_map.get(&(x, y)).unwrap_or(&0).to_string());
+        }
+        occlusion_map_string.push_str("\n");
+    }
+    occlusion_map_string
 }
