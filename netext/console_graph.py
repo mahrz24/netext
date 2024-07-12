@@ -24,7 +24,7 @@ import netext._core as core
 from netext.rendering.segment_buffer import StripBuffer
 
 from netext.buffer_renderer import render_buffers
-from netext.edge_rasterizer import rasterize_edge
+from netext.edge_rasterizer import EdgeRoutingRequest, rasterize_edge, rasterize_edges
 from netext.node_rasterizer import NodeBuffer, rasterize_node
 
 from rich.traceback import install
@@ -890,42 +890,43 @@ class ConsoleGraph:
             raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
 
         # Now we rasterize the edges
-
-        # Iterate over all edges (so far in no particular order)
-        edge_layouts: list[EdgeLayout] = []
-
         all_node_buffers = []
         for _, node_buffer in self.node_buffers.items():
             all_node_buffers.append(node_buffer)
+
+        edge_routing_requests = []
 
         for u, v in self._core_graph.all_edges():
             data = self._core_graph.edge_data_or_default(u, v, dict())
             properties = EdgeProperties.from_data_dict(data)
             edge_lod = properties.lod_map(self._zoom_factor)
 
-            result = rasterize_edge(
-                self.console,
-                self._edge_router,
-                self.node_buffers[u],
-                self.node_buffers[v],
-                properties,
-                edge_lod,
+            edge_routing_requests.append(EdgeRoutingRequest(
+                u=u,
+                v=v,
+                u_buffer=self.node_buffers[u],
+                v_buffer=self.node_buffers[v],
+                properties=properties,
+                lod=edge_lod,
                 port_positions=self.port_positions,
-            )
+            ))
 
-            if result is None:
-                continue
+        edge_buffers, edge_layouts, label_buffers = rasterize_edges(
+            self.console,
+            self._edge_router,
+            edge_routing_requests
+        )
 
-            edge_buffer, edge_layout, label_nodes = result
+        for (u,v), edge_layout in edge_layouts.items():
             self._edge_router.add_edge(u, v, [core.Point(p.x, p.y) for p in edge_layout.path.points])
+            self.edge_layouts[(u, v)] = edge_layout
 
-            if edge_buffer is not None:
-                self.edge_buffers[(u, v)] = edge_buffer
-            if label_nodes is not None:
-                self.edge_label_buffers[(u, v)] = label_nodes
-            if edge_layout is not None:
-                edge_layouts.append(edge_layout)
-                self.edge_layouts[(u, v)] = edge_layout
+        for (u,v), edge_buffer in edge_buffers.items():
+            self.edge_buffers[(u, v)] = edge_buffer
+
+        for (u,v), label_nodes in label_buffers.items():
+            self.edge_label_buffers[(u, v)] = label_nodes
+
 
         self._render_port_buffers()
 

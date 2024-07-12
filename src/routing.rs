@@ -264,6 +264,15 @@ impl EdgeRouter {
         cost
     }
 
+    fn route_edges(&self, edges: Vec<(Point, Point, Direction, Direction, RoutingConfig)>) -> PyResult<Vec<Vec<DirectedPoint>>> {
+        let mut result = Vec::new();
+        for (start, end, start_direction, end_direction, config) in edges {
+            let directed_points = self.route_edge(start, end, start_direction, end_direction, config)?;
+            result.push(directed_points);
+        }
+        Ok(result)
+    }
+
     fn route_edge(
         &self,
         start: Point,

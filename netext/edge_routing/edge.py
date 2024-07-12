@@ -19,10 +19,6 @@ class EdgeInput:
     routing_mode: EdgeRoutingMode
     edge_segment_drawing_mode: EdgeSegmentDrawingMode
 
-    # This is used by the edge rasterizer to use data from
-    # external layout engines where to route along.
-    routing_hints: list[Point] = field(default_factory=list)
-
     def __hash__(self) -> int:
         return hash(
             (
@@ -30,7 +26,6 @@ class EdgeInput:
                 self.end,
                 self.routing_mode,
                 self.edge_segment_drawing_mode,
-                frozenset(self.routing_hints),
             )
         )
 
