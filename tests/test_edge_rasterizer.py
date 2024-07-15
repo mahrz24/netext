@@ -31,7 +31,7 @@ def test_trivial_edge(console: Console) -> None:
         properties=EdgeProperties(),
     )
     assert result is not None
-    edge, _, _ = result
+    edge, _ = result
 
     assert edge.width == 6
     assert edge.height == 7

@@ -1,7 +1,7 @@
 use priority_queue::PriorityQueue;
 use rstar::RTreeObject;
-use std::{cmp::Reverse, hash::Hash};
 use std::collections::{HashMap, HashSet};
+use std::{cmp::Reverse, hash::Hash};
 
 use pyo3::prelude::*;
 
@@ -14,7 +14,7 @@ use crate::{
 };
 
 #[pyclass]
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct RoutingConfig {
     neighborhood: Neighborhood,
     corner_cost: i32,
@@ -55,8 +55,26 @@ impl Default for RoutingConfig {
     }
 }
 
-fn heuristic(a: &DirectedPoint, b: &DirectedPoint) -> i32 {
-    ((((a.x - b.x).pow(2) + (a.y - b.y).pow(2)) as f64).sqrt() as i32) * 10
+fn heuristic(a: &DirectedPoint, b: &DirectedPoint, config: RoutingConfig) -> i32 {
+    let lowest_distance = if config.neighborhood == Neighborhood::Orthogonal {
+        (a.x - b.x).abs() + (a.y - b.y).abs()
+    } else {
+        (a.x - b.x).abs().max((a.y - b.y).abs())
+    };
+
+    let diagonal_cost = if config.diagonal_cost > 0 && b.direction.is_diagonal() {
+        config.diagonal_cost
+    } else {
+        0
+    };
+
+    if a.direction == b.direction {
+        lowest_distance + diagonal_cost
+    } else {
+        lowest_distance + diagonal_cost + config.corner_cost
+    }
+
+
 }
 
 fn get_neighbors(node: &DirectedPoint, neighborhood: Neighborhood) -> Vec<DirectedPoint> {
@@ -115,7 +133,7 @@ pub struct EdgeRouter {
     pub object_map: PyIndexSet,
     pub shape_occlusion: HashMap<(i32, i32), i32>,
     pub line_occlusion: HashMap<(i32, i32), i32>,
-    pub existing_edges: HashMap<(usize, usize), Vec<Point>>
+    pub existing_edges: HashMap<(usize, usize), Vec<Point>>,
 }
 
 impl RTreeObject for PlacedRectangularNode {
@@ -152,7 +170,7 @@ impl EdgeRouter {
             object_map: PyIndexSet::default(),
             shape_occlusion: HashMap::default(),
             line_occlusion: HashMap::default(),
-            existing_edges: HashMap::default()
+            existing_edges: HashMap::default(),
         }
     }
 
@@ -167,7 +185,10 @@ impl EdgeRouter {
         self.placed_node_tree.insert(placed_node);
         for x in placed_node.top_left().x..=placed_node.bottom_right().x {
             for y in placed_node.top_left().y..=placed_node.bottom_right().y {
-                self.shape_occlusion.entry((x, y)).and_modify(|e| *e += 1).or_insert(1);
+                self.shape_occlusion
+                    .entry((x, y))
+                    .and_modify(|e| *e += 1)
+                    .or_insert(1);
             }
         }
 
@@ -184,7 +205,10 @@ impl EdgeRouter {
         let end_index = self.object_map.insert_full(end)?.0;
 
         for point in &line {
-            self.line_occlusion.entry((point.x, point.y)).and_modify(|e| *e += 1).or_insert(1);
+            self.line_occlusion
+                .entry((point.x, point.y))
+                .and_modify(|e| *e += 1)
+                .or_insert(1);
         }
 
         self.existing_edges.insert((start_index, end_index), line);
@@ -195,8 +219,12 @@ impl EdgeRouter {
     fn remove_node(&mut self, node: &Bound<PyAny>) -> PyResult<()> {
         let index = self.object_map.get_full(node)?.map(|(index, _)| index);
         if let Some(index) = index {
-            for x in self.placed_nodes[&index].top_left().x..=self.placed_nodes[&index].bottom_right().x {
-                for y in self.placed_nodes[&index].top_left().y..=self.placed_nodes[&index].bottom_right().y {
+            for x in
+                self.placed_nodes[&index].top_left().x..=self.placed_nodes[&index].bottom_right().x
+            {
+                for y in self.placed_nodes[&index].top_left().y
+                    ..=self.placed_nodes[&index].bottom_right().y
+                {
                     self.shape_occlusion.entry((x, y)).and_modify(|e| *e -= 1);
                 }
             }
@@ -217,7 +245,9 @@ impl EdgeRouter {
 
         if let Some(line) = self.existing_edges.get(&(start_index, end_index)) {
             for point in line {
-                self.line_occlusion.entry((point.x, point.y)).and_modify(|e| *e -= 1);
+                self.line_occlusion
+                    .entry((point.x, point.y))
+                    .and_modify(|e| *e -= 1);
             }
             self.existing_edges.remove(&(start_index, end_index));
         }
@@ -237,7 +267,7 @@ impl EdgeRouter {
 
         if src.x != dst.x || src.y != dst.y {
             if src.direction.is_diagonal() {
-                cost += 14+config.diagonal_cost;
+                cost += 14 + config.diagonal_cost;
             } else {
                 cost += 10;
             }
@@ -251,12 +281,12 @@ impl EdgeRouter {
         // Add shape cost if the edge intersects a shape
         if config.shape_cost > 0 {
             if *self.shape_occlusion.get(&(dst.x, dst.y)).unwrap_or(&0) > 0 {
-                    cost += config.shape_cost;
+                cost += config.shape_cost;
             }
         }
 
         if config.line_cost > 0 {
-            if *self.line_occlusion.get(&(dst.x, dst.y)).unwrap_or(&0) > 0  {
+            if *self.line_occlusion.get(&(dst.x, dst.y)).unwrap_or(&0) > 0 {
                 cost += config.line_cost;
             }
         }
@@ -264,10 +294,27 @@ impl EdgeRouter {
         cost
     }
 
-    fn route_edges(&self, edges: Vec<(Point, Point, Direction, Direction, RoutingConfig)>) -> PyResult<Vec<Vec<DirectedPoint>>> {
+    fn route_edges(
+        &mut self,
+        edges: Vec<(
+            Bound<'_, PyAny>,
+            Bound<'_, PyAny>,
+            Point,
+            Point,
+            Direction,
+            Direction,
+            RoutingConfig,
+        )>,
+    ) -> PyResult<Vec<Vec<DirectedPoint>>> {
         let mut result = Vec::new();
-        for (start, end, start_direction, end_direction, config) in edges {
-            let directed_points = self.route_edge(start, end, start_direction, end_direction, config)?;
+        for (u, v, start, end, start_direction, end_direction, config) in edges {
+            let directed_points =
+                self.route_edge(start, end, start_direction, end_direction, config)?;
+            let path = directed_points
+                .iter()
+                .map(|p| Point::new(p.x, p.y))
+                .collect();
+            let _ = self.add_edge(&u, &v, path);
             result.push(directed_points);
         }
         Ok(result)
@@ -295,21 +342,21 @@ impl EdgeRouter {
         g_score.insert(start, 0);
 
         let mut f_score = HashMap::new();
-        f_score.insert(start, heuristic(&start, &end));
+        f_score.insert(start, heuristic(&start, &end, config));
 
         while let Some((current, _)) = open_set.pop() {
             if current == end {
                 return Ok(reconstruct_path(&came_from, current));
             }
 
-            for neighbor in get_neighbors(&current, config.neighborhood) {
+            for neighbor in get_neighbors(&current, config.clone().neighborhood) {
                 let tentative_g_score = g_score.get(&current).unwrap_or(&(i32::MAX - 100))
                     + self.transition_cost(&current, &neighbor, &config);
 
                 if tentative_g_score < *g_score.get(&neighbor).unwrap_or(&(i32::MAX - 100)) {
                     came_from.insert(neighbor, current);
                     g_score.insert(neighbor, tentative_g_score);
-                    f_score.insert(neighbor, tentative_g_score + heuristic(&neighbor, &end));
+                    f_score.insert(neighbor, tentative_g_score + heuristic(&neighbor, &end, config));
 
                     open_set.push(neighbor, Reverse(*f_score.get(&neighbor).unwrap()));
                 }
@@ -329,7 +376,7 @@ fn occlusion_map_as_string(occlusion_map: &HashMap<(i32, i32), i32>) -> String {
     let y_min = occlusion_map.keys().map(|(_, y)| y).min().unwrap_or(&0);
     let y_max = occlusion_map.keys().map(|(_, y)| y).max().unwrap_or(&0);
     for y in *y_min..=*y_max {
-        for x in *x_min..=*x_max{
+        for x in *x_min..=*x_max {
             occlusion_map_string.push_str(&occlusion_map.get(&(x, y)).unwrap_or(&0).to_string());
         }
         occlusion_map_string.push_str("\n");

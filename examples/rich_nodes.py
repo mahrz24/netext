@@ -5,6 +5,7 @@ from rich.table import Table
 from rich.text import Text
 from netext import ConsoleGraph
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
+from netext.edge_routing.modes import EdgeRoutingMode
 from netext.properties.shape import JustContent
 
 
@@ -50,5 +51,6 @@ def _render(n, d, s):
 nx.set_node_attributes(ast_graph, _render, "$content-renderer")
 nx.set_node_attributes(ast_graph, JustContent(), "$shape")
 
+nx.set_edge_attributes(ast_graph, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
 nx.set_edge_attributes(ast_graph, EdgeSegmentDrawingMode.BOX_HEAVY, "$edge-segment-drawing-mode")
 print(ConsoleGraph(ast_graph))

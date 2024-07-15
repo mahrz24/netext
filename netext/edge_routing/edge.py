@@ -1,12 +1,10 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.geometry import Point
 from netext.node_rasterizer import NodeBuffer
 from typing import Iterable, Tuple
-
-from netext.rendering.segment_buffer import ZIndex
 
 
 @dataclass(frozen=True)
@@ -82,35 +80,3 @@ class EdgePath:
 
     def edge_iter_point(self, index: int) -> Point:
         return self.points[index]
-
-
-@dataclass(frozen=True)
-class EdgeLayout:
-    input: EdgeInput
-    path: EdgePath
-    z_index: ZIndex
-
-    def __hash__(self) -> int:
-        return hash(
-            (
-                self.input,
-                self.z_index,
-                frozenset(self.path.directed_points),
-            )
-        )
-
-    @property
-    def left_x(self) -> int:
-        return min(point.x for point, _ in self.path.directed_points)
-
-    @property
-    def right_x(self) -> int:
-        return max(point.x for point, _ in self.path.directed_points)
-
-    @property
-    def top_y(self) -> int:
-        return min(point.y for point, _ in self.path.directed_points)
-
-    @property
-    def bottom_y(self) -> int:
-        return max(point.y for point, _ in self.path.directed_points)

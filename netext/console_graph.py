@@ -14,7 +14,6 @@ from rich.measure import Measurement
 from netext.geometry import Point, Region
 
 from netext.edge_rendering.buffer import EdgeBuffer
-from netext.edge_routing.edge import EdgeLayout
 from netext.geometry.magnet import Magnet, ShapeSide
 from netext.geometry.point import FloatPoint
 from netext.properties.edge import EdgeProperties
@@ -191,7 +190,6 @@ class ConsoleGraph:
         self.node_positions: dict[Hashable, FloatPoint] = dict()
 
         self.edge_buffers: dict[tuple[Hashable, Hashable], EdgeBuffer] = dict()
-        self.edge_layouts: dict[tuple[Hashable, Hashable], EdgeLayout] = dict()
 
         self.edge_label_buffers: dict[tuple[Hashable, Hashable], list[StripBuffer]] = dict()
 
@@ -393,14 +391,12 @@ class ConsoleGraph:
             port_positions=self.port_positions,
         )
         if result is not None:
-            edge_buffer, edge_layout, label_nodes = result
+            edge_buffer, label_nodes = result
 
         if edge_buffer is not None:
             self.edge_buffers[(u, v)] = edge_buffer
         if label_nodes is not None:
             self.edge_label_buffers[(u, v)] = label_nodes
-        if edge_layout is not None:
-            self.edge_layouts[(u, v)] = edge_layout
 
         self._render_port_buffer_for_node(u)
         self._render_port_buffer_for_node(v)
@@ -673,13 +669,11 @@ class ConsoleGraph:
         self._edge_router.remove_edge(u, v)
 
         edge_buffer: EdgeBuffer | None = None
-        edge_layout: EdgeLayout | None = None
         label_nodes: list[StripBuffer] | None = None
 
         self.node_buffers[v].disconnect(u)
         self.node_buffers[u].disconnect(v)
 
-        del self.edge_layouts[(u, v)]
         del self.edge_buffers[(u, v)]
         del self.edge_label_buffers[(u, v)]
 
@@ -698,13 +692,11 @@ class ConsoleGraph:
         self._render_port_buffer_for_node(v)
 
         if result is not None:
-            edge_buffer, edge_layout, label_nodes = result
+            edge_buffer, label_nodes = result
         if edge_buffer is not None:
             self.edge_buffers[(u, v)] = edge_buffer
         if label_nodes is not None:
             self.edge_label_buffers[(u, v)] = label_nodes
-        if edge_layout is not None:
-            self.edge_layouts[(u, v)] = edge_layout
 
     def layout(self) -> None:
         self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_FOR_LAYOUT)
@@ -911,15 +903,11 @@ class ConsoleGraph:
                 port_positions=self.port_positions,
             ))
 
-        edge_buffers, edge_layouts, label_buffers = rasterize_edges(
+        edge_buffers, label_buffers = rasterize_edges(
             self.console,
             self._edge_router,
             edge_routing_requests
         )
-
-        for (u,v), edge_layout in edge_layouts.items():
-            self._edge_router.add_edge(u, v, [core.Point(p.x, p.y) for p in edge_layout.path.points])
-            self.edge_layouts[(u, v)] = edge_layout
 
         for (u,v), edge_buffer in edge_buffers.items():
             self.edge_buffers[(u, v)] = edge_buffer
