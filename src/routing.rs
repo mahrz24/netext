@@ -74,7 +74,6 @@ fn heuristic(a: &DirectedPoint, b: &DirectedPoint, config: RoutingConfig) -> i32
         lowest_distance + diagonal_cost + config.corner_cost
     }
 
-
 }
 
 fn get_neighbors(node: &DirectedPoint, neighborhood: Neighborhood) -> Vec<DirectedPoint> {

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from netext._core import Direction
 import shapely as sp
 
 
