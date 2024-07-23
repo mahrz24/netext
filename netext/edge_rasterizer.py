@@ -7,6 +7,7 @@ from netext.edge_rendering.arrow_tips import render_arrow_tip_buffers
 from netext.edge_rendering.buffer import EdgeBuffer
 from netext.edge_rendering.path_rasterizer import rasterize_edge_path
 from netext.edge_routing.edge import EdgeInput
+from netext.edge_routing.node_anchors import NodeAnchors
 from netext.edge_routing.route import route_edge, route_edges
 from netext.geometry.point import Point
 
@@ -27,8 +28,6 @@ class EdgeRoutingRequest:
     v_buffer: NodeBuffer
     properties: EdgeProperties
     lod: int = 1
-    port_positions: dict[Hashable, dict[str, tuple[Point, Point | None]]] = field(default_factory=dict)
-
 
 def rasterize_edges(
     console: Console,
@@ -49,7 +48,7 @@ def rasterize_edges(
             request.properties = request.properties.lod_properties.get(request.lod, request.properties)
 
         start, end, start_direction, end_direction = determine_edge_anchors(
-            request.u_buffer, request.v_buffer, request.properties, request.port_positions
+            request.u_buffer, request.v_buffer, request.properties
         )
         edge_input = EdgeInput(
             start=start,
@@ -101,7 +100,6 @@ def rasterize_edge(
     v_buffer: NodeBuffer,
     properties: EdgeProperties,
     lod: int = 1,
-    port_positions: dict[Hashable, dict[str, tuple[Point, Point | None]]] = dict(),
 ) -> tuple[EdgeBuffer, list[StripBuffer]] | None:
     if not properties.show:
         return None
@@ -109,7 +107,7 @@ def rasterize_edge(
     if lod != 1:
         properties = properties.lod_properties.get(lod, properties)
 
-    start, end, start_direction, end_direction = determine_edge_anchors(u_buffer, v_buffer, properties, port_positions)
+    start, end, start_direction, end_direction = determine_edge_anchors(u_buffer, v_buffer, properties)
 
     edge_input = EdgeInput(
         start=start,
@@ -204,64 +202,17 @@ def determine_edge_anchors(
     u_buffer: NodeBuffer,
     v_buffer: NodeBuffer,
     properties: EdgeProperties,
-    port_positions: dict[Hashable, dict[str, tuple[Point, Point | None]]],
 ) -> tuple[Point, Point, Direction, Direction]:
-    if (port_name := properties.start_port) is not None and port_name in port_positions[u_buffer.node]:
-        start, start_helper = port_positions[u_buffer.node][port_name]
+    if (port_name := properties.start_port) is not None and port_name in u_buffer.node_anchors.all_positions:
+        start, start_direction = u_buffer.node_anchors.all_positions[port_name]
         u_buffer.connect_port(port_name, v_buffer.node)
     else:
-        start, start_helper = u_buffer.get_magnet_position(v_buffer.center, properties.start_magnet)
+        start, start_direction = u_buffer.get_magnet_position(v_buffer.center, properties.start_magnet)
 
-    if (port_name := properties.end_port) is not None and port_name in port_positions[v_buffer.node]:
-        end, end_helper = port_positions[v_buffer.node][port_name]
+    if (port_name := properties.end_port) is not None and port_name in v_buffer.node_anchors.all_positions:
+        end, end_direction = v_buffer.node_anchors.all_positions[port_name]
         v_buffer.connect_port(port_name, u_buffer.node)
     else:
-        end, end_helper = v_buffer.get_magnet_position(u_buffer.center, properties.end_magnet)
+        end, end_direction = v_buffer.get_magnet_position(u_buffer.center, properties.end_magnet)
 
-    start_direction, end_direction = calculate_start_end_directions(start, end, start_helper, end_helper)
     return start, end, start_direction, end_direction
-
-
-def calculate_start_end_directions(
-    start: Point, end: Point, start_helper: Point | None, end_helper: Point | None
-) -> tuple[Direction, Direction]:
-    start_direction = Direction.CENTER
-    if start_helper is not None:
-        delta = start_helper - start
-        if delta.x > 0 and delta.y > 0:
-            start_direction = Direction.UP_RIGHT
-        elif delta.x > 0 and delta.y < 0:
-            start_direction = Direction.DOWN_RIGHT
-        elif delta.x < 0 and delta.y > 0:
-            start_direction = Direction.UP_LEFT
-        elif delta.x < 0 and delta.y < 0:
-            start_direction = Direction.DOWN_LEFT
-        elif delta.x > 0:
-            start_direction = Direction.RIGHT
-        elif delta.x < 0:
-            start_direction = Direction.LEFT
-        elif delta.y > 0:
-            start_direction = Direction.UP
-        else:
-            start_direction = Direction.DOWN
-
-    end_direction = Direction.CENTER
-    if end_helper is not None:
-        delta = end_helper - end
-        if delta.x > 0 and delta.y > 0:
-            end_direction = Direction.UP_RIGHT
-        elif delta.x > 0 and delta.y < 0:
-            end_direction = Direction.DOWN_RIGHT
-        elif delta.x < 0 and delta.y > 0:
-            end_direction = Direction.UP_LEFT
-        elif delta.x < 0 and delta.y < 0:
-            end_direction = Direction.DOWN_LEFT
-        elif delta.x > 0:
-            end_direction = Direction.RIGHT
-        elif delta.x < 0:
-            end_direction = Direction.LEFT
-        elif delta.y > 0:
-            end_direction = Direction.UP
-        else:
-            end_direction = Direction.DOWN
-    return start_direction, end_direction

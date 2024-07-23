@@ -353,7 +353,7 @@ impl CoreGraph {
         match index {
             Some((index, _)) => {
                 let index = NodeIndex::new(index);
-                let neighbours: Vec<&PyObject> = self
+                let neighbors: Vec<&PyObject> = self
                     .graph
                     .neighbors_directed(index, petgraph::Direction::Incoming)
                     .chain(
@@ -362,7 +362,45 @@ impl CoreGraph {
                     )
                     .filter_map(|neighbour| self.object_map.get_index(neighbour.index()))
                     .collect();
-                Ok(neighbours)
+                Ok(neighbors)
+            }
+            None => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Node does {:?} not exist.",
+                obj
+            ))),
+        }
+    }
+
+    fn neighbors_outgoing(&self, obj: &Bound<'_, PyAny>) -> PyResult<Vec<&PyObject>> {
+        let index = self.object_map.get_full(obj)?;
+        match index {
+            Some((index, _)) => {
+                let index = NodeIndex::new(index);
+                let neighbors: Vec<&PyObject> = self
+                    .graph
+                    .neighbors_directed(index, petgraph::Direction::Outgoing)
+                    .filter_map(|neighbour| self.object_map.get_index(neighbour.index()))
+                    .collect();
+                Ok(neighbors)
+            }
+            None => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                "Node does {:?} not exist.",
+                obj
+            ))),
+        }
+    }
+
+    fn neighbors_incoming(&self, obj: &Bound<'_, PyAny>) -> PyResult<Vec<&PyObject>> {
+        let index = self.object_map.get_full(obj)?;
+        match index {
+            Some((index, _)) => {
+                let index = NodeIndex::new(index);
+                let neighbors: Vec<&PyObject> = self
+                    .graph
+                    .neighbors_directed(index, petgraph::Direction::Incoming)
+                    .filter_map(|neighbour| self.object_map.get_index(neighbour.index()))
+                    .collect();
+                Ok(neighbors)
             }
             None => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                 "Node does {:?} not exist.",

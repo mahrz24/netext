@@ -4,6 +4,7 @@ import warnings
 
 from rich.console import Console
 from rich.padding import Padding
+from netext.edge_routing.node_anchors import NodeAnchors
 from netext.geometry import Point
 from netext.geometry.magnet import ShapeSide
 from netext.node_rendering.buffers import NodeBuffer
@@ -19,7 +20,7 @@ def rasterize_node(
     node: Hashable,
     data: dict[str, Any],
     lod: int = 1,
-    port_side_assignments: dict[ShapeSide, list[str]] = dict(),
+    node_anchors: NodeAnchors = NodeAnchors(),
 ) -> NodeBuffer:
     properties = NodeProperties.from_data_dict(data)
 
@@ -38,7 +39,7 @@ def rasterize_node(
             [
                 len(port.label) + 1
                 for port_name, port in properties.ports.items()
-                if port_name in port_side_assignments.get(ShapeSide.TOP, [])
+                if port_name in node_anchors.ports_per_side.get(ShapeSide.TOP, [])
             ]
             + [0]
         )
@@ -46,7 +47,7 @@ def rasterize_node(
             [
                 len(port.label) + 1
                 for port_name, port in properties.ports.items()
-                if port_name in port_side_assignments.get(ShapeSide.LEFT, [])
+                if port_name in node_anchors.ports_per_side.get(ShapeSide.LEFT, [])
             ]
             + [0]
         )
@@ -54,7 +55,7 @@ def rasterize_node(
             [
                 len(port.label) + 1
                 for port_name, port in properties.ports.items()
-                if port_name in port_side_assignments.get(ShapeSide.BOTTOM, [])
+                if port_name in node_anchors.ports_per_side.get(ShapeSide.BOTTOM, [])
             ]
             + [0]
         )
@@ -62,7 +63,7 @@ def rasterize_node(
             [
                 len(port.label) + 1
                 for port_name, port in properties.ports.items()
-                if port_name in port_side_assignments.get(ShapeSide.RIGHT, [])
+                if port_name in node_anchors.ports_per_side.get(ShapeSide.RIGHT, [])
             ]
             + [0]
         )
@@ -103,7 +104,7 @@ def rasterize_node(
         style=properties.style,
         padding=padding,
         properties=shape_props,
-        port_side_assignments=port_side_assignments,
+        port_side_assignments=node_anchors.ports_per_side,
     )
 
     return NodeBuffer.from_strips(
@@ -113,4 +114,5 @@ def rasterize_node(
         center=Point(x=0, y=0),
         z_index=ZIndex(layer=Layer.NODES),
         lod=lod,
+        node_anchors=node_anchors,
     )

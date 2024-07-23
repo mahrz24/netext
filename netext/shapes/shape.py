@@ -5,6 +5,7 @@ from rich.padding import PaddingDimensions
 from rich.segment import Segment
 from rich.style import Style
 
+from netext._core import Direction
 from netext.geometry import Magnet, Point
 from shapely import LineString, Polygon
 from netext.geometry.magnet import ShapeSide
@@ -24,7 +25,7 @@ class Shape(Protocol):
         magnet: Magnet,
         offset: int = 0,
         extrusion_offset: int = 2,
-    ) -> tuple[Point, Point | None]:
+    ) -> tuple[Point, Direction]:
         return NotImplemented
 
     def get_closest_magnet(
@@ -111,47 +112,35 @@ class RectangularShapeMixin:
         magnet: Magnet,
         offset: int = 0,
         extrusion_offset: int = 2,
-    ) -> tuple[Point, Point | None]:
+    ) -> tuple[Point, Direction]:
         extruded_point: Point | None = None
         match magnet:
             case Magnet.TOP:
-                extruded_point = Point(
-                    x=shape_buffer.center.x + offset,
-                    y=shape_buffer.top_y - extrusion_offset,
-                )
+                direction = Direction.UP
                 return (
                     Point(x=shape_buffer.center.x + offset, y=shape_buffer.top_y),
-                    extruded_point,
+                    direction,
                 )
             case Magnet.LEFT:
-                extruded_point = Point(
-                    x=shape_buffer.left_x - extrusion_offset,
-                    y=shape_buffer.center.y + offset,
-                )
+                direction = Direction.LEFT
                 return (
                     Point(x=shape_buffer.left_x, y=shape_buffer.center.y + offset),
-                    extruded_point,
+                    direction,
                 )
             case Magnet.BOTTOM:
-                extruded_point = Point(
-                    x=shape_buffer.center.x - offset,
-                    y=shape_buffer.bottom_y + extrusion_offset,
-                )
+                direction = Direction.DOWN
                 return (
                     Point(x=shape_buffer.center.x - offset, y=shape_buffer.bottom_y),
-                    extruded_point,
+                    direction,
                 )
             case Magnet.RIGHT:
-                extruded_point = Point(
-                    x=shape_buffer.right_x + extrusion_offset,
-                    y=shape_buffer.center.y - offset,
-                )
+                direction = Direction.RIGHT
                 return (
                     Point(x=shape_buffer.right_x, y=shape_buffer.center.y - offset),
-                    extruded_point,
+                    direction,
                 )
             case Magnet.CENTER:
-                return shape_buffer.center - Point(x=offset, y=0), None
+                return shape_buffer.center - Point(x=offset, y=0), Direction.CENTER
             case Magnet.CLOSEST:
                 direct_line = LineString([shape_buffer.center.shapely, target_point.shapely])
                 node_polygon = self.polygon(shape_buffer)
@@ -159,7 +148,7 @@ class RectangularShapeMixin:
                 intersection_point = intersection.line_interpolate_point(1.0, normalized=True)
 
                 closest_magnet = Magnet.TOP
-                closest_point, closest_extruded_point = self.get_magnet_position(
+                closest_point, closest_direction = self.get_magnet_position(
                     shape_buffer=shape_buffer,
                     target_point=target_point,
                     magnet=closest_magnet,
@@ -170,7 +159,7 @@ class RectangularShapeMixin:
                 closest_distance = intersection_point.distance(closest_point.shapely)
 
                 for magnet in [Magnet.LEFT, Magnet.RIGHT, Magnet.BOTTOM]:
-                    point, extruded_point = self.get_magnet_position(
+                    point, direction = self.get_magnet_position(
                         shape_buffer=shape_buffer,
                         target_point=target_point,
                         magnet=magnet,
@@ -180,10 +169,10 @@ class RectangularShapeMixin:
                     distance = intersection_point.distance(point.shapely)
                     if distance < closest_distance:
                         closest_point = point
-                        closest_extruded_point = extruded_point
+                        closest_direction = direction
                         closest_distance = distance
 
-                return closest_point, closest_extruded_point
+                return closest_point, closest_direction
         raise RuntimeError(magnet)
 
 

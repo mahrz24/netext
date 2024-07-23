@@ -11,6 +11,7 @@ import networkx as nx  # type: ignore
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.measure import Measurement
 
+from netext.edge_routing.node_anchors import NodeAnchors
 from netext.geometry import Point, Region
 
 from netext.edge_rendering.buffer import EdgeBuffer
@@ -98,32 +99,10 @@ class ZoomSpec:
     """Scaling along the y-axis."""
 
 
-def determine_port_side_assignment(
-    properties: NodeProperties,
-    port_sides: dict[str, ShapeSide],
-    port_side_assignments: dict[ShapeSide, list[str]],
-) -> None:
-    """Determines the port side assignment for a given node based on its properties.
-
-    Args:
-        node (Hashable): The node for which to determine the port side assignment.
-        properties (NodeProperties): The properties of the node.
-    """
-    # Determine port side assignment
-    for current_port_name, port in sorted(properties.ports.items(), key=lambda x: x[1].key):
-        port_magnet = port.magnet if port.magnet is not None else Magnet.LEFT
-        if port.magnet == Magnet.CENTER or port.magnet == Magnet.CLOSEST:
-            port_magnet = Magnet.LEFT
-        port_side = ShapeSide(port_magnet.value)
-        port_sides[current_port_name] = port_side
-        port_side_assignments[port_side].append(current_port_name)
-
-
 class ConsoleGraph:
     def __init__(
         self,
         graph: DiGraph,
-        # see https://github.com/python/mypy/issues/3737
         layout_engine: core.LayoutEngine = core.SugiyamaLayout(),
         console: Console = Console(),
         viewport: Region | None = None,
@@ -144,7 +123,7 @@ class ConsoleGraph:
         object size is determined by the graph (no reactive rendering).
 
         Args:
-            graph (G): A networkx graph object (see [networkx.Graph][] or [networkx.DiGraph][]).
+            graph (G): A networkx digraph object ([networkx.DiGraph][]).
             layout_engine (LayoutEngine[G], optional): The layout engine used.
             console (Console, optional): The rich console driver used to render.
             viewport (Region, optional): The viewport to render. Defaults to the whole graph.
@@ -184,18 +163,12 @@ class ConsoleGraph:
 
         self.node_buffers_for_layout: dict[Hashable, NodeBuffer] = dict()
         self.node_buffers: dict[Hashable, NodeBuffer] = dict()
-
         self.port_buffers: dict[Hashable, list[StripBuffer]] = dict()
 
         self.node_positions: dict[Hashable, FloatPoint] = dict()
 
         self.edge_buffers: dict[tuple[Hashable, Hashable], EdgeBuffer] = dict()
-
         self.edge_label_buffers: dict[tuple[Hashable, Hashable], list[StripBuffer]] = dict()
-
-        self.port_side_assignments: dict[Hashable, dict[ShapeSide, list[str]]] = defaultdict(lambda: defaultdict(list))
-        self.port_sides: dict[Hashable, dict[str, ShapeSide]] = defaultdict(dict)
-        self.port_positions: dict[Hashable, dict[str, tuple[Point, Point | None]]] = defaultdict(dict)
 
     def _require(self, required_state: RenderState):
         if required_state in nx.descendants(transition_graph, self._render_state):
@@ -301,16 +274,21 @@ class ConsoleGraph:
         self._core_graph.add_node(node, dict(data, **{"$properties": properties}))
 
         # Add to node buffers for layout
-        self.node_buffers_for_layout[node] = rasterize_node(self.console, node, cast(dict[str, Any], data))
+        node_buffer = rasterize_node(self.console, node, cast(dict[str, Any], data))
+        node_buffer.determine_port_sides()
 
-        determine_port_side_assignment(properties, self.port_sides[node], self.port_side_assignments[node])
+        self.node_buffers_for_layout[node] = node_buffer
 
-        self.node_buffers[node] = rasterize_node(
+        lod = properties.lod_map(self._zoom_factor) if self._zoom_factor is not None else 1
+
+        node_buffer = rasterize_node(
             self.console,
             node,
             data,
-            port_side_assignments=self.port_side_assignments[node],
+            lod=lod,
+            node_anchors=node_buffer.node_anchors,
         )
+        node_buffer.determine_port_positions()
 
         if position is not None:
             node_position = cast(FloatPoint, position)
@@ -331,9 +309,6 @@ class ConsoleGraph:
                 self._zoom_factor = zoom_factor
                 self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
                 return
-
-            lod = properties.lod_map(zoom_factor)
-            self._determine_port_positions(node, lod=lod, properties=properties)
 
             position_view_space = Point(
                 round(node_position.x * self.zoom_x),
@@ -360,7 +335,6 @@ class ConsoleGraph:
         self._require(RenderState.EDGES_RENDERED)
 
         edge_buffer: EdgeBuffer | None = None
-        edge_layout: EdgeLayout | None = None
         label_nodes: list[StripBuffer] | None = None
 
         if self._zoom_factor is None:
@@ -387,8 +361,7 @@ class ConsoleGraph:
             self.node_buffers[u],
             self.node_buffers[v],
             properties,
-            edge_lod,
-            port_positions=self.port_positions,
+            edge_lod
         )
         if result is not None:
             edge_buffer, label_nodes = result
@@ -423,8 +396,6 @@ class ConsoleGraph:
         self.node_buffers.pop(node)
 
         self.port_buffers.pop(node, None)
-        self.port_positions.pop(node, None)
-        self.port_side_assignments.pop(node, None)
         self._core_graph.remove_node(node)
         self._edge_router.remove_node(node)
 
@@ -494,30 +465,27 @@ class ConsoleGraph:
             old_position = self.node_buffers[node].center
 
             # Update node buffers for layout
-            self.node_buffers_for_layout[node] = rasterize_node(self.console, node, cast(dict[str, Any], new_data))
+            lod = properties.lod_map(self._zoom_factor) if self._zoom_factor is not None else 1
+            node_buffer = rasterize_node(self.console, node, data=cast(dict[str, Any], new_data), lod=lod)
+            self.node_buffers_for_layout[node] = node_buffer
+
+            node_buffer.determine_port_sides()
 
             # Update port side assignment
 
-            # Determine port side assignment
-            # TODO this is duplicated and also not using the properties
-            self.port_sides[node] = dict()
-            self.port_side_assignments[node] = defaultdict(list)
-
-            determine_port_side_assignment(properties, self.port_sides[node], self.port_side_assignments[node])
-
-            new_node = rasterize_node(
+            new_node_buffer = rasterize_node(
                 self.console,
                 node,
                 new_data,
-                port_side_assignments=self.port_side_assignments[node],
+                node_anchors=node_buffer.node_anchors,
             )
 
             old_node = self.node_buffers[node]
-            new_node.center = old_position
-            self.node_buffers[node] = new_node
+            new_node_buffer.center = old_position
+            self.node_buffers[node] = new_node_buffer
 
             # If the data change, triggered a change of the shape, we need to rerender the edges
-            if new_node.shape.polygon(new_node) != old_node.shape.polygon(old_node):
+            if new_node_buffer.shape.polygon(new_node_buffer) != old_node.shape.polygon(old_node):
                 force_edge_rerender = True
 
         node_data = cast(dict[Hashable, Any], self._core_graph.node_data_or_default(node, dict()))
@@ -541,7 +509,7 @@ class ConsoleGraph:
                 round(node_position.x * self.zoom_x),
                 round(node_position.y * self.zoom_y),
             )
-            self.node_buffers[node].port_positions = defaultdict(dict)
+            self.node_buffers[node].node_anchors.all_positions = dict()
 
             # Then we recompute zoom (in case we have a zoom to fit)
             zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
@@ -554,22 +522,10 @@ class ConsoleGraph:
                 self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
                 return
 
-        lod = properties.lod_map(zoom_factor)
-
-        if lod != 1:
-            self.node_buffers[node] = rasterize_node(
-                self.console,
-                node,
-                data,
-                lod=lod,
-                port_side_assignments=self.port_side_assignments[node],
-            )
-
         # This seems quite weird to keep
         # TODO also ports could have changed with data update needs some proper treatment
         self.node_buffers[node].connected_ports = connected_ports
 
-        self._determine_port_positions(node, lod=lod, properties=properties)
         self._render_port_buffer_for_node(node)
 
         affected_edges: list[tuple[Hashable, Hashable]] = []
@@ -686,7 +642,6 @@ class ConsoleGraph:
             self.node_buffers[v],
             properties,
             edge_lod,
-            port_positions=self.port_positions,
         )
         self._render_port_buffer_for_node(u)
         self._render_port_buffer_for_node(v)
@@ -745,42 +700,16 @@ class ConsoleGraph:
         for node, position in self.node_positions.items():
             self.node_buffers_for_layout[node].center = Point(x=round(position.x), y=round(position.y))
 
-        # TODO Split off into own step
-        for node in self._core_graph.all_nodes():
-            data = self._core_graph.node_data_or_default(node, dict())
-            properties = NodeProperties.from_data_dict(data)
-            if properties.ports:
-                for current_port_name, port in sorted(properties.ports.items(), key=lambda x: x[1].key):
-                    if port.magnet == Magnet.CENTER or port.magnet == Magnet.CLOSEST or port.magnet is None:
-                        # Determine the port magnet
-                        port_side = ShapeSide.LEFT
-                        neighbours = self._core_graph.neighbors(node)
-                        for v_node in neighbours:
-                            if self._core_graph.contains_edge(node, v_node):
-                                edge_out_properties = EdgeProperties.from_data_dict(
-                                    self._core_graph.edge_data_or_default(node, v_node, dict())
-                                )
-                                edge_in_properties = EdgeProperties.from_data_dict(
-                                    self._core_graph.edge_data_or_default(v_node, node, dict())
-                                )
-                                if edge_out_properties.start_port == current_port_name:
-                                    port_side = ShapeSide(
-                                        self.node_buffers_for_layout[node]
-                                        .get_closest_magnet(self.node_buffers_for_layout[v_node].center)
-                                        .value
-                                    )
-                                elif edge_in_properties.end_port == current_port_name:
-                                    port_side = ShapeSide(
-                                        self.node_buffers_for_layout[node]
-                                        .get_closest_magnet(self.node_buffers_for_layout[v_node].center)
-                                        .value
-                                    )
+        # Compute the port sides for each node
+        for node, node_buffer in self.node_buffers_for_layout.items():
+            out_neighbors = [(other, EdgeProperties.from_data_dict(
+                                    self._core_graph.edge_data_or_default(node, other, dict())
+                                )) for other in self._core_graph.neighbors_outgoing(node)]
+            in_neighbors = [(other, EdgeProperties.from_data_dict(
+                                    self._core_graph.edge_data_or_default(other, node, dict())
+                                )) for other in self._core_graph.neighbors_incoming(node)]
 
-                    else:
-                        port_side = ShapeSide(port.magnet.value)
-
-                    self.port_sides[node][current_port_name] = port_side
-                    self.port_side_assignments[node][port_side].append(current_port_name)
+            node_buffer.determine_port_sides(out_neighbors=out_neighbors, in_neighbors=in_neighbors)
 
     def _transition_compute_zoomed_positions(self) -> None:
         # Reset the edge router, a change of zoom factor requires a new routing
@@ -848,7 +777,7 @@ class ConsoleGraph:
                 node,
                 data,
                 lod=lod,
-                port_side_assignments=self.port_side_assignments[node],
+                node_anchors=self.node_buffers_for_layout[node].node_anchors,
             )
 
             node_buffer.center = position_view_space
@@ -863,19 +792,8 @@ class ConsoleGraph:
             )
             self._edge_router.add_node(node, placed_node)
 
-            self._determine_port_positions(node, lod, properties)
+            node_buffer.determine_port_positions()
 
-    def _determine_port_positions(self, node: Hashable, lod: int, properties: NodeProperties):
-        # Determine the port positions as this is now possible
-        for current_port_name, _ in sorted(properties.ports.items(), key=lambda x: x[1].key):
-            port_side = self.port_sides[node][current_port_name]
-            pos, pos_helper = self.node_buffers[node].get_port_position(
-                port_name=current_port_name,
-                lod=lod,
-                port_side=port_side,
-                ports_on_side=self.port_side_assignments[node][port_side],
-            )
-            self.port_positions[node][current_port_name] = (pos, pos_helper)
 
     def _transition_render_edges(self) -> None:
         if self._zoom_factor is None:
@@ -900,7 +818,6 @@ class ConsoleGraph:
                 v_buffer=self.node_buffers[v],
                 properties=properties,
                 lod=edge_lod,
-                port_positions=self.port_positions,
             ))
 
         edge_buffers, label_buffers = rasterize_edges(
@@ -930,13 +847,8 @@ class ConsoleGraph:
             raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
 
         node_buffer = self.node_buffers[node]
-        properties = NodeProperties.from_data_dict(self._core_graph.node_data_or_default(node, dict()))
-        lod = properties.lod_map(self._zoom_factor)
         self.port_buffers[node] = node_buffer.get_port_buffers(
             self.console,
-            lod,
-            self.port_side_assignments[node],
-            self.port_sides[node],
         )
 
     def _all_buffers(self) -> Iterable[StripBuffer]:

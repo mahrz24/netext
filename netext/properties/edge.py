@@ -1,11 +1,11 @@
 from dataclasses import dataclass, field
 from typing import Any, Callable, Union, cast
-from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
 from rich.style import Style
 from netext.geometry.magnet import Magnet
 
+from netext.properties.arrow_tips import ArrowTip
 from netext.properties.node import _get_allow_none_if_exists, remove_none_values
 
 
