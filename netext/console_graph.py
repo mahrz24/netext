@@ -1,4 +1,3 @@
-from collections import defaultdict
 from collections.abc import Hashable
 from dataclasses import dataclass
 from enum import Enum
@@ -11,11 +10,9 @@ import networkx as nx  # type: ignore
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.measure import Measurement
 
-from netext.edge_routing.node_anchors import NodeAnchors
 from netext.geometry import Point, Region
 
 from netext.edge_rendering.buffer import EdgeBuffer
-from netext.geometry.magnet import Magnet, ShapeSide
 from netext.geometry.point import FloatPoint
 from netext.properties.edge import EdgeProperties
 from netext.properties.node import NodeProperties
@@ -290,11 +287,13 @@ class ConsoleGraph:
         )
         node_buffer.determine_port_positions()
 
+        self.node_buffers[node] = node_buffer
+
         if position is not None:
             node_position = cast(FloatPoint, position)
             node_position += self.offset
             self.node_positions[node] = node_position
-            self.node_buffers[node].center = Point(
+            node_buffer.center = Point(
                 round(node_position.x * self.zoom_x),
                 round(node_position.y * self.zoom_y),
             )
@@ -677,7 +676,7 @@ class ConsoleGraph:
 
     def _transition_compute_node_layout(self) -> None:
         # Position the nodes and store these original positions
-        self.node_positions = dict([(n, Point(p.x, p.y)) for (n, p) in self._layout_engine.layout(self._core_graph)])
+        self.node_positions = dict([(n, FloatPoint(p.x, p.y)) for (n, p) in self._layout_engine.layout(self._core_graph)])
 
         self.offset: FloatPoint = FloatPoint(0, 0)
 
@@ -702,10 +701,10 @@ class ConsoleGraph:
 
         # Compute the port sides for each node
         for node, node_buffer in self.node_buffers_for_layout.items():
-            out_neighbors = [(other, EdgeProperties.from_data_dict(
+            out_neighbors = [(self.node_buffers_for_layout[other], EdgeProperties.from_data_dict(
                                     self._core_graph.edge_data_or_default(node, other, dict())
                                 )) for other in self._core_graph.neighbors_outgoing(node)]
-            in_neighbors = [(other, EdgeProperties.from_data_dict(
+            in_neighbors = [(self.node_buffers_for_layout[other], EdgeProperties.from_data_dict(
                                     self._core_graph.edge_data_or_default(other, node, dict())
                                 )) for other in self._core_graph.neighbors_incoming(node)]
 
