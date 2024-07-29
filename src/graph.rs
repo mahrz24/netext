@@ -248,7 +248,7 @@ impl CoreGraph {
         }
     }
 
-    fn update_edge_data(
+    pub fn update_edge_data(
         &mut self,
         py: Python<'_>,
         obj_a: &Bound<'_, PyAny>,
