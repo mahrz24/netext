@@ -18,23 +18,19 @@ from netext.rendering.segment_buffer import StripBuffer
 
 
 class Shape(Protocol):
-    def get_magnet_position(
+    def get_side_position(
         self,
         shape_buffer: "ShapeBuffer",
-        target_point: Point,
-        magnet: Magnet,
+        side: ShapeSide,
         offset: int = 0,
-        extrusion_offset: int = 2,
     ) -> tuple[Point, Direction]:
         return NotImplemented
 
-    def get_closest_magnet(
+    def get_closest_side(
         self,
         shape_buffer: "ShapeBuffer",
         target_point: Point,
-        offset: int = 0,
-        extrusion_offset: int = 2,
-    ) -> Magnet:
+    ) -> ShapeSide:
         return NotImplemented
 
     def polygon(self, shape_buffer: "ShapeBuffer", margin: float = 0) -> Polygon:
@@ -67,113 +63,68 @@ class RectangularShapeMixin:
             ]
         )
 
-    def get_closest_magnet(
+    def get_closest_side(
         self,
         shape_buffer: "ShapeBuffer",
         target_point: Point,
-        offset: int = 0,
-        extrusion_offset: int = 2,
-    ) -> Magnet:
+    ) -> ShapeSide:
         direct_line = LineString([shape_buffer.center.shapely, target_point.shapely])
         node_polygon = self.polygon(shape_buffer)
         intersection = direct_line.intersection(node_polygon)
         intersection_point = intersection.line_interpolate_point(1.0, normalized=True)
 
-        closest_magnet = Magnet.TOP
-        closest_point, _ = self.get_magnet_position(
+        closest_side = ShapeSide.TOP
+        closest_point, _ = self.get_side_position(
             shape_buffer=shape_buffer,
-            target_point=target_point,
-            magnet=closest_magnet,
-            offset=offset,
-            extrusion_offset=extrusion_offset,
+            side=closest_side,
         )
 
         closest_distance = intersection_point.distance(closest_point.shapely)
 
-        for magnet in [Magnet.LEFT, Magnet.RIGHT, Magnet.BOTTOM]:
-            point, _ = self.get_magnet_position(
+        for side in [ShapeSide.LEFT, ShapeSide.RIGHT, ShapeSide.BOTTOM]:
+            point, _ = self.get_side_position(
                 shape_buffer=shape_buffer,
-                target_point=target_point,
-                magnet=magnet,
-                offset=offset,
-                extrusion_offset=extrusion_offset,
+                side=side,
             )
             distance = intersection_point.distance(point.shapely)
             if distance < closest_distance:
                 closest_distance = distance
-                closest_magnet = magnet
+                closest_side = side
 
-        return closest_magnet
+        return closest_side
 
-    def get_magnet_position(
+    def get_side_position(
         self,
         shape_buffer: "ShapeBuffer",
-        target_point: Point,
-        magnet: Magnet,
+        side: ShapeSide,
         offset: int = 0,
-        extrusion_offset: int = 2,
     ) -> tuple[Point, Direction]:
-        extruded_point: Point | None = None
-        match magnet:
-            case Magnet.TOP:
+        match side:
+            case ShapeSide.TOP:
                 direction = Direction.UP
                 return (
                     Point(x=shape_buffer.center.x + offset, y=shape_buffer.top_y),
                     direction,
                 )
-            case Magnet.LEFT:
+            case ShapeSide.LEFT:
                 direction = Direction.LEFT
                 return (
                     Point(x=shape_buffer.left_x, y=shape_buffer.center.y + offset),
                     direction,
                 )
-            case Magnet.BOTTOM:
+            case ShapeSide.BOTTOM:
                 direction = Direction.DOWN
                 return (
                     Point(x=shape_buffer.center.x - offset, y=shape_buffer.bottom_y),
                     direction,
                 )
-            case Magnet.RIGHT:
+            case ShapeSide.RIGHT:
                 direction = Direction.RIGHT
                 return (
                     Point(x=shape_buffer.right_x, y=shape_buffer.center.y - offset),
                     direction,
                 )
-            case Magnet.CENTER:
-                return shape_buffer.center - Point(x=offset, y=0), Direction.CENTER
-            case Magnet.CLOSEST:
-                direct_line = LineString([shape_buffer.center.shapely, target_point.shapely])
-                node_polygon = self.polygon(shape_buffer)
-                intersection = direct_line.intersection(node_polygon)
-                intersection_point = intersection.line_interpolate_point(1.0, normalized=True)
-
-                closest_magnet = Magnet.TOP
-                closest_point, closest_direction = self.get_magnet_position(
-                    shape_buffer=shape_buffer,
-                    target_point=target_point,
-                    magnet=closest_magnet,
-                    offset=offset,
-                    extrusion_offset=extrusion_offset,
-                )
-
-                closest_distance = intersection_point.distance(closest_point.shapely)
-
-                for magnet in [Magnet.LEFT, Magnet.RIGHT, Magnet.BOTTOM]:
-                    point, direction = self.get_magnet_position(
-                        shape_buffer=shape_buffer,
-                        target_point=target_point,
-                        magnet=magnet,
-                        offset=offset,
-                        extrusion_offset=extrusion_offset,
-                    )
-                    distance = intersection_point.distance(point.shapely)
-                    if distance < closest_distance:
-                        closest_point = point
-                        closest_direction = direction
-                        closest_distance = distance
-
-                return closest_point, closest_direction
-        raise RuntimeError(magnet)
+        raise RuntimeError(side)
 
 
 class JustContentShape(RectangularShapeMixin):

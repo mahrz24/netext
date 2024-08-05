@@ -9,6 +9,7 @@ from netext.edge_rendering.path_rasterizer import rasterize_edge_path
 from netext.edge_routing.edge import EdgeInput
 from netext.edge_routing.node_anchors import NodeAnchors
 from netext.edge_routing.route import route_edge, route_edges
+from netext.geometry.magnet import Magnet, ShapeSide
 from netext.geometry.point import Point
 
 from netext.node_rendering.buffers import EdgeLabelBuffer, NodeBuffer
@@ -126,8 +127,6 @@ def rasterize_edge(
         edge_routing_mode=properties.routing_mode
     )
 
-    edge_path = edge_path.cut_with_nodes([u_buffer, v_buffer])
-
     if not edge_path.directed_points or edge_path.start == edge_path.end:
         return None
 
@@ -207,12 +206,22 @@ def determine_edge_anchors(
         start, start_direction = u_buffer.node_anchors.all_positions[port_name]
         u_buffer.connect_port(port_name, v_buffer.node)
     else:
-        start, start_direction = u_buffer.get_magnet_position(v_buffer.center, properties.start_magnet)
+        if properties.start_magnet == Magnet.CLOSEST:
+            side = v_buffer.get_closest_side(u_buffer.center)
+        else:
+            side = ShapeSide(properties.start_magnet.value)
+
+        start, start_direction = u_buffer.get_side_position(side)
 
     if (port_name := properties.end_port) is not None and port_name in v_buffer.node_anchors.all_positions:
         end, end_direction = v_buffer.node_anchors.all_positions[port_name]
         v_buffer.connect_port(port_name, u_buffer.node)
     else:
-        end, end_direction = v_buffer.get_magnet_position(u_buffer.center, properties.end_magnet)
+        if properties.start_magnet == Magnet.CLOSEST:
+            side = v_buffer.get_closest_side(u_buffer.center)
+        else:
+            side = ShapeSide(properties.start_magnet.value)
+
+        end, end_direction = v_buffer.get_side_position(side)
 
     return start, end, start_direction, end_direction

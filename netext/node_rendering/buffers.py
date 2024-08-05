@@ -96,32 +96,24 @@ class NodeBuffer(ShapeBuffer):
             node_anchors=node_anchors,
         )
 
-    def get_magnet_position(
+    def get_side_position(
         self,
-        target_point: Point,
-        magnet: Magnet,
+        side: ShapeSide,
         offset: int = 0,
-        extrusion_offset: int = 2,
     ) -> tuple[Point, Direction]:
-        return self.shape.get_magnet_position(
+        return self.shape.get_side_position(
             self,
-            target_point=target_point,
-            magnet=magnet,
+            side=side,
             offset=offset,
-            extrusion_offset=extrusion_offset,
         )
 
-    def get_closest_magnet(
+    def get_closest_side(
         self,
         target_point: Point,
-        offset: int = 0,
-        extrusion_offset: int = 2,
-    ) -> Magnet:
-        return self.shape.get_closest_magnet(
+    ) -> ShapeSide:
+        return self.shape.get_closest_side(
             self,
             target_point=target_point,
-            offset=offset,
-            extrusion_offset=extrusion_offset,
         )
 
     @property
@@ -141,14 +133,14 @@ class NodeBuffer(ShapeBuffer):
         in_neighbors = in_neighbors or []
 
         for current_port_name, port in sorted(self.properties.ports.items(), key=lambda x: x[1].key):
-            if port.magnet == Magnet.CENTER or port.magnet == Magnet.CLOSEST or port.magnet is None:
+            if port.magnet == Magnet.CLOSEST or port.magnet is None:
                 port_side = ShapeSide.LEFT
                 for v_buffer, props in out_neighbors:
                     if props.start_port == current_port_name:
-                        port_side = ShapeSide(self.get_closest_magnet(v_buffer.center).value)
+                        port_side = self.get_closest_side(v_buffer.center)
                 for u_buffer, props in in_neighbors:
                     if props.end_port == current_port_name:
-                        port_side = ShapeSide(self.get_closest_magnet(u_buffer.center).value)
+                        port_side = self.get_closest_side(u_buffer.center)
             else:
                 port_side = ShapeSide(port.magnet.value)
             self.node_anchors.port_sides[current_port_name] = port_side
@@ -195,9 +187,8 @@ class NodeBuffer(ShapeBuffer):
 
         # The magnet has been derived from the shape side, so it's determined and the target point
         # does not matter
-        start, start_direction = self.get_magnet_position(
-            target_point=Point(0, 0),
-            magnet=Magnet(port_side.value),
+        start, start_direction = self.get_side_position(
+            side=port_side,
             offset=port.offset or port_offset,
         )
         self.node_anchors.all_positions[port_name] = (start, start_direction)

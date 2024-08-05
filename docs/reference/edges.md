@@ -146,7 +146,6 @@ Possible values are:
 | Right          | [Magnet.RIGHT][netext.geometry.magnet.Magnet.RIGHT]     | Connect to the right side of the node |
 | Top          | [Magnet.TOP][netext.geometry.magnet.Magnet.TOP]     | Connect to the top side of the node |
 | Bottom          | [Magnet.BOTTOM][netext.geometry.magnet.Magnet.BOTTOM]     | Connect to the bottom side of the node |
-| Center          | [Magnet.CENTER][netext.geometry.magnet.Magnet.CENTER]     | Connect to the center of the node, edge will be cut at the node boundary. |
 | Closest          | [Magnet.CLOSEST][netext.geometry.magnet.Magnet.CLOSEST]     | Connect to the closest magnet position. |
 
 ## Ports
