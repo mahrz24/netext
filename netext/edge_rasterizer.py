@@ -67,8 +67,6 @@ def rasterize_edges(
     label_buffers = dict()
 
     for request, edge_input, edge_path in zip(edge_route_requests, edge_inputs, edge_paths):
-        edge_path = edge_path.cut_with_nodes([request.u_buffer, request.v_buffer])
-
         if not edge_path.directed_points or edge_path.start == edge_path.end:
             continue
 

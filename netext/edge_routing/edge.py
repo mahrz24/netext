@@ -3,8 +3,7 @@ from enum import Enum
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.geometry import Point
-from netext.node_rasterizer import NodeBuffer
-from typing import Iterable, Tuple
+from typing import Tuple
 
 
 @dataclass(frozen=True)
@@ -45,18 +44,6 @@ class EdgePath:
     start: Point
     end: Point
     directed_points: list[Tuple[Point, Direction]]
-
-    def cut_with_nodes(self, node_buffers: Iterable[NodeBuffer]) -> "EdgePath":
-        cut_points = [
-            (point, dir)
-            for point, dir in self.directed_points
-            if not any(node_buffer.shape.polygon(node_buffer).covers(point.shapely) for node_buffer in node_buffers)
-        ]
-        if not cut_points:
-            return self
-        start = cut_points[0][0]
-        end = cut_points[-1][0]
-        return EdgePath(start=start, end=end, directed_points=cut_points)
 
     @property
     def points(self) -> list[Point]:
