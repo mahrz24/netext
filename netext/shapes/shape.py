@@ -68,20 +68,25 @@ class RectangularShapeMixin:
         shape_buffer: "ShapeBuffer",
         target_point: Point,
     ) -> ShapeSide:
+        direct_line = LineString([shape_buffer.center.shapely, target_point.shapely])
+        node_polygon = self.polygon(shape_buffer)
+        intersection = direct_line.intersection(node_polygon)
+        intersection_point = intersection.line_interpolate_point(1.0, normalized=True)
+
         closest_side = ShapeSide.TOP
         closest_point, _ = self.get_side_position(
             shape_buffer=shape_buffer,
             side=closest_side,
         )
 
-        closest_distance = target_point.shapely.distance(closest_point.shapely)
+        closest_distance = intersection_point.distance(closest_point.shapely)
 
         for side in [ShapeSide.LEFT, ShapeSide.RIGHT, ShapeSide.BOTTOM]:
             point, _ = self.get_side_position(
                 shape_buffer=shape_buffer,
                 side=side,
             )
-            distance = target_point.shapely.distance(point.shapely)
+            distance = intersection_point.distance(point.shapely)
             if distance < closest_distance:
                 closest_distance = distance
                 closest_side = side

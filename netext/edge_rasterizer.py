@@ -215,7 +215,7 @@ def determine_edge_anchors(
         v_buffer.connect_port(port_name, u_buffer.node)
     else:
         if properties.end_magnet == Magnet.CLOSEST:
-            side = v_buffer.get_closest_side(u_buffer.center)
+            side = v_buffer.get_closest_side(start)
         else:
             side = ShapeSide(properties.end_magnet.value)
         end, end_direction = v_buffer.get_side_position(side)
