@@ -38,6 +38,8 @@ nx.set_node_attributes(G, Style(color="green"), "$style")
 nx.set_node_attributes(G, True, "$show")
 
 nx.set_edge_attributes(G, ArrowTip.ARROW, "$end-arrow-tip")
+nx.set_edge_attributes(G, ArrowTip.ARROW, "$start-arrow-tip")
+
 nx.set_edge_attributes(G, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
 nx.set_edge_attributes(G, EdgeSegmentDrawingMode.BOX, "$edge-segment-drawing-mode")
 
