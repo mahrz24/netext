@@ -100,11 +100,13 @@ class NodeBuffer(ShapeBuffer):
         self,
         side: ShapeSide,
         offset: int = 0,
+        extrude: int = 0,
     ) -> tuple[Point, Direction]:
         return self.shape.get_side_position(
             self,
             side=side,
             offset=offset,
+            extrude=extrude,
         )
 
     def get_closest_side(

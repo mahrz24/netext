@@ -1,9 +1,8 @@
 from collections.abc import Hashable
 import netext._core as core
-from netext._core import Direction
+from netext._core import DirectedPoint, Direction, Point
 from netext.edge_routing.edge import EdgePath
 from netext.edge_routing.modes import EdgeRoutingMode
-from netext.geometry import Point
 
 def _edge_routing_mode_to_routing_config(
     edge_routing_mode: EdgeRoutingMode
@@ -45,7 +44,7 @@ def route_edge(
     return EdgePath(
         start=start,
         end=end,
-        directed_points=[(Point(x=x, y=y), direction) for (x, y, direction) in path],
+        directed_points=[DirectedPoint(x=x, y=y, direction=direction) for (x, y, direction) in path],
     )
 
 
@@ -70,7 +69,7 @@ def route_edges(
         EdgePath(
             start=start,
             end=end,
-            directed_points=[(Point(x=x, y=y), direction) for (x, y, direction) in path],
+            directed_points=path,
         )
         for (_, _, start, end, _, _, _), path in zip(edge_anchors, point_paths)
     ]

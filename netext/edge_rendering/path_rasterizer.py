@@ -125,16 +125,16 @@ def rasterize_edge_path(path: EdgePath, style: Style, edge_segment_drawing_mode:
     # Convert path to characters and points using the specified drawing mode
     character_path = []
     directions = []
-    current_point = path.directed_points[0][0]
-    for point, direction in path.directed_points:
-        if point == current_point:
-            directions.append(direction)
+    current_point = path.directed_points[0].point
+    for directed_point in path.directed_points:
+        if directed_point.point == current_point:
+            directions.append(directed_point.direction)
         else:
             character_path.append((current_point, rasterize_point(directions, style, edge_segment_drawing_mode)))
-            current_point = point
-            directions = [direction]
+            current_point = directed_point.point
+            directions = [directed_point.direction]
     character_path.append((current_point, rasterize_point(directions, style, edge_segment_drawing_mode)))
-    assert len(character_path) == len(path.points)
+    assert len(character_path) == len(path.distinct_points)
     strips = []
     # Create a map of the points y coordinates to a list of points sorted by the x coordinate
     y_to_x = {}

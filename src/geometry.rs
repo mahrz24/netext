@@ -1,4 +1,4 @@
-use pyo3::{exceptions::PyIndexError, prelude::*, PyClass};
+use pyo3::{exceptions::PyIndexError, prelude::*, types::PyType, PyClass};
 
 pub trait PointLike {
     fn x(&self) -> i32;
@@ -72,6 +72,52 @@ impl Point {
     #[getter]
     pub fn y(&self) -> i32 {
         self.y
+    }
+
+    #[classmethod]
+    fn max_point(cls: &Bound<'_, PyType>, points: Vec<Point>) -> PyResult<Point> {
+        let max_x = points.iter().map(|p| p.x()).max().unwrap_or(0);
+        let max_y = points.iter().map(|p| p.y()).max().unwrap_or(0);
+        Ok(Point{ x: max_x, y: max_y })
+    }
+
+    #[classmethod]
+    fn min_point(cls: &Bound<'_, PyType>, points: Vec<Point>) -> PyResult<Point> {
+        let min_x = points.iter().map(|p| p.x()).min().unwrap_or(0);
+        let min_y = points.iter().map(|p| p.y()).min().unwrap_or(0);
+        Ok(Point{ x: min_x, y: min_y })
+    }
+
+    fn __eq__(&self, other: &Point) -> bool {
+        self.x == other.x && self.y == other.y
+    }
+
+    fn __add__(&self, other: &Point) -> Point {
+        Point {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+
+    fn __sub__(&self, other: &Point) -> Point {
+        Point {
+            x: self.x - other.x,
+            y: self.y - other.y,
+        }
+    }
+
+    fn __mul__(&self, other: i32) -> Point {
+        Point {
+            x: self.x * other,
+            y: self.y * other,
+        }
+    }
+
+    fn __div__(&self, other: i32) -> Point {
+        Point {
+            x: self.x / other,
+            y: self.y / other,
+        }
     }
 }
 
@@ -287,8 +333,13 @@ impl DirectedPoint {
         Ok(self.direction.clone())
     }
 
+    #[getter]
+    fn get_point(&self) -> PyResult<Point> {
+        Ok(Point { x: self.x, y: self.y })
+    }
+
     fn __len__(&self) -> PyResult<usize> {
-        Ok(3) // The number of elements in the class
+        Ok(2) // The number of elements in the class
     }
 
     fn __getitem__(&self, idx: usize, py: Python<'_>) -> PyResult<PyObject> {
@@ -298,9 +349,8 @@ impl DirectedPoint {
         };
 
         match idx {
-            0 => Ok(self.x.to_object(py)),
-            1 => Ok(self.y.to_object(py)),
-            2 => Ok(direction.to_object(py)),
+            0 => Ok(Py::new(py, Point { x: self.x, y: self.y })?.to_object(py)),
+            1 => Ok(direction.to_object(py)),
             _ => Err(PyIndexError::new_err("index out of range")),
         }
     }

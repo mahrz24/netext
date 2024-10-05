@@ -1,10 +1,10 @@
 from typing import Hashable
 from rich.segment import Segment
 from rich.style import Style
+from netext._core import Direction, Point
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_rendering.buffer import EdgeBuffer
 from netext.edge_routing.edge import EdgePath
-from netext.geometry import Point
 from netext.properties.arrow_tips import ARROW_TIPS, ArrowDirections, ArrowTip
 from netext.rendering.segment_buffer import Layer, Strip, StripBuffer, ZIndex
 
@@ -16,22 +16,29 @@ def render_arrow_tip_buffer(
     edge: tuple[Hashable, Hashable],
     arrow_tip: ArrowTip,
     arrow_tip_position: Point,
-    arrow_tip_dir: Point,
+    arrow_tip_dir: Direction,
     edge_segment_drawing_mode: EdgeSegmentDrawingMode,
     style: Style | None = None,
 ) -> StripBuffer:
-    tangent = arrow_tip_dir - arrow_tip_position
-
-    if abs(tangent.x) > abs(tangent.y):
-        if tangent.x > 0:
-            direction = ArrowDirections.LEFT
-        else:
-            direction = ArrowDirections.RIGHT
-    else:
-        if tangent.y > 0:
+    match arrow_tip_dir:
+        case Direction.UP:
             direction = ArrowDirections.UP
-        else:
+        case Direction.DOWN:
             direction = ArrowDirections.DOWN
+        case Direction.LEFT:
+            direction = ArrowDirections.LEFT
+        case Direction.RIGHT:
+            direction = ArrowDirections.RIGHT
+        case Direction.UP_LEFT:
+            direction = ArrowDirections.UP
+        case Direction.UP_RIGHT:
+            direction = ArrowDirections.UP
+        case Direction.DOWN_LEFT:
+            direction = ArrowDirections.DOWN
+        case Direction.DOWN_RIGHT:
+            direction = ArrowDirections.DOWN
+        case _:
+            direction = ArrowDirections.UP
 
     tip_character = ARROW_TIPS[arrow_tip][edge_segment_drawing_mode][direction]
 
@@ -54,8 +61,7 @@ def render_arrow_tip_buffers(
 ) -> list[StripBuffer]:
     buffers: list[StripBuffer] = []
 
-    start_arrow_tip_position = edge_path.edge_iter_point(0)
-    start_arrow_tip_dir = edge_path.edge_iter_point(1)
+    start_arrow_tip_position, start_arrow_tip_dir  = edge_path.directed_points[1]
 
     if start_arrow_tip is not None and start_arrow_tip != ArrowTip.NONE:
         buffers.append(
@@ -69,8 +75,7 @@ def render_arrow_tip_buffers(
             )
         )
 
-    end_arrow_tip_position = edge_path.edge_iter_point(-1)
-    end_arrow_tip_dir = edge_path.edge_iter_point(-2)
+    end_arrow_tip_position, end_arrow_tip_dir = edge_path.directed_points[-2]
 
     if end_arrow_tip is not None and end_arrow_tip != ArrowTip.NONE:
         buffers.append(

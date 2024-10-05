@@ -167,7 +167,7 @@ def rasterize_path_and_label(console, u_buffer, v_buffer, properties, edge_input
         shape = JustContentShape()
         label_strips = shape.render_shape(console, properties.label, style=Style(), properties=JustContent(), padding=0)
 
-        label_position = edge_path.edge_iter_point(round(edge_path.length / 2))
+        label_position = edge_path.distinct_points[round(edge_path.length / 2)]
 
         label_buffer = EdgeLabelBuffer.from_strips_and_edge(
             label_strips,
@@ -208,7 +208,7 @@ def determine_edge_anchors(
             side = u_buffer.get_closest_side(v_buffer.center)
         else:
             side = ShapeSide(properties.start_magnet.value)
-        start, start_direction = u_buffer.get_side_position(side)
+        start, start_direction = u_buffer.get_side_position(side, offset=0, extrude=0)
 
     if (port_name := properties.end_port) is not None and port_name in v_buffer.node_anchors.all_positions:
         end, end_direction = v_buffer.node_anchors.all_positions[port_name]
@@ -218,6 +218,6 @@ def determine_edge_anchors(
             side = v_buffer.get_closest_side(start)
         else:
             side = ShapeSide(properties.end_magnet.value)
-        end, end_direction = v_buffer.get_side_position(side)
+        end, end_direction = v_buffer.get_side_position(side, offset=0, extrude=0)
 
     return start, end, start_direction, end_direction

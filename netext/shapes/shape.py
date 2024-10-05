@@ -23,6 +23,7 @@ class Shape(Protocol):
         shape_buffer: "ShapeBuffer",
         side: ShapeSide,
         offset: int = 0,
+        extrude: int = 0
     ) -> tuple[Point, Direction]:
         return NotImplemented
 
@@ -98,30 +99,31 @@ class RectangularShapeMixin:
         shape_buffer: "ShapeBuffer",
         side: ShapeSide,
         offset: int = 0,
+        extrude: int = 0
     ) -> tuple[Point, Direction]:
         match side:
             case ShapeSide.TOP:
                 direction = Direction.UP
                 return (
-                    Point(x=shape_buffer.center.x + offset, y=shape_buffer.top_y),
+                    Point(x=shape_buffer.center.x + offset, y=shape_buffer.top_y - extrude),
                     direction,
                 )
             case ShapeSide.LEFT:
                 direction = Direction.LEFT
                 return (
-                    Point(x=shape_buffer.left_x, y=shape_buffer.center.y + offset),
+                    Point(x=shape_buffer.left_x - extrude, y=shape_buffer.center.y + offset),
                     direction,
                 )
             case ShapeSide.BOTTOM:
                 direction = Direction.DOWN
                 return (
-                    Point(x=shape_buffer.center.x - offset, y=shape_buffer.bottom_y),
+                    Point(x=shape_buffer.center.x - offset, y=shape_buffer.bottom_y + extrude),
                     direction,
                 )
             case ShapeSide.RIGHT:
                 direction = Direction.RIGHT
                 return (
-                    Point(x=shape_buffer.right_x, y=shape_buffer.center.y - offset),
+                    Point(x=shape_buffer.right_x + extrude, y=shape_buffer.center.y - offset),
                     direction,
                 )
         raise RuntimeError(side)

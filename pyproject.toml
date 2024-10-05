@@ -15,7 +15,7 @@ dev-dependencies = [
     "importlib-metadata",
     "rich-pixels>=2.1.1",
     "ruff",
-    "textual>=0.40",
+    "textual>=0.80",
     "pyinstrument>=4.6.2",
     "pip>=24.0",
     "textual-dev>=1.5.1",

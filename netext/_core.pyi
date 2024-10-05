@@ -28,15 +28,23 @@ class DirectedPoint:
     x: int
     y: int
     direction: Direction
+    point: Point
 
     def __iter__(self) -> Iterator: ...
     def __init__(self, x: int, y: int, direction: Direction) -> None: ...
+
 
 class Point:
     x: int
     y: int
 
     def __init__(self, x: int, y: int) -> None: ...
+
+    @classmethod
+    def min_point(cls, points: list["Point"]) -> "Point": ...
+
+    @classmethod
+    def max_point(cls, points: list["Point"]) -> "Point": ...
 
 class Size:
     def __init__(self, width: int, height: int) -> None: ...
