@@ -9,9 +9,6 @@ from netext.properties.arrow_tips import ARROW_TIPS, ArrowDirections, ArrowTip
 from netext.rendering.segment_buffer import Layer, Strip, StripBuffer, ZIndex
 
 
-
-
-
 def render_arrow_tip_buffer(
     edge: tuple[Hashable, Hashable],
     arrow_tip: ArrowTip,
@@ -61,7 +58,7 @@ def render_arrow_tip_buffers(
 ) -> list[StripBuffer]:
     buffers: list[StripBuffer] = []
 
-    start_arrow_tip_position, start_arrow_tip_dir  = edge_path.directed_points[1]
+    start_arrow_tip_position, start_arrow_tip_dir  = edge_path.directed_points[0]
 
     if start_arrow_tip is not None and start_arrow_tip != ArrowTip.NONE:
         buffers.append(
@@ -69,13 +66,13 @@ def render_arrow_tip_buffers(
                 edge,
                 start_arrow_tip,
                 start_arrow_tip_position,
-                start_arrow_tip_dir,
+                start_arrow_tip_dir.opposite(),
                 edge_segment_drawing_mode,
                 style=style,
             )
         )
 
-    end_arrow_tip_position, end_arrow_tip_dir = edge_path.directed_points[-2]
+    end_arrow_tip_position, end_arrow_tip_dir = edge_path.directed_points[-1]
 
     if end_arrow_tip is not None and end_arrow_tip != ArrowTip.NONE:
         buffers.append(
@@ -83,7 +80,7 @@ def render_arrow_tip_buffers(
                 edge,
                 end_arrow_tip,
                 end_arrow_tip_position,
-                end_arrow_tip_dir,
+                end_arrow_tip_dir.opposite(),
                 edge_segment_drawing_mode,
                 style=style,
             )

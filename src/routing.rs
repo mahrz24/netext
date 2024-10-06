@@ -1,15 +1,14 @@
 use priority_queue::PriorityQueue;
 use rstar::RTreeObject;
-use std::collections::{HashMap, HashSet};
-use std::{cmp::Reverse, hash::Hash};
+use std::cmp::min;
+use std::cmp::Reverse;
+use std::collections::HashMap;
+use std::hash::Hash;
 
 use pyo3::prelude::*;
 
 use crate::{
-    geometry::{
-        BoundingBox, DirectedPoint, Direction, Neighborhood, PlacedNode, PlacedRectangularNode,
-        Point,
-    },
+    geometry::{BoundingBox, DirectedPoint, Direction, Neighborhood, PlacedRectangularNode, Point},
     pyindexset::PyIndexSet,
 };
 
@@ -55,6 +54,10 @@ impl Default for RoutingConfig {
     }
 }
 
+fn waypoint_heuristic(a: &Point, b: &Point) -> i32 {
+    return (a.x - b.x).abs() + (a.y - b.y).abs()
+}
+
 fn heuristic(a: &DirectedPoint, b: &DirectedPoint, config: RoutingConfig) -> i32 {
     let lowest_distance = if config.neighborhood == Neighborhood::Orthogonal {
         (a.x - b.x).abs() + (a.y - b.y).abs()
@@ -69,14 +72,17 @@ fn heuristic(a: &DirectedPoint, b: &DirectedPoint, config: RoutingConfig) -> i32
     };
 
     if a.direction == b.direction {
-        lowest_distance + diagonal_cost
+        (lowest_distance + diagonal_cost)*12
     } else {
-        lowest_distance + diagonal_cost + config.corner_cost
+        (lowest_distance + diagonal_cost + config.corner_cost)*12
     }
-
 }
 
-fn get_neighbors(node: &DirectedPoint, neighborhood: Neighborhood) -> Vec<DirectedPoint> {
+fn get_neighbors(
+    node: &DirectedPoint,
+    neighborhood: Neighborhood,
+    allow_direction_change: bool,
+) -> Vec<DirectedPoint> {
     let mut neighbors = vec![];
     let x = node.x;
     let y = node.y;
@@ -94,8 +100,24 @@ fn get_neighbors(node: &DirectedPoint, neighborhood: Neighborhood) -> Vec<Direct
         Direction::Center => neighbors.push(DirectedPoint::new(x, y, Direction::Center)),
     }
 
+    let allowed_directions = if !allow_direction_change && node.direction != Direction::Center {
+        match node.direction {
+            Direction::Up => vec![Direction::Up, Direction::Down],
+            Direction::UpRight => vec![Direction::UpRight, Direction::DownLeft],
+            Direction::Right => vec![Direction::Right, Direction::Left],
+            Direction::DownRight => vec![Direction::DownRight, Direction::UpLeft],
+            Direction::Down => vec![Direction::Down, Direction::Up],
+            Direction::DownLeft => vec![Direction::DownLeft, Direction::UpRight],
+            Direction::Left => vec![Direction::Left, Direction::Right],
+            Direction::UpLeft => vec![Direction::UpLeft, Direction::DownRight],
+            Direction::Center => vec![Direction::Center],
+        }
+    } else {
+        node.direction.other_directions(neighborhood)
+    };
+
     // Changing direction
-    for d in node.direction.other_directions(neighborhood) {
+    for d in allowed_directions {
         match d {
             Direction::Up => neighbors.push(DirectedPoint::new(x, y, Direction::Up)),
             Direction::UpRight => neighbors.push(DirectedPoint::new(x, y, Direction::UpRight)),
@@ -111,16 +133,17 @@ fn get_neighbors(node: &DirectedPoint, neighborhood: Neighborhood) -> Vec<Direct
     neighbors
 }
 
-fn reconstruct_path(
-    came_from: &HashMap<DirectedPoint, DirectedPoint>,
-    current: DirectedPoint,
-) -> Vec<DirectedPoint> {
+fn reconstruct_path<T: Eq + Hash + Copy>(
+    came_from: &HashMap<T, T>,
+    current: T,
+) -> Vec<T> {
     let mut total_path = vec![current];
     let mut current = current;
     while let Some(&parent) = came_from.get(&current) {
         current = parent;
         total_path.push(current);
     }
+    //println!("Path length: {:?}", total_path.len());
     total_path.reverse();
     total_path
 }
@@ -156,6 +179,114 @@ impl RTreeObject for DirectedPoint {
             [self.x as f32, self.y as f32],
             [self.x as f32, self.y as f32],
         )
+    }
+}
+
+impl EdgeRouter {
+    fn route_waypoints(
+        &self,
+        start: Point,
+        end: Point,
+        xs: &Vec<i32>,
+        ys: &Vec<i32>,
+    ) -> Vec<Point> {
+        let mut open_set = PriorityQueue::new();
+        open_set.push(start, Reverse(0));
+
+        let mut came_from = HashMap::new();
+        let mut g_score = HashMap::new();
+        g_score.insert(start, 0);
+
+        let mut f_score = HashMap::new();
+        f_score.insert(start, waypoint_heuristic(&start, &end));
+
+        let mut path_length = 0;
+
+        // println!("Start: {:?}", start);
+        // println!("End: {:?}", end);
+
+        while let Some((current, _)) = open_set.pop() {
+            if current == end {
+                // println!("Path length: {:?}", path_length);
+                return reconstruct_path(&came_from, current);
+            }
+
+            let current_end_distance = (current.x - end.x).abs() + (current.y - end.y).abs();
+            let current_start_distance = (current.x - start.x).abs() + (current.y - start.y).abs();
+
+            let current_distance = min(current_start_distance, current_end_distance);
+
+            // for neighbor in
+            //     get_neighbors(&current, config.clone().neighborhood, current_distance > 2)
+            // {
+            //     let tentative_g_score = g_score.get(&current).unwrap_or(&(i32::MAX - 100))
+            //         + self.waypoint_transition_cost(&current, &neighbor, &config);
+
+            //     if tentative_g_score < *g_score.get(&neighbor).unwrap_or(&(i32::MAX - 100)) {
+            //         came_from.insert(neighbor, current);
+            //         g_score.insert(neighbor, tentative_g_score);
+            //         f_score.insert(
+            //             neighbor,
+            //             tentative_g_score + heuristic(&neighbor, &end, config),
+            //         );
+
+            //         open_set.push(neighbor, Reverse(*f_score.get(&neighbor).unwrap()));
+            //     }
+            // }
+            path_length += 1;
+        }
+        vec![start, end]
+    }
+
+    fn waypoint_transition_cost(
+        &self,
+        src: &Point,
+        dst: &Point,
+    ) -> i32 {
+        let mut cost: i32 = 0;
+
+        if src.x != dst.x || src.y != dst.y {
+            cost += 1;
+        }
+
+        cost
+    }
+
+    fn transition_cost(
+        &self,
+        src: &DirectedPoint,
+        dst: &DirectedPoint,
+        config: &RoutingConfig,
+    ) -> i32 {
+        let mut cost: i32 = 0;
+
+        if src.x != dst.x || src.y != dst.y {
+            if src.direction.is_diagonal() {
+                cost += 14 + config.diagonal_cost;
+            } else {
+                cost += 10;
+            }
+        }
+
+        // Add corner cost if the direction turns (going from left to right is not a corner)
+        if src.direction != dst.direction.opposite() {
+            cost += config.corner_cost;
+        }
+
+        // Add shape cost if the edge intersects a shape
+        if config.shape_cost > 0 {
+            if *self.shape_occlusion.get(&(dst.x, dst.y)).unwrap_or(&0) > 0 {
+                cost += config.shape_cost;
+            }
+        }
+
+        if config.line_cost > 0 {
+            if *self.line_occlusion.get(&(dst.x, dst.y)).unwrap_or(&0) > 0 {
+                cost += config.line_cost;
+            }
+        }
+
+        cost
     }
 }
 
@@ -255,43 +386,7 @@ impl EdgeRouter {
         Ok(())
     }
 
-    fn transition_cost(
-        &self,
-        src: &DirectedPoint,
-        dst: &DirectedPoint,
-        config: &RoutingConfig,
-    ) -> i32 {
-        // TODO Use rtrees to find shapes
-        let mut cost: i32 = 0;
 
-        if src.x != dst.x || src.y != dst.y {
-            if src.direction.is_diagonal() {
-                cost += 14 + config.diagonal_cost;
-            } else {
-                cost += 10;
-            }
-        }
-
-        // Add corner cost if the direction turns (going from left to right is not a corner)
-        if src.direction != dst.direction.opposite() {
-            cost += config.corner_cost;
-        }
-
-        // Add shape cost if the edge intersects a shape
-        if config.shape_cost > 0 {
-            if *self.shape_occlusion.get(&(dst.x, dst.y)).unwrap_or(&0) > 0 {
-                cost += config.shape_cost;
-            }
-        }
-
-        if config.line_cost > 0 {
-            if *self.line_occlusion.get(&(dst.x, dst.y)).unwrap_or(&0) > 0 {
-                cost += config.line_cost;
-            }
-        }
-
-        cost
-    }
 
     fn route_edges(
         &mut self,
@@ -306,6 +401,16 @@ impl EdgeRouter {
         )>,
     ) -> PyResult<Vec<Vec<DirectedPoint>>> {
         let mut result = Vec::new();
+
+        let center_points = self
+            .placed_nodes
+            .values()
+            .map(|node| node.center)
+            .collect::<Vec<_>>();
+
+        let center_xs = center_points.iter().map(|p| p.x).collect::<Vec<_>>();
+        let center_ys = center_points.iter().map(|p| p.y).collect::<Vec<_>>();
+
         for (u, v, start, end, start_direction, end_direction, config) in edges {
             let directed_points =
                 self.route_edge(start, end, start_direction, end_direction, config)?;
@@ -343,23 +448,40 @@ impl EdgeRouter {
         let mut f_score = HashMap::new();
         f_score.insert(start, heuristic(&start, &end, config));
 
+        let mut path_length = 0;
+
+        // println!("Start: {:?}", start);
+        // println!("End: {:?}", end);
+
         while let Some((current, _)) = open_set.pop() {
             if current == end {
+                // println!("Path length: {:?}", path_length);
                 return Ok(reconstruct_path(&came_from, current));
             }
 
-            for neighbor in get_neighbors(&current, config.clone().neighborhood) {
+            let current_end_distance = (current.x - end.x).abs() + (current.y - end.y).abs();
+            let current_start_distance = (current.x - start.x).abs() + (current.y - start.y).abs();
+
+            let current_distance = min(current_start_distance, current_end_distance);
+
+            for neighbor in
+                get_neighbors(&current, config.clone().neighborhood, current_distance > 1)
+            {
                 let tentative_g_score = g_score.get(&current).unwrap_or(&(i32::MAX - 100))
                     + self.transition_cost(&current, &neighbor, &config);
 
                 if tentative_g_score < *g_score.get(&neighbor).unwrap_or(&(i32::MAX - 100)) {
                     came_from.insert(neighbor, current);
                     g_score.insert(neighbor, tentative_g_score);
-                    f_score.insert(neighbor, tentative_g_score + heuristic(&neighbor, &end, config));
+                    f_score.insert(
+                        neighbor,
+                        tentative_g_score + heuristic(&neighbor, &end, config),
+                    );
 
                     open_set.push(neighbor, Reverse(*f_score.get(&neighbor).unwrap()));
                 }
             }
+            path_length += 1;
         }
 
         Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(

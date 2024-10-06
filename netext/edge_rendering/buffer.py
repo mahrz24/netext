@@ -1,6 +1,6 @@
 from typing import Hashable
+from netext._core import Point
 from netext.edge_routing.edge import EdgePath
-from netext.geometry import Point
 from netext.rendering.segment_buffer import Reference, StripBuffer
 
 

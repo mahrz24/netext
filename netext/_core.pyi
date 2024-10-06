@@ -96,6 +96,9 @@ class Direction(Enum):
     DOWN_RIGHT = 6
     DOWN_LEFT = 7
 
+    def opposite(self) -> "Direction": ...
+    def is_diagonal(self) -> bool: ...
+
 class LayoutEngine:
     def layout(self, graph: CoreGraph) -> Iterable[tuple[Hashable, Point]]: ...
 

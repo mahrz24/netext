@@ -208,7 +208,7 @@ def determine_edge_anchors(
             side = u_buffer.get_closest_side(v_buffer.center)
         else:
             side = ShapeSide(properties.start_magnet.value)
-        start, start_direction = u_buffer.get_side_position(side, offset=0, extrude=0)
+        start, start_direction = u_buffer.get_side_position(side, offset=0, extrude=1)
 
     if (port_name := properties.end_port) is not None and port_name in v_buffer.node_anchors.all_positions:
         end, end_direction = v_buffer.node_anchors.all_positions[port_name]
@@ -218,6 +218,6 @@ def determine_edge_anchors(
             side = v_buffer.get_closest_side(start)
         else:
             side = ShapeSide(properties.end_magnet.value)
-        end, end_direction = v_buffer.get_side_position(side, offset=0, extrude=0)
+        end, end_direction = v_buffer.get_side_position(side, offset=0, extrude=1)
 
     return start, end, start_direction, end_direction

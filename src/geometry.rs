@@ -236,6 +236,7 @@ pub enum Direction {
     DownLeft = 7,
 }
 
+#[pymethods]
 impl Direction {
     pub fn opposite(&self) -> Direction {
         match self {
@@ -260,7 +261,9 @@ impl Direction {
             _ => false,
         }
     }
+}
 
+impl Direction {
     pub fn all_directions(neighborhood: Neighborhood) -> Vec<Direction> {
         match neighborhood {
             Neighborhood::Orthogonal => vec![

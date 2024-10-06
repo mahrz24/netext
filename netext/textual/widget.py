@@ -426,7 +426,7 @@ class GraphView(ScrollView):
                 widget.styles.height = node_buffer.height
             # TODO node buffer top left should be point
             widget.styles.offset = self.view_to_widget_coordinates(Point(node_buffer.left_x, node_buffer.top_y))
-        return super().refresh(*regions, repaint=repaint, layout=layout, recompose=recompose)
+        return super().refresh(*regions, repaint=repaint, layout=layout)
 
     def pre_render_strips(self) -> list[list[Segment]]:
         all_buffers = list(self._console_graph._all_buffers())

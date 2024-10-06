@@ -44,7 +44,7 @@ def route_edge(
     return EdgePath(
         start=start,
         end=end,
-        directed_points=[DirectedPoint(x=x, y=y, direction=direction) for (x, y, direction) in path],
+        directed_points=path,
     )
 
 
