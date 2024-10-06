@@ -7,6 +7,7 @@ from typing import Any, Iterable, cast
 from networkx import DiGraph  # type: ignore
 
 import networkx as nx  # type: ignore
+from rich import inspect
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.measure import Measurement
 
@@ -831,7 +832,6 @@ class ConsoleGraph:
         for (u,v), label_nodes in label_buffers.items():
             self.edge_label_buffers[(u, v)] = label_nodes
 
-
         self._render_port_buffers()
 
     def _render_port_buffers(self) -> None:
@@ -862,6 +862,7 @@ class ConsoleGraph:
         node_buffers = [node_buffer for node, node_buffer in self.node_buffers.items() if node in visible_nodes]
 
         port_buffers = [port_buffers for node, port_buffers in self.port_buffers.items() if node in visible_nodes]
+        inspect(port_buffers)
         return chain(
             node_buffers,
             self.edge_buffers.values(),

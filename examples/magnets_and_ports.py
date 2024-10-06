@@ -53,7 +53,7 @@ for routing, drawing in [
             "$start-port": "d",
             "$edge-segment-drawing-mode": drawing,
             "$end-arrow-tip": ArrowTip.ARROW,
-            "$end-magnet": Magnet.TOP,
+            "$end-magnet": Magnet.RIGHT,
             "$style": Style(color="green"),
         },
     )

@@ -183,75 +183,6 @@ impl RTreeObject for DirectedPoint {
 }
 
 impl EdgeRouter {
-    fn route_waypoints(
-        &self,
-        start: Point,
-        end: Point,
-        xs: &Vec<i32>,
-        ys: &Vec<i32>,
-    ) -> Vec<Point> {
-        let mut open_set = PriorityQueue::new();
-        open_set.push(start, Reverse(0));
-
-        let mut came_from = HashMap::new();
-        let mut g_score = HashMap::new();
-        g_score.insert(start, 0);
-
-        let mut f_score = HashMap::new();
-        f_score.insert(start, waypoint_heuristic(&start, &end));
-
-        let mut path_length = 0;
-
-        // println!("Start: {:?}", start);
-        // println!("End: {:?}", end);
-
-        while let Some((current, _)) = open_set.pop() {
-            if current == end {
-                // println!("Path length: {:?}", path_length);
-                return reconstruct_path(&came_from, current);
-            }
-
-            let current_end_distance = (current.x - end.x).abs() + (current.y - end.y).abs();
-            let current_start_distance = (current.x - start.x).abs() + (current.y - start.y).abs();
-
-            let current_distance = min(current_start_distance, current_end_distance);
-
-            // for neighbor in
-            //     get_neighbors(&current, config.clone().neighborhood, current_distance > 2)
-            // {
-            //     let tentative_g_score = g_score.get(&current).unwrap_or(&(i32::MAX - 100))
-            //         + self.waypoint_transition_cost(&current, &neighbor, &config);
-
-            //     if tentative_g_score < *g_score.get(&neighbor).unwrap_or(&(i32::MAX - 100)) {
-            //         came_from.insert(neighbor, current);
-            //         g_score.insert(neighbor, tentative_g_score);
-            //         f_score.insert(
-            //             neighbor,
-            //             tentative_g_score + heuristic(&neighbor, &end, config),
-            //         );
-
-            //         open_set.push(neighbor, Reverse(*f_score.get(&neighbor).unwrap()));
-            //     }
-            // }
-            path_length += 1;
-        }
-        vec![start, end]
-    }
-
-    fn waypoint_transition_cost(
-        &self,
-        src: &Point,
-        dst: &Point,
-    ) -> i32 {
-        let mut cost: i32 = 0;
-
-        if src.x != dst.x || src.y != dst.y {
-            cost += 1;
-        }
-
-        cost
-    }
-
     fn transition_cost(
         &self,
         src: &DirectedPoint,
@@ -401,15 +332,6 @@ impl EdgeRouter {
         )>,
     ) -> PyResult<Vec<Vec<DirectedPoint>>> {
         let mut result = Vec::new();
-
-        let center_points = self
-            .placed_nodes
-            .values()
-            .map(|node| node.center)
-            .collect::<Vec<_>>();
-
-        let center_xs = center_points.iter().map(|p| p.x).collect::<Vec<_>>();
-        let center_ys = center_points.iter().map(|p| p.y).collect::<Vec<_>>();
 
         for (u, v, start, end, start_direction, end_direction, config) in edges {
             let directed_points =

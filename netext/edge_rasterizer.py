@@ -7,7 +7,6 @@ from netext.edge_rendering.arrow_tips import render_arrow_tip_buffers
 from netext.edge_rendering.buffer import EdgeBuffer
 from netext.edge_rendering.path_rasterizer import rasterize_edge_path
 from netext.edge_routing.edge import EdgeInput
-from netext.edge_routing.node_anchors import NodeAnchors
 from netext.edge_routing.route import route_edge, route_edges
 from netext.geometry.magnet import Magnet, ShapeSide
 from netext.geometry.point import Point
