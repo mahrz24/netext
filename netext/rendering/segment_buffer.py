@@ -4,7 +4,7 @@ from typing import Any, Hashable, Tuple
 
 from rich.segment import Segment
 from netext.geometry import Region
-from netext.geometry.point import Point
+from netext._core import Point
 
 
 @dataclass

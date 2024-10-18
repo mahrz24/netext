@@ -11,13 +11,14 @@ from rich import inspect
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.measure import Measurement
 
-from netext.geometry import Point, Region
+from netext.geometry import Region
 
 from netext.edge_rendering.buffer import EdgeBuffer
 from netext.geometry.point import FloatPoint
 from netext.properties.edge import EdgeProperties
 from netext.properties.node import NodeProperties
 import netext._core as core
+from netext._core import Point
 
 from netext.rendering.segment_buffer import StripBuffer
 

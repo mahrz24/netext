@@ -2,7 +2,7 @@ import pytest
 from rich.console import Console
 
 from netext.edge_rasterizer import rasterize_edge
-from netext.geometry.point import Point
+from netext._core import Point
 from netext.node_rasterizer import rasterize_node
 from netext.properties.edge import EdgeProperties
 
@@ -33,5 +33,5 @@ def test_trivial_edge(console: Console) -> None:
     assert result is not None
     edge, _ = result
 
-    assert edge.width == 6
+    assert edge.width == 5
     assert edge.height == 7

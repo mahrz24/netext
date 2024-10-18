@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from netext.geometry.point import Point
+from netext._core import Point
 from netext.geometry.size import Size
 
 

@@ -9,7 +9,7 @@ from netext.edge_rendering.path_rasterizer import rasterize_edge_path
 from netext.edge_routing.edge import EdgeInput
 from netext.edge_routing.route import route_edge, route_edges
 from netext.geometry.magnet import Magnet, ShapeSide
-from netext.geometry.point import Point
+from netext._core import Point
 
 from netext.node_rendering.buffers import EdgeLabelBuffer, NodeBuffer
 from netext.properties.edge import EdgeProperties
@@ -17,7 +17,7 @@ from netext.properties.shape import JustContent
 from netext.shapes.shape import JustContentShape
 from netext.rendering.segment_buffer import Layer, StripBuffer, ZIndex
 import netext._core as core
-from netext._core import Direction
+from netext._core import DirectedPoint, Direction
 
 
 @dataclass
@@ -47,18 +47,18 @@ def rasterize_edges(
         if request.lod != 1:
             request.properties = request.properties.lod_properties.get(request.lod, request.properties)
 
-        start, end, start_direction, end_direction = determine_edge_anchors(
+        start, end = determine_edge_anchors(
             request.u_buffer, request.v_buffer, request.properties
         )
         edge_input = EdgeInput(
-            start=start,
-            end=end,
+            start=start.point,
+            end=end.point,
             label=request.properties.label,
             routing_mode=request.properties.routing_mode,
             edge_segment_drawing_mode=request.properties.segment_drawing_mode,
         )
         edge_inputs.append(edge_input)
-        edge_anchors.append((request.u, request.v, start, end, start_direction, end_direction, request.properties.routing_mode))
+        edge_anchors.append((request.u, request.v, start, end, request.properties.routing_mode))
 
     edge_paths = route_edges(edge_router, edge_anchors)
 
@@ -105,11 +105,11 @@ def rasterize_edge(
     if lod != 1:
         properties = properties.lod_properties.get(lod, properties)
 
-    start, end, start_direction, end_direction = determine_edge_anchors(u_buffer, v_buffer, properties)
+    start, end, = determine_edge_anchors(u_buffer, v_buffer, properties)
 
     edge_input = EdgeInput(
-        start=start,
-        end=end,
+        start=start.point,
+        end=end.point,
         label=properties.label,
         routing_mode=properties.routing_mode,
         edge_segment_drawing_mode=properties.segment_drawing_mode,
@@ -119,8 +119,6 @@ def rasterize_edge(
         start=start,
         end=end,
         edge_router=edge_router,
-        start_direction=start_direction,
-        end_direction=end_direction,
         edge_routing_mode=properties.routing_mode
     )
 
@@ -198,25 +196,25 @@ def determine_edge_anchors(
     u_buffer: NodeBuffer,
     v_buffer: NodeBuffer,
     properties: EdgeProperties,
-) -> tuple[Point, Point, Direction, Direction]:
+) -> tuple[DirectedPoint, DirectedPoint]:
     if (port_name := properties.start_port) is not None and port_name in u_buffer.node_anchors.all_positions:
-        start, start_direction = u_buffer.node_anchors.all_positions[port_name]
+        start = u_buffer.node_anchors.all_positions[port_name]
         u_buffer.connect_port(port_name, v_buffer.node)
     else:
         if properties.start_magnet == Magnet.CLOSEST:
             side = u_buffer.get_closest_side(v_buffer.center)
         else:
             side = ShapeSide(properties.start_magnet.value)
-        start, start_direction = u_buffer.get_side_position(side, offset=0, extrude=1)
+        start = u_buffer.get_side_position(side, offset=0, extrude=1)
 
     if (port_name := properties.end_port) is not None and port_name in v_buffer.node_anchors.all_positions:
-        end, end_direction = v_buffer.node_anchors.all_positions[port_name]
+        end = v_buffer.node_anchors.all_positions[port_name]
         v_buffer.connect_port(port_name, u_buffer.node)
     else:
         if properties.end_magnet == Magnet.CLOSEST:
-            side = v_buffer.get_closest_side(start)
+            side = v_buffer.get_closest_side(start.point)
         else:
             side = ShapeSide(properties.end_magnet.value)
-        end, end_direction = v_buffer.get_side_position(side, offset=0, extrude=1)
+        end = v_buffer.get_side_position(side, offset=0, extrude=1)
 
-    return start, end, start_direction, end_direction
+    return start, end

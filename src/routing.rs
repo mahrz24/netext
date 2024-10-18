@@ -324,18 +324,16 @@ impl EdgeRouter {
         edges: Vec<(
             Bound<'_, PyAny>,
             Bound<'_, PyAny>,
-            Point,
-            Point,
-            Direction,
-            Direction,
+            DirectedPoint,
+            DirectedPoint,
             RoutingConfig,
         )>,
     ) -> PyResult<Vec<Vec<DirectedPoint>>> {
         let mut result = Vec::new();
 
-        for (u, v, start, end, start_direction, end_direction, config) in edges {
+        for (u, v, start, end, config) in edges {
             let directed_points =
-                self.route_edge(start, end, start_direction, end_direction, config)?;
+                self.route_edge(start, end, config)?;
             let path = directed_points
                 .iter()
                 .map(|p| Point::new(p.x, p.y))
@@ -348,17 +346,12 @@ impl EdgeRouter {
 
     fn route_edge(
         &self,
-        start: Point,
-        end: Point,
-        start_direction: Direction,
-        end_direction: Direction,
+        start: DirectedPoint,
+        end: DirectedPoint,
         config: RoutingConfig,
     ) -> PyResult<Vec<DirectedPoint>> {
         // println!("Line occlusion:\n{:}", occlusion_map_as_string(&self.line_occlusion));
         // println!("Shape occlusion:\n{:}", occlusion_map_as_string(&self.shape_occlusion));
-
-        let start = DirectedPoint::new(start.x, start.y, start_direction);
-        let end = DirectedPoint::new(end.x, end.y, end_direction);
 
         let mut open_set = PriorityQueue::new();
         open_set.push(start, Reverse(0));

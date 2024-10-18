@@ -62,9 +62,6 @@ requires-python = ">=3.10"
 dependencies = [
     "rich>=13",
     "networkx[default]~=3.0",
-    "grandalf>=0.7",
-    "shapely~=2.0",
-    "rtree>=1.0.1",
     "cachetools>=5.3.0",
     "plum-dispatch >=2.1.1",
 ]

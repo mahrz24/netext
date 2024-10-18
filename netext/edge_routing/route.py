@@ -26,50 +26,44 @@ def _edge_routing_mode_to_routing_config(
             )
 
 def route_edge(
-    start: Point,
-    end: Point,
-    start_direction: Direction,
-    end_direction: Direction,
+    start: DirectedPoint,
+    end: DirectedPoint,
     edge_router: core.EdgeRouter,
     edge_routing_mode: EdgeRoutingMode,
 ) -> EdgePath:
     path = edge_router.route_edge(
-        start=core.Point(x=start.x, y=start.y),
-        end=core.Point(x=end.x, y=end.y),
-        start_direction=start_direction,
-        end_direction=end_direction,
+        start,
+        end,
         config=_edge_routing_mode_to_routing_config(edge_routing_mode),
     )
 
     return EdgePath(
-        start=start,
-        end=end,
+        start=start.point,
+        end=end.point,
         directed_points=path,
     )
 
 
 def route_edges(
-    edge_router: core.EdgeRouter, edge_anchors: list[tuple[Hashable, Hashable, Point, Point, Direction, Direction, EdgeRoutingMode]]
+    edge_router: core.EdgeRouter, edge_anchors: list[tuple[Hashable, Hashable, DirectedPoint, DirectedPoint, EdgeRoutingMode]]
 ) -> list[EdgePath]:
     core_anchors = [
         (
             u,
             v,
-            core.Point(x=start.x, y=start.y),
-            core.Point(x=end.x, y=end.y),
-            start_direction,
-            end_direction,
+            start,
+            end,
             _edge_routing_mode_to_routing_config(edge_routing_mode),
         )
-        for u, v, start, end, start_direction, end_direction, edge_routing_mode in edge_anchors
+        for u, v, start, end, edge_routing_mode in edge_anchors
     ]
     point_paths = edge_router.route_edges(core_anchors)
 
     return [
         EdgePath(
-            start=start,
-            end=end,
+            start=start.point,
+            end=end.point,
             directed_points=path,
         )
-        for (_, _, start, end, _, _, _), path in zip(edge_anchors, point_paths)
+        for (_, _, start, end, _), path in zip(edge_anchors, point_paths)
     ]

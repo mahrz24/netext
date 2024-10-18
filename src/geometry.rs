@@ -119,6 +119,34 @@ impl Point {
             y: self.y / other,
         }
     }
+
+    fn distance_to_sqrd(&self, other: &Point) -> i32 {
+        let x_diff = (self.x - other.x) as i32;
+        let y_diff = (self.y - other.y) as i32;
+        x_diff.pow(2) + y_diff.pow(2)
+    }
+
+    fn distance_to_max(&self, other: &Point) -> i32 {
+        let x_diff = (self.x - other.x).abs();
+        let y_diff = (self.y - other.y).abs();
+        x_diff.max(y_diff)
+    }
+
+    fn as_tuple(&self) -> (i32, i32) {
+        (self.x, self.y)
+    }
+
+    fn __len__(&self) -> PyResult<usize> {
+        Ok(2) // The number of elements in the class
+    }
+
+    fn __getitem__(&self, idx: usize, py: Python<'_>) -> PyResult<PyObject> {
+        match idx {
+            0 => Ok(self.x.to_object(py)),
+            1 => Ok(self.y.to_object(py)),
+            _ => Err(PyIndexError::new_err("index out of range")),
+        }
+    }
 }
 
 impl PointLike for Point {

@@ -5,7 +5,7 @@ from rich.padding import PaddingDimensions
 from rich.segment import Segment
 from rich.style import Style
 
-from netext._core import Direction
+from netext._core import DirectedPoint, Direction
 from netext.geometry import Magnet, Point
 from shapely import LineString, Polygon
 from netext.geometry.magnet import ShapeSide
@@ -24,7 +24,7 @@ class Shape(Protocol):
         side: ShapeSide,
         offset: int = 0,
         extrude: int = 0
-    ) -> tuple[Point, Direction]:
+    ) -> DirectedPoint:
         return NotImplemented
 
     def get_closest_side(
@@ -69,25 +69,20 @@ class RectangularShapeMixin:
         shape_buffer: "ShapeBuffer",
         target_point: Point,
     ) -> ShapeSide:
-        direct_line = LineString([shape_buffer.center.shapely, target_point.shapely])
-        node_polygon = self.polygon(shape_buffer)
-        intersection = direct_line.intersection(node_polygon)
-        intersection_point = intersection.line_interpolate_point(1.0, normalized=True)
-
         closest_side = ShapeSide.TOP
         closest_point, _ = self.get_side_position(
             shape_buffer=shape_buffer,
             side=closest_side,
         )
 
-        closest_distance = intersection_point.distance(closest_point.shapely)
+        closest_distance = closest_point.distance_to_sqrd(target_point)
 
         for side in [ShapeSide.LEFT, ShapeSide.RIGHT, ShapeSide.BOTTOM]:
             point, _ = self.get_side_position(
                 shape_buffer=shape_buffer,
                 side=side,
             )
-            distance = intersection_point.distance(point.shapely)
+            distance = point.distance_to_sqrd(target_point)
             if distance < closest_distance:
                 closest_distance = distance
                 closest_side = side
@@ -100,32 +95,20 @@ class RectangularShapeMixin:
         side: ShapeSide,
         offset: int = 0,
         extrude: int = 0
-    ) -> tuple[Point, Direction]:
+    ) -> DirectedPoint:
         match side:
             case ShapeSide.TOP:
                 direction = Direction.UP
-                return (
-                    Point(x=shape_buffer.center.x + offset, y=shape_buffer.top_y - extrude),
-                    direction,
-                )
+                return DirectedPoint(x=shape_buffer.center.x + offset, y=shape_buffer.top_y - extrude, direction=direction)
             case ShapeSide.LEFT:
                 direction = Direction.LEFT
-                return (
-                    Point(x=shape_buffer.left_x - extrude, y=shape_buffer.center.y + offset),
-                    direction,
-                )
+                return DirectedPoint(x=shape_buffer.left_x - extrude, y=shape_buffer.center.y + offset, direction=direction)
             case ShapeSide.BOTTOM:
                 direction = Direction.DOWN
-                return (
-                    Point(x=shape_buffer.center.x - offset, y=shape_buffer.bottom_y + extrude),
-                    direction,
-                )
+                return DirectedPoint(x=shape_buffer.center.x - offset, y=shape_buffer.bottom_y + extrude, direction=direction)
             case ShapeSide.RIGHT:
                 direction = Direction.RIGHT
-                return (
-                    Point(x=shape_buffer.right_x + extrude, y=shape_buffer.center.y - offset),
-                    direction,
-                )
+                return DirectedPoint(x=shape_buffer.right_x + extrude, y=shape_buffer.center.y - offset, direction=direction)
         raise RuntimeError(side)
 
 

@@ -1,4 +1,4 @@
-from netext.geometry.point import Point
+from netext._core import Point
 from netext.geometry.magnet import Magnet
 from netext.geometry.region import Region
 

@@ -7,9 +7,9 @@ from typing_extensions import Self
 from rich.console import Console
 from rich.style import Style
 
-from netext._core import Direction
+from netext._core import Direction, Point, DirectedPoint
 from netext.edge_routing.node_anchors import NodeAnchors
-from netext.geometry import Magnet, Point
+from netext.geometry import Magnet
 from netext.geometry.magnet import ShapeSide
 from netext.properties.edge import EdgeProperties
 from netext.properties.node import NodeProperties, Port
@@ -101,7 +101,7 @@ class NodeBuffer(ShapeBuffer):
         side: ShapeSide,
         offset: int = 0,
         extrude: int = 0,
-    ) -> tuple[Point, Direction]:
+    ) -> DirectedPoint:
         return self.shape.get_side_position(
             self,
             side=side,
@@ -151,17 +151,17 @@ class NodeBuffer(ShapeBuffer):
     def determine_port_positions(self) -> None:
         for current_port_name, _ in sorted(self.properties.ports.items(), key=lambda x: x[1].key):
             port_side = self.node_anchors.port_sides[current_port_name]
-            pos, pos_direction = self.get_port_position(
+            pos = self.get_port_position(
                 port_name=current_port_name,
                 port_side=port_side,
                 ports_on_side=self.node_anchors.ports_per_side[port_side],
             )
-            self.node_anchors.all_positions[current_port_name] = (pos, pos_direction)
-            self.node_anchors.port_positions[current_port_name] = pos
+            self.node_anchors.all_positions[current_port_name] = pos
+            self.node_anchors.port_positions[current_port_name] = pos.point
 
     def get_port_position(
         self, port_name: str, port_side: ShapeSide, ports_on_side: list[str]
-    ) -> tuple[Point, Direction]:
+    ) -> DirectedPoint:
         # TODO This needs to be moved to the shape, as it's shape specific
         # E.g. the port offset computation makes some assumptions about the border size
         # TODO should we raise on wrong port?
@@ -189,13 +189,13 @@ class NodeBuffer(ShapeBuffer):
 
         # The magnet has been derived from the shape side, so it's determined and the target point
         # does not matter
-        start, start_direction = self.get_side_position(
+        start = self.get_side_position(
             side=port_side,
             offset=port.offset or port_offset,
         )
-        self.node_anchors.all_positions[port_name] = (start, start_direction)
+        self.node_anchors.all_positions[port_name] = start
 
-        return start, start_direction
+        return start
 
     def connect_port(self, port_name: str, node: Hashable):
         # TODO check
@@ -240,35 +240,35 @@ class NodeBuffer(ShapeBuffer):
             buffers.append(port_buffer)
 
             # This should always be not None
-            # if port_helper is not None:
-            #     port_label = port.label
-            #     # This does not work well with unicode chars, use rich methods here instead
-            #     port_label_length = len(port.label)
-            #     if self.node_anchors.port_sides[port_name] in [ShapeSide.TOP, ShapeSide.BOTTOM]:
-            #         port_label = "\n".join([c for c in port.label])
-            #     port_label_strips = shape.render_shape(
-            #         console, port_label, style=Style(), padding=0, properties=JustContent()
-            #     )
+            if port_helper is not None:
+                port_label = port.label
+                # This does not work well with unicode chars, use rich methods here instead
+                port_label_length = len(port.label)
+                if self.node_anchors.port_sides[port_name] in [ShapeSide.TOP, ShapeSide.BOTTOM]:
+                    port_label = "\n".join([c for c in port.label])
+                port_label_strips = shape.render_shape(
+                    console, port_label, style=Style(), padding=0, properties=JustContent()
+                )
 
-            #     normalizer = port_helper.distance_to(port_position)
+                # normalizer = port_helper.distance_to(port_position)
 
-            #     offset: float = 1
-            #     if port_sides[port_name] in [ShapeSide.BOTTOM, ShapeSide.TOP]:
-            #         offset = 0.5
-            #     label_position = port_position
-            #     # Fixme: This is not correct, the offset should be calculated from the port position
-            #     # - (port_helper - port_position) * (
-            #     #     1.0 / normalizer * ((port_label_length) * 0.5 + offset)
-            #     # )
-            #     port_label_buffer = PortLabelBuffer.from_strips_and_node(
-            #         port_label_strips,
-            #         port_name=port_name,
-            #         node=self.node,
-            #         shape=shape,
-            #         z_index=ZIndex(layer=Layer.PORT_LABELS),
-            #         center=label_position,
-            #     )
-            #     buffers.append(port_label_buffer)
+                offset: float = 1
+                if self.node_anchors.port_sides[port_name] in [ShapeSide.BOTTOM, ShapeSide.TOP]:
+                    offset = 0.5
+                label_position = port_position
+                # Fixme: This is not correct, the offset should be calculated from the port position
+                # - (port_helper - port_position) * (
+                #     1.0 / normalizer * ((port_label_length) * 0.5 + offset)
+                # )
+                port_label_buffer = PortLabelBuffer.from_strips_and_node(
+                    port_label_strips,
+                    port_name=port_name,
+                    node=self.node,
+                    shape=shape,
+                    z_index=ZIndex(layer=Layer.PORT_LABELS),
+                    center=label_position,
+                )
+                buffers.append(port_label_buffer)
 
         return buffers
 

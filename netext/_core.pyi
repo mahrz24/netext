@@ -46,6 +46,12 @@ class Point:
     @classmethod
     def max_point(cls, points: list["Point"]) -> "Point": ...
 
+    def distance_to_sqrd(self, other: "Point") -> int: ...
+
+    def distance_to_max(self, other: "Point") -> float: ...
+
+    def as_tuple(self) -> tuple[int, int]: ...
+
 class Size:
     def __init__(self, width: int, height: int) -> None: ...
 
@@ -61,14 +67,12 @@ class EdgeRouter:
     def remove_edge(self, u: Hashable, v: Hashable) -> None: ...
     def route_edge(
         self,
-        start: Point,
-        end: Point,
-        start_direction: Direction,
-        end_direction: Direction,
+        start: DirectedPoint,
+        end: DirectedPoint,
         config: RoutingConfig,
     ) -> list[DirectedPoint]: ...
     def route_edges(
-        self, edge_anchors: list[tuple[Hashable, Hashable, Point, Point, Direction, Direction, RoutingConfig]]
+        self, edge_anchors: list[tuple[Hashable, Hashable, DirectedPoint, DirectedPoint, RoutingConfig]]
     ) -> list[list[DirectedPoint]]: ...
 
 class Neighborhood(Enum):
