@@ -224,11 +224,14 @@ class NodeBuffer(ShapeBuffer):
                 port_symbol = port.symbol_connected
             port_strips = shape.render_shape(console, port_symbol, style=Style(), padding=0, properties=JustContent())
 
-            port_position, port_helper = self.get_port_position(
+            port_position, port_direction = self.get_port_position(
                 port_name=port_name,
                 ports_on_side=self.node_anchors.ports_per_side[self.node_anchors.port_sides[port_name]],
                 port_side=self.node_anchors.port_sides[port_name],
             )
+
+            port_position: Point
+            port_direction: Direction
 
             port_buffer = PortBuffer.from_strips_and_node(
                 port_strips,
@@ -239,36 +242,34 @@ class NodeBuffer(ShapeBuffer):
             )
             buffers.append(port_buffer)
 
-            # This should always be not None
-            if port_helper is not None:
-                port_label = port.label
-                # This does not work well with unicode chars, use rich methods here instead
-                port_label_length = len(port.label)
-                if self.node_anchors.port_sides[port_name] in [ShapeSide.TOP, ShapeSide.BOTTOM]:
-                    port_label = "\n".join([c for c in port.label])
-                port_label_strips = shape.render_shape(
-                    console, port_label, style=Style(), padding=0, properties=JustContent()
-                )
+            port_label = port.label
+            # TODO: This does not work well with unicode chars, use rich methods here instead
+            port_label_length = len(port.label)
+            if self.node_anchors.port_sides[port_name] in [ShapeSide.TOP, ShapeSide.BOTTOM]:
+                port_label = "\n".join([c for c in port.label])
+            port_label_strips = shape.render_shape(
+                console, port_label, style=Style(), padding=0, properties=JustContent()
+            )
 
-                # normalizer = port_helper.distance_to(port_position)
+            match self.node_anchors.port_sides[port_name]:
+                case ShapeSide.TOP:
+                    label_position = Point(x=port_position.x, y=port_position.y + port_label_length)
+                case ShapeSide.LEFT:
+                    label_position = Point(x=port_position.x - port_label_length, y=port_position.y)
+                case ShapeSide.BOTTOM:
+                    label_position = Point(x=port_position.x, y=port_position.y - port_label_length)
+                case ShapeSide.RIGHT:
+                    label_position = Point(x=port_position.x + port_label_length, y=port_position.y)
 
-                offset: float = 1
-                if self.node_anchors.port_sides[port_name] in [ShapeSide.BOTTOM, ShapeSide.TOP]:
-                    offset = 0.5
-                label_position = port_position
-                # Fixme: This is not correct, the offset should be calculated from the port position
-                # - (port_helper - port_position) * (
-                #     1.0 / normalizer * ((port_label_length) * 0.5 + offset)
-                # )
-                port_label_buffer = PortLabelBuffer.from_strips_and_node(
-                    port_label_strips,
-                    port_name=port_name,
-                    node=self.node,
-                    shape=shape,
-                    z_index=ZIndex(layer=Layer.PORT_LABELS),
-                    center=label_position,
-                )
-                buffers.append(port_label_buffer)
+            port_label_buffer = PortLabelBuffer.from_strips_and_node(
+                port_label_strips,
+                port_name=port_name,
+                node=self.node,
+                shape=shape,
+                z_index=ZIndex(layer=Layer.PORT_LABELS),
+                center=label_position,
+            )
+            buffers.append(port_label_buffer)
 
         return buffers
 

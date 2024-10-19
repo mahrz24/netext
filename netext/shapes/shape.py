@@ -6,8 +6,7 @@ from rich.segment import Segment
 from rich.style import Style
 
 from netext._core import DirectedPoint, Direction
-from netext.geometry import Magnet, Point
-from shapely import LineString, Polygon
+from netext.geometry import Point
 from netext.geometry.magnet import ShapeSide
 from netext.properties.shape import ShapeProperties
 
@@ -34,9 +33,6 @@ class Shape(Protocol):
     ) -> ShapeSide:
         return NotImplemented
 
-    def polygon(self, shape_buffer: "ShapeBuffer", margin: float = 0) -> Polygon:
-        return NotImplemented
-
     def render_shape(
         self,
         console: Console,
@@ -53,16 +49,6 @@ class RectangularShapeMixin:
     def _renderable_type_to_strips(self, console: Console, node_renderable: RenderableType) -> list[Strip]:
         segment_lists = list(console.render_lines(node_renderable, pad=False))
         return [Strip(segments=cast(list[Segment | Spacer], segments)) for segments in segment_lists]
-
-    def polygon(self, shape_buffer: "ShapeBuffer", margin: float = 0) -> Polygon:
-        return Polygon(
-            [
-                (shape_buffer.left_x - margin, shape_buffer.top_y - margin),
-                (shape_buffer.right_x + margin, shape_buffer.top_y - margin),
-                (shape_buffer.right_x + margin, shape_buffer.bottom_y + margin),
-                (shape_buffer.left_x - margin, shape_buffer.bottom_y + margin),
-            ]
-        )
 
     def get_closest_side(
         self,
