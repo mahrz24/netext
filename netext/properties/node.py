@@ -67,6 +67,7 @@ class NodeProperties:
     lod_map: Callable[[float], int] = lambda _: 1  # noqa: E731
     lod_properties: dict[int, "NodeProperties"] = field(default_factory=dict)
     ports: dict[str, Port] = field(default_factory=dict)
+    slots: bool = False
 
     @classmethod
     def from_data_dict(cls, data: dict[str, Any]):
@@ -91,6 +92,7 @@ class NodeProperties:
         lod_map: Callable[[float], int] = _get_allow_none_if_exists(data, "$lod-map", fallback.lod_map)
         lod_properties: dict[int, "NodeProperties"] = dict()
         ports: dict[str, dict[str, Any] | Port] = data.get("$ports", dict())
+        slots: bool = _get_allow_none_if_exists(data, "$slots", fallback.slots)
 
         result = cls(
             shape=shape,
@@ -102,6 +104,7 @@ class NodeProperties:
             lod_map=lod_map,
             lod_properties=lod_properties,
             ports={k: Port.parse(v) for k, v in ports.items()},
+            slots=slots,
         )
 
         # Load properies for all levels of detail

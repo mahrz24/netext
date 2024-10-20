@@ -30,9 +30,6 @@ from rich.traceback import install
 
 install(show_locals=False)
 
-lib_tracer = core.LibTracer()
-
-
 class RenderState(Enum):
     INITIAL = "initial"
     """The initial state, no rendering has happened yet."""
@@ -274,7 +271,7 @@ class ConsoleGraph:
 
         # Add to node buffers for layout
         node_buffer = rasterize_node(self.console, node, cast(dict[str, Any], data))
-        node_buffer.determine_port_sides()
+        node_buffer.determine_edge_sides()
 
         self.node_buffers_for_layout[node] = node_buffer
 
@@ -287,7 +284,7 @@ class ConsoleGraph:
             lod=lod,
             node_anchors=node_buffer.node_anchors,
         )
-        node_buffer.determine_port_positions()
+        node_buffer.determine_edge_positions()
 
         self.node_buffers[node] = node_buffer
 
@@ -470,10 +467,9 @@ class ConsoleGraph:
             node_buffer = rasterize_node(self.console, node, data=cast(dict[str, Any], new_data), lod=lod)
             self.node_buffers_for_layout[node] = node_buffer
 
-            node_buffer.determine_port_sides()
+            node_buffer.determine_edge_sides()
 
             # Update port side assignment
-
             new_node_buffer = rasterize_node(
                 self.console,
                 node,
@@ -486,8 +482,9 @@ class ConsoleGraph:
             self.node_buffers[node] = new_node_buffer
 
             # If the data change, triggered a change of the shape, we need to rerender the edges
-            if new_node_buffer.shape.polygon(new_node_buffer) != old_node.shape.polygon(old_node):
-                force_edge_rerender = True
+            # TODO: Replace this by something possible without shapely
+            # if new_node_buffer.shape.polygon(new_node_buffer) != old_node.shape.polygon(old_node):
+            force_edge_rerender = True
 
         node_data = cast(dict[Hashable, Any], self._core_graph.node_data_or_default(node, dict()))
         data = cast(dict[str, Any], node_data)
@@ -710,7 +707,7 @@ class ConsoleGraph:
                                     self._core_graph.edge_data_or_default(other, node, dict())
                                 )) for other in self._core_graph.neighbors_incoming(node)]
 
-            node_buffer.determine_port_sides(out_neighbors=out_neighbors, in_neighbors=in_neighbors)
+            node_buffer.determine_edge_sides(out_neighbors=out_neighbors, in_neighbors=in_neighbors)
 
     def _transition_compute_zoomed_positions(self) -> None:
         # Reset the edge router, a change of zoom factor requires a new routing
@@ -793,7 +790,7 @@ class ConsoleGraph:
             )
             self._edge_router.add_node(node, placed_node)
 
-            node_buffer.determine_port_positions()
+            node_buffer.determine_edge_positions()
 
 
     def _transition_render_edges(self) -> None:
