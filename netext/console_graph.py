@@ -477,7 +477,7 @@ class ConsoleGraph:
                 node_anchors=node_buffer.node_anchors,
             )
 
-            old_node = self.node_buffers[node]
+            #old_node = self.node_buffers[node]
             new_node_buffer.center = old_position
             self.node_buffers[node] = new_node_buffer
 
@@ -860,7 +860,6 @@ class ConsoleGraph:
         node_buffers = [node_buffer for node, node_buffer in self.node_buffers.items() if node in visible_nodes]
 
         port_buffers = [port_buffers for node, port_buffers in self.port_buffers.items() if node in visible_nodes]
-        inspect(port_buffers)
         return chain(
             node_buffers,
             self.edge_buffers.values(),

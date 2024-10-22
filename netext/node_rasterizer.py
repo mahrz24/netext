@@ -20,9 +20,12 @@ def rasterize_node(
     node: Hashable,
     data: dict[str, Any],
     lod: int = 1,
-    node_anchors: NodeAnchors = NodeAnchors(),
+    node_anchors: NodeAnchors | None = None,
 ) -> NodeBuffer:
     properties = NodeProperties.from_data_dict(data)
+
+    if node_anchors is None:
+        node_anchors = NodeAnchors()
 
     if lod != 1:
         properties = properties.lod_properties.get(lod, properties)
@@ -30,7 +33,7 @@ def rasterize_node(
     content_renderable = properties.content_renderer(str(node), data, properties.content_style)
 
     padding = properties.padding
-    if properties.ports:
+    if properties.ports or properties.shape:
         # Determine longest padding label length
         # TODO: This can be shape specific and might be moved into the shape like
         # the additional padding on the number of ports
@@ -41,7 +44,18 @@ def rasterize_node(
                 for port_name, port in properties.ports.items()
                 if port_name in node_anchors.ports_per_side.get(ShapeSide.TOP, [])
             ]
-            + [0]
+            + [
+                (
+                    len([port for port in properties.ports.values() if port.magnet == ShapeSide.LEFT])
+                    + len(node_anchors.edges_per_side.get(ShapeSide.LEFT, []))
+                )
+                // 2,
+                (
+                    len([port for port in properties.ports.values() if port.magnet == ShapeSide.RIGHT])
+                    + len(node_anchors.edges_per_side.get(ShapeSide.RIGHT, []))
+                )
+                // 2,
+            ]
         )
         additional_left_padding = max(
             [
@@ -49,7 +63,18 @@ def rasterize_node(
                 for port_name, port in properties.ports.items()
                 if port_name in node_anchors.ports_per_side.get(ShapeSide.LEFT, [])
             ]
-            + [0]
+            + [
+                (
+                    len([port for port in properties.ports.values() if port.magnet == ShapeSide.TOP])
+                    + len(node_anchors.edges_per_side.get(ShapeSide.TOP, []))
+                )
+                // 2,
+                (
+                    len([port for port in properties.ports.values() if port.magnet == ShapeSide.BOTTOM])
+                    + len(node_anchors.edges_per_side.get(ShapeSide.BOTTOM, []))
+                )
+                // 2,
+            ]
         )
         additional_bottom_padding = max(
             [
@@ -57,7 +82,18 @@ def rasterize_node(
                 for port_name, port in properties.ports.items()
                 if port_name in node_anchors.ports_per_side.get(ShapeSide.BOTTOM, [])
             ]
-            + [0]
+            + [
+                (
+                    len([port for port in properties.ports.values() if port.magnet == ShapeSide.LEFT])
+                    + len(node_anchors.edges_per_side.get(ShapeSide.LEFT, []))
+                )
+                // 2,
+                (
+                    len([port for port in properties.ports.values() if port.magnet == ShapeSide.RIGHT])
+                    + len(node_anchors.edges_per_side.get(ShapeSide.RIGHT, []))
+                )
+                // 2,
+            ]
         )
         additional_right_padding = max(
             [
@@ -65,7 +101,18 @@ def rasterize_node(
                 for port_name, port in properties.ports.items()
                 if port_name in node_anchors.ports_per_side.get(ShapeSide.RIGHT, [])
             ]
-            + [0]
+            + [
+                (
+                    len([port for port in properties.ports.values() if port.magnet == ShapeSide.TOP])
+                    + len(node_anchors.edges_per_side.get(ShapeSide.TOP, []))
+                )
+                // 2,
+                (
+                    len([port for port in properties.ports.values() if port.magnet == ShapeSide.BOTTOM])
+                    + len(node_anchors.edges_per_side.get(ShapeSide.BOTTOM, []))
+                )
+                // 2,
+            ]
         )
         padding = (
             padding[0] + additional_top_padding,

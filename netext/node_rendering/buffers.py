@@ -142,14 +142,14 @@ class NodeBuffer(ShapeBuffer):
                     else:
                         edge_side = ShapeSide(props.start_magnet.value)
                     self.node_anchors.edge_sides[(self.node, v_buffer.node)] = edge_side
-                    self.node_anchors.edges_per_side[edge_side].append((self.node, v_buffer.node))
+                    self.node_anchors.edges_per_side[edge_side].append(v_buffer.node)
             for u_buffer, props in in_neighbors:
                 if props.start_magnet == Magnet.CLOSEST:
                     edge_side = self.get_closest_side(u_buffer.center)
                 else:
                     edge_side = ShapeSide(props.start_magnet.value)
                 self.node_anchors.edge_sides[(u_buffer.node, self.node)] = edge_side
-                self.node_anchors.edges_per_side[edge_side].append((u_buffer.node, self.node))
+                self.node_anchors.edges_per_side[edge_side].append(u_buffer.node)
 
         for current_port_name, port in sorted(self.properties.ports.items(), key=lambda x: x[1].key):
             if port.magnet == Magnet.CLOSEST or port.magnet is None:
@@ -177,6 +177,7 @@ class NodeBuffer(ShapeBuffer):
             )
             self.node_anchors.all_positions[current_port_name] = pos
             self.node_anchors.port_positions[current_port_name] = pos.point
+
         for side in [ShapeSide.TOP, ShapeSide.LEFT, ShapeSide.BOTTOM, ShapeSide.RIGHT]:
             edges_on_side = len(self.node_anchors.edges_per_side[side])
             ports_on_side = len(self.node_anchors.ports_per_side[side])
@@ -185,19 +186,21 @@ class NodeBuffer(ShapeBuffer):
                 if edges_on_side == 1:
                     edge_offset = 0
                 else:
-                    # TODO Looks a bit weird for odd port numbers as the space is not centered
+                    # TODO Duplication with port offset computation
+                    # Also should be moved to the shape
                     if side == ShapeSide.TOP or side == ShapeSide.BOTTOM:
                         edge_offset = math.ceil((float(ports_on_side+edge_index) / (edges_on_side - 1)) * (self.width - 3)) - math.floor(
                             (self.width - 2) / 2
                         )
                     else:
                         edge_offset = math.ceil(
-                            (float(edge_index) / (ports_on_side + edges_on_side - 1)) * (self.height - 3)
+                            (float(ports_on_side+edge_index) / (ports_on_side + edges_on_side - 1)) * (self.height - 3)
                         ) - math.floor((self.height - 2) / 2)
 
                 start = self.get_side_position(
                     side,
-                    offset=edge_offset
+                    offset=edge_offset,
+                    extrude=1,
                 )
                 self.node_anchors.all_positions[edge] = start
 

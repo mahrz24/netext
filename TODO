@@ -1,9 +1,11 @@
-- Incremental changes still crash sometimes (KeyError in update_edge)
+- [ ] Incremental changes still crash sometimes (KeyError in update_edge)
 - Node connection modes
-    - Directly to magnet
-    - Slots, with growing nodes
-    - Ports (with labels)
-- Propagate the setting for how long to keep straight lines from a node
-- Waypoints for even faster A*
-- Sugiyama better alignment of nodes
-- Better default choice of magnets / slots for connections
+    - [ ] Directly to magnet
+    - [ ] Slots, with growing nodes
+    - [X] Ports (with labels)
+- [ ] Propagate the setting for how long to keep straight lines from a node
+- [ ] Waypoints for even faster A*
+- [ ] Sugiyama better alignment of nodes
+- [ ] Sugiyama LR / TB layout
+- [ ] Line dashing
+- [ ] Better default choice of magnets / slots for connections

@@ -201,20 +201,25 @@ def determine_edge_anchors(
         start = u_buffer.node_anchors.all_positions[port_name]
         u_buffer.connect_port(port_name, v_buffer.node)
     else:
-        if properties.start_magnet == Magnet.CLOSEST:
-            side = u_buffer.get_closest_side(v_buffer.center)
+        if u_buffer.properties.slots and v_buffer.node in u_buffer.node_anchors.all_positions:
+            start = u_buffer.node_anchors.all_positions[v_buffer.node]
         else:
-            side = ShapeSide(properties.start_magnet.value)
-        start = u_buffer.get_side_position(side, offset=0, extrude=1)
+            if properties.start_magnet == Magnet.CLOSEST:
+                side = u_buffer.get_closest_side(v_buffer.center)
+            else:
+                side = ShapeSide(properties.start_magnet.value)
+            start = u_buffer.get_side_position(side, offset=0, extrude=1)
 
     if (port_name := properties.end_port) is not None and port_name in v_buffer.node_anchors.all_positions:
         end = v_buffer.node_anchors.all_positions[port_name]
         v_buffer.connect_port(port_name, u_buffer.node)
     else:
-        if properties.end_magnet == Magnet.CLOSEST:
-            side = v_buffer.get_closest_side(start.point)
+        if v_buffer.properties.slots and u_buffer.node in v_buffer.node_anchors.all_positions:
+            end = v_buffer.node_anchors.all_positions[u_buffer.node]
         else:
-            side = ShapeSide(properties.end_magnet.value)
-        end = v_buffer.get_side_position(side, offset=0, extrude=1)
-
+            if properties.end_magnet == Magnet.CLOSEST:
+                side = v_buffer.get_closest_side(start.point)
+            else:
+                side = ShapeSide(properties.end_magnet.value)
+            end = v_buffer.get_side_position(side, offset=0, extrude=1)
     return start, end
