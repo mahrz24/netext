@@ -17,6 +17,7 @@ from netext.geometry.region import Region as NetextRegion
 from netext.geometry.point import FloatPoint, Point
 from textual.message import Message
 
+from netext.properties.node import NodeProperties
 from netext.rendering.segment_buffer import Reference
 
 
@@ -126,6 +127,17 @@ class GraphView(ScrollView):
     def graph(self, graph: DiGraph) -> None:
         self._graph = graph
         self._graph_was_updated()
+
+    def node_properties(self, node: Hashable) -> NodeProperties:
+        """Returns the properties of a node.
+
+        Args:
+            node (Hashable): The node to get the properties of.
+
+        Returns:
+            dict[str, Any]: The properties of the node.
+        """
+        return self._console_graph.node_buffers[node].properties
 
     def on_resize(self, message: Resize):
         self._resized()

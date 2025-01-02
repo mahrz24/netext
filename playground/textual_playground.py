@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 import uuid
 from netext.geometry.magnet import Magnet
-from netext.node_rasterizer import BoxShape, JustContentShape
+from netext.properties.node import NodeProperties
+from netext.properties.shape import Box, JustContent
 from netext.rendering.segment_buffer import Reference
 from netext.textual.widget import GraphView
 from textual import events
@@ -216,6 +217,7 @@ class PortEditor(Widget):
 
 class StyleEditor(Widget):
     node_data: dict[str, Any]
+    node_properties: NodeProperties
     node: Hashable
 
     def __init__(
@@ -227,9 +229,11 @@ class StyleEditor(Widget):
         disabled: bool = False,
         node: Hashable,
         node_data: dict[str, Any],
+        node_properties: NodeProperties,
     ) -> None:
         self.node_data = node_data
         self.node = node
+        self.node_properties = node_properties
         super().__init__(*children, name=name, id=id, classes=classes, disabled=disabled)
 
     @dataclass
@@ -239,8 +243,11 @@ class StyleEditor(Widget):
 
     def compose(self) -> ComposeResult:
         # TODO with proper property system, defaults are materialized before this
-        shape = self.node_data.get("$shape", BoxShape())
-        box_type = self.node_data.get("$box-type", box.ROUNDED)
+        shape = self.node_properties.shape
+        box_type = None
+
+        if isinstance(shape, Box):
+            box_type = shape.box_type
 
         with Vertical():
             yield Label("Shape", classes="section-title")
@@ -248,12 +255,12 @@ class StyleEditor(Widget):
                 yield RadioButton(
                     "Just Content",
                     id="just-content",
-                    value=isinstance(shape, JustContentShape),
+                    value=isinstance(shape, JustContent),
                 )
-                yield RadioButton("Box", id="box", value=isinstance(shape, BoxShape))
+                yield RadioButton("Box", id="box", value=isinstance(shape, Box))
             with RadioSet(
                 id="box-type-selector",
-                classes="invisible" if not isinstance(shape, BoxShape) else None,
+                classes="invisible" if not isinstance(shape, Box) else None,
             ):
                 yield RadioButton("ASCII", id="ascii", value=box_type == box.ASCII)
                 yield RadioButton("SQUARE", id="square", value=box_type == box.SQUARE)
@@ -266,11 +273,11 @@ class StyleEditor(Widget):
     @on(RadioSet.Changed, "#shape-selector")
     def shape_changed(self, event: RadioSet.Changed) -> None:
         if event.index == 0:
-            self.node_data["$shape"] = JustContentShape()
+            self.node_data["$shape"] = "just-content"
             self.query("#box-type-selector").add_class("invisible")
         elif event.index == 1:
             self.query("#box-type-selector").remove_class("invisible")
-            self.node_data["$shape"] = BoxShape()
+            self.node_data["$shape"] = "box"
         self.post_message(self.StyleChanged(node=self.node, node_data=self.node_data))
 
     @on(RadioSet.Changed, "#box-type-selector")
@@ -318,12 +325,14 @@ class StyleEditor(Widget):
 
 class NodeInspector(Widget):
     node_data: dict[str, Any]
+    node_properties: NodeProperties
     node: Hashable
 
     @dataclass
     class NodeChanged(Message):
         node: Hashable
         node_data: dict[str, Any]
+        node_properties: NodeProperties
 
     def __init__(
         self,
@@ -333,10 +342,13 @@ class NodeInspector(Widget):
         classes: str | None = None,
         disabled: bool = False,
         node_data: dict[str, Any],
+        node_properties: NodeProperties,
         node: Hashable,
     ) -> None:
         self.node = node
         self.node_data = node_data
+        self.node_properties = node_properties
+        self.log(f"Node Properties: {node_properties}")
         super().__init__(*children, name=name, id=id, classes=classes, disabled=disabled)
 
     def compose(self) -> ComposeResult:
@@ -349,16 +361,19 @@ class NodeInspector(Widget):
                 yield Input(value=self.node_data["title"], id="title")
                 yield Label("Node Dictionary", classes="section-title")
                 yield Pretty(node_dct)
-            yield StyleEditor(node_data=self.node_data, node=self.node)
+            yield StyleEditor(node_data=self.node_data, node=self.node, node_properties=self.node_properties)
             yield PortEditor(node_data=self.node_data, node=self.node)
             with Vertical():
                 yield Label("Attributes", classes="section-title")
                 yield Pretty(attr_dct)
+                yield Pretty(self.node_properties)
 
     @on(Input.Submitted, "#title")
     def title_changed(self, event: Input.Submitted) -> None:
         self.node_data["title"] = event.control.value
-        self.post_message(NodeInspector.NodeChanged(node=self.node, node_data=self.node_data))
+        self.post_message(
+            NodeInspector.NodeChanged(node=self.node, node_data=self.node_data, node_properties=self.node_properties)
+        )
 
 
 class Statusbar(Static):
@@ -381,6 +396,7 @@ class GraphArea(Widget):
     class ElementSelected(Message):
         element: Reference | None
         element_data: dict[str, Any] | None
+        element_properties: NodeProperties | None
 
     def compose(self) -> ComposeResult:
         graph_view = GraphView(g, zoom=1, scroll_via_viewport=False, id="graph")
@@ -389,7 +405,7 @@ class GraphArea(Widget):
     def watch_selected_element(self, old_value: Reference | None, new_value: Reference | None) -> None:
         g = self.query_one(GraphView)
 
-        element_message = self.ElementSelected(element=None, element_data=None)
+        element_message = self.ElementSelected(element=None, element_data=None, element_properties=None)
 
         if old_value is not None and old_value.type == "edge":
             if g.graph.has_edge(*old_value.ref):
@@ -413,7 +429,8 @@ class GraphArea(Widget):
         if new_value is not None and new_value.type == "node":
             g.update_node(new_value.ref, data={"$style": Style(color="blue")})
             element_message = self.ElementSelected(
-                element=new_value, element_data=g.graph.nodes(data=True)[new_value.ref]
+                element=new_value, element_data=g.graph.nodes(data=True)[new_value.ref],
+                element_properties=g.node_properties(new_value.ref)
             )
 
         self.post_message(element_message)
@@ -605,7 +622,7 @@ class GraphArea(Widget):
         self.hover_element = None
 
     def on_mouse_move(self, event: events.MouseMove) -> None:
-        if self.move_selected and self.selected_element is not None:
+        if self.move_selected and self.selected_element is not None and self.selected_element.type == "node":
             g = self.query_one(GraphView)
             g.update_node(self.selected_element.ref, position=Offset(x=event.x, y=event.y))
 
@@ -613,6 +630,7 @@ class GraphArea(Widget):
 class GraphInspector(Widget):
     selected_element: Reactive[Reference | None] = reactive(cast(Reference | None, None))
     selected_element_data: dict[str, Any] | None = None
+    selected_element_properties: NodeProperties | None = None
 
     def __init__(
         self,
@@ -638,6 +656,7 @@ class GraphInspector(Widget):
                     NodeInspector(
                         node=new_value.ref,
                         node_data=self.selected_element_data,
+                        node_properties=self.selected_element_properties,
                     )
                 )
 
@@ -662,6 +681,7 @@ class MainScreen(Screen):
     def on_graph_area_element_selected(self, event: GraphArea.ElementSelected) -> None:
         graph_inspector = self.query_one(GraphInspector)
         graph_inspector.selected_element_data = event.element_data
+        graph_inspector.selected_element_properties = event.element_properties
         graph_inspector.selected_element = event.element
 
     def on_toolbar_tool_switched(self, event: Toolbar.ToolSwitched) -> None:

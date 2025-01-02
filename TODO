@@ -4,9 +4,18 @@
     - [X] Slots, with growing nodes
     - [X] Ports (with labels)
 - [ ] Propagate the setting for how long to keep straight lines from a node
-- [ ] Waypoints for even faster A*
 - [ ] Sugiyama better alignment of nodes
 - [ ] Sugiyama LR / TB layout
 - [ ] Force directed layout
 - [ ] Line dashing
+
+# Release pipeline
+
+- [ ] Add maturin to build part of the CI
+- [ ] Update documentation
+- [ ] Make release pipeline
+
+# Past release
+
+- [ ] Waypoints for even faster A*
 - [ ] Better default choice of magnets / slots for connections

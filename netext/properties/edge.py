@@ -6,7 +6,7 @@ from rich.style import Style
 from netext.geometry.magnet import Magnet
 
 from netext.properties.arrow_tips import ArrowTip
-from netext.properties.node import _get_allow_none_if_exists, remove_none_values
+from netext.properties.node import remove_none_values
 
 
 @dataclass
@@ -43,27 +43,21 @@ class EdgeProperties:
         fallback: Union["EdgeProperties", None] = None,
     ) -> "EdgeProperties":
         fallback = fallback or cls()
-        style: Style = _get_allow_none_if_exists(data, f"$style{suffix}", fallback.style)
-        show: bool = _get_allow_none_if_exists(data, f"$show{suffix}", fallback.show)
-        label: str | None = _get_allow_none_if_exists(data, f"$label{suffix}", fallback.label)
-        routing_mode: EdgeRoutingMode = _get_allow_none_if_exists(
-            data, f"$edge-routing-mode{suffix}", fallback.routing_mode
+        style: Style = data.get(f"$style{suffix}", fallback.style)
+        show: bool = data.get(f"$show{suffix}", fallback.show)
+        label: str | None = data.get(f"$label{suffix}", fallback.label)
+        routing_mode: EdgeRoutingMode = data.get(f"$edge-routing-mode{suffix}", fallback.routing_mode)
+        segment_drawing_mode: EdgeSegmentDrawingMode = data.get(
+            f"$edge-segment-drawing-mode{suffix}", fallback.segment_drawing_mode
         )
-        segment_drawing_mode: EdgeSegmentDrawingMode = _get_allow_none_if_exists(
-            data, f"$edge-segment-drawing-mode{suffix}", fallback.segment_drawing_mode
-        )
-        start_arrow_tip: ArrowTip | None = _get_allow_none_if_exists(
-            data, f"$start-arrow-tip{suffix}", fallback.start_arrow_tip
-        )
-        end_arrow_tip: ArrowTip | None = _get_allow_none_if_exists(
-            data, f"$end-arrow-tip{suffix}", fallback.end_arrow_tip
-        )
-        start_port: str | None = _get_allow_none_if_exists(data, f"$start-port{suffix}", fallback.start_port)
-        end_port: str | None = _get_allow_none_if_exists(data, f"$end-port{suffix}", fallback.end_port)
-        start_magnet: Magnet = _get_allow_none_if_exists(data, f"$start-magnet{suffix}", fallback.start_magnet)
-        end_magnet: Magnet = _get_allow_none_if_exists(data, f"$end-magnet{suffix}", fallback.end_magnet)
+        start_arrow_tip: ArrowTip | None = data.get(f"$start-arrow-tip{suffix}", fallback.start_arrow_tip)
+        end_arrow_tip: ArrowTip | None = data.get(f"$end-arrow-tip{suffix}", fallback.end_arrow_tip)
+        start_port: str | None = data.get(f"$start-port{suffix}", fallback.start_port)
+        end_port: str | None = data.get(f"$end-port{suffix}", fallback.end_port)
+        start_magnet: Magnet = data.get(f"$start-magnet{suffix}", fallback.start_magnet)
+        end_magnet: Magnet = data.get(f"$end-magnet{suffix}", fallback.end_magnet)
 
-        lod_map: Callable[[float], int] = _get_allow_none_if_exists(data, "$lod-map", fallback.lod_map)
+        lod_map: Callable[[float], int] = data.get("$lod-map", fallback.lod_map)
         lod_properties: dict[int, "EdgeProperties"] = dict()
 
         result = cls(

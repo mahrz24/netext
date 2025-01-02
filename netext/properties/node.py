@@ -7,14 +7,6 @@ from rich.padding import PaddingDimensions
 from rich.text import Text
 from rich.console import RenderableType
 
-
-def _get_allow_none_if_exists(data: dict[str, Any], key: str, default: Any) -> Any:
-    if key in data:
-        return data[key]
-    else:
-        return default
-
-
 def remove_none_values(data: dict[str, Any]) -> dict[str, Any]:
     result_data = dict(**data)
     to_be_ignored = []
@@ -82,17 +74,17 @@ class NodeProperties:
         fallback: Union["NodeProperties", None] = None,
     ) -> "NodeProperties":
         fallback = fallback or cls()
-        shape: ShapeProperties = _get_allow_none_if_exists(data, f"$shape{suffix}", fallback.shape)
-        style: Style = _get_allow_none_if_exists(data, f"$style{suffix}", fallback.style)
-        content_style = _get_allow_none_if_exists(data, f"$content-style{suffix}", fallback.content_style)
-        margin: int = _get_allow_none_if_exists(data, f"$margin{suffix}", fallback.margin)
-        padding: PaddingDimensions = _get_allow_none_if_exists(data, f"$padding{suffix}", fallback.padding)
-        content_renderer = _get_allow_none_if_exists(data, f"$content-renderer{suffix}", fallback.content_renderer)
+        shape: ShapeProperties = ShapeProperties.parse(data, suffix, fallback.shape)
+        style: Style = data.get(f"$style{suffix}", fallback.style)
+        content_style = data.get(f"$content-style{suffix}", fallback.content_style)
+        margin: int = data.get(f"$margin{suffix}", fallback.margin)
+        padding: PaddingDimensions = data.get(f"$padding{suffix}", fallback.padding)
+        content_renderer = data.get(f"$content-renderer{suffix}", fallback.content_renderer)
 
-        lod_map: Callable[[float], int] = _get_allow_none_if_exists(data, "$lod-map", fallback.lod_map)
+        lod_map: Callable[[float], int] = data.get("$lod-map", fallback.lod_map)
         lod_properties: dict[int, "NodeProperties"] = dict()
         ports: dict[str, dict[str, Any] | Port] = data.get("$ports", dict())
-        slots: bool = _get_allow_none_if_exists(data, "$slots", fallback.slots)
+        slots: bool = data.get("$slots", fallback.slots)
 
         result = cls(
             shape=shape,
