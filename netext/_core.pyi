@@ -87,6 +87,7 @@ class RoutingConfig:
         diagonal_cost: int,
         line_cost: int,
         shape_cost: int,
+        direction_change_margin: int,
     ) -> None: ...
 
 class Direction(Enum):

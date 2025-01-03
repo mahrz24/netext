@@ -100,13 +100,15 @@ class NodeProperties:
         )
 
         # Load properies for all levels of detail
+        lods = set()
         for key in data.keys():
             try:
-                lod = int(key.removesuffix(suffix).split("-")[-1])
-                if lod not in lod_properties:
-                    lod_properties[lod] = cls.from_attribute_dict(data, f"-{lod}", result)
+                lods.add(int(key.removesuffix(suffix).split("-")[-1]))
             except ValueError:
                 continue
+
+        for lod in lods:
+            lod_properties[lod] = cls.from_attribute_dict(data, f"-{lod}", result)
 
         result.lod_properties = lod_properties
 

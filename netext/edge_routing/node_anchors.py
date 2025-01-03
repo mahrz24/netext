@@ -1,7 +1,7 @@
 from collections import defaultdict
 from collections.abc import Hashable
 from dataclasses import dataclass, field
-from netext._core import DirectedPoint, Direction
+from netext._core import DirectedPoint
 from netext.geometry.magnet import ShapeSide
 from netext._core import Point
 

@@ -20,6 +20,7 @@ pub struct RoutingConfig {
     diagonal_cost: i32,
     line_cost: i32,
     shape_cost: i32,
+    direction_change_margin: i32,
 }
 
 #[pymethods]
@@ -31,6 +32,7 @@ impl RoutingConfig {
         diagonal_cost: i32,
         line_cost: i32,
         shape_cost: i32,
+        direction_change_margin: i32
     ) -> Self {
         RoutingConfig {
             neighborhood,
@@ -38,6 +40,7 @@ impl RoutingConfig {
             diagonal_cost,
             line_cost,
             shape_cost,
+            direction_change_margin
         }
     }
 }
@@ -50,12 +53,9 @@ impl Default for RoutingConfig {
             diagonal_cost: 1,
             line_cost: 1,
             shape_cost: 1,
+            direction_change_margin: 1
         }
     }
-}
-
-fn waypoint_heuristic(a: &Point, b: &Point) -> i32 {
-    return (a.x - b.x).abs() + (a.y - b.y).abs()
 }
 
 fn heuristic(a: &DirectedPoint, b: &DirectedPoint, config: RoutingConfig) -> i32 {
@@ -143,7 +143,6 @@ fn reconstruct_path<T: Eq + Hash + Copy>(
         current = parent;
         total_path.push(current);
     }
-    //println!("Path length: {:?}", total_path.len());
     total_path.reverse();
     total_path
 }
@@ -350,9 +349,6 @@ impl EdgeRouter {
         end: DirectedPoint,
         config: RoutingConfig,
     ) -> PyResult<Vec<DirectedPoint>> {
-        // println!("Line occlusion:\n{:}", occlusion_map_as_string(&self.line_occlusion));
-        // println!("Shape occlusion:\n{:}", occlusion_map_as_string(&self.shape_occlusion));
-
         let mut open_set = PriorityQueue::new();
         open_set.push(start, Reverse(0));
 
@@ -363,14 +359,8 @@ impl EdgeRouter {
         let mut f_score = HashMap::new();
         f_score.insert(start, heuristic(&start, &end, config));
 
-        let mut path_length = 0;
-
-        // println!("Start: {:?}", start);
-        // println!("End: {:?}", end);
-
         while let Some((current, _)) = open_set.pop() {
             if current == end {
-                // println!("Path length: {:?}", path_length);
                 return Ok(reconstruct_path(&came_from, current));
             }
 
@@ -380,7 +370,7 @@ impl EdgeRouter {
             let current_distance = min(current_start_distance, current_end_distance);
 
             for neighbor in
-                get_neighbors(&current, config.clone().neighborhood, current_distance > 1)
+                get_neighbors(&current, config.clone().neighborhood, current_distance > config.direction_change_margin)
             {
                 let tentative_g_score = g_score.get(&current).unwrap_or(&(i32::MAX - 100))
                     + self.transition_cost(&current, &neighbor, &config);
@@ -396,26 +386,10 @@ impl EdgeRouter {
                     open_set.push(neighbor, Reverse(*f_score.get(&neighbor).unwrap()));
                 }
             }
-            path_length += 1;
         }
 
         Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
             "Goal not found.",
         ))
     }
-}
-
-fn occlusion_map_as_string(occlusion_map: &HashMap<(i32, i32), i32>) -> String {
-    let mut occlusion_map_string = String::new();
-    let x_min = occlusion_map.keys().map(|(x, _)| x).min().unwrap_or(&0);
-    let x_max = occlusion_map.keys().map(|(x, _)| x).max().unwrap_or(&0);
-    let y_min = occlusion_map.keys().map(|(_, y)| y).min().unwrap_or(&0);
-    let y_max = occlusion_map.keys().map(|(_, y)| y).max().unwrap_or(&0);
-    for y in *y_min..=*y_max {
-        for x in *x_min..=*x_max {
-            occlusion_map_string.push_str(&occlusion_map.get(&(x, y)).unwrap_or(&0).to_string());
-        }
-        occlusion_map_string.push_str("\n");
-    }
-    occlusion_map_string
 }

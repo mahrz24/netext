@@ -15,7 +15,7 @@ from netext.geometry import Region
 from netext.console_graph import AutoZoom
 from netext.properties.shape import JustContent
 
-g = cast(nx.Graph, nx.binomial_tree(5))
+g = cast(nx.DiGraph, nx.binomial_tree(5))
 nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
 nx.set_edge_attributes(g, ArrowTip.NONE, "$end-arrow-tip-0")
 nx.set_edge_attributes(g, lambda zoom: 0 if zoom < 0.5 else 1, "$lod-map")
@@ -30,7 +30,7 @@ nx.set_edge_attributes(g, Style(color="purple", bold=True), "$style")
 
 nx.set_node_attributes(g, Style(color="green"), "$style")
 nx.set_node_attributes(g, lambda zoom: 0 if zoom < 0.5 else 1, "$lod-map")
-nx.set_node_attributes(g, JustContent(), "$shape-0")
+nx.set_node_attributes(g, "just-content", "$shape-0")
 nx.set_node_attributes(g, lambda _, __, ___: "⏺", "$content-renderer-0")
 
 

@@ -1,16 +1,20 @@
-- [ ] Incremental changes still crash sometimes (KeyError in update_edge)
+- [X] Incremental changes still crash sometimes (KeyError in update_edge)
 - Node connection modes
     - [X] Directly to magnet
     - [X] Slots, with growing nodes
     - [X] Ports (with labels)
-- [ ] Propagate the setting for how long to keep straight lines from a node
+- [X] Propagate the setting for how long to keep straight lines from a node
+- [ ] Fix properties with level of detail
 - [ ] Sugiyama better alignment of nodes
 - [ ] Sugiyama LR / TB layout
 - [ ] Force directed layout
 - [ ] Line dashing
+- [ ] Support for all box modes from rich
+
 
 # Release pipeline
 
+- [ ] Add tests for new features and the rust code
 - [ ] Add maturin to build part of the CI
 - [ ] Update documentation
 - [ ] Make release pipeline
@@ -19,3 +23,4 @@
 
 - [ ] Waypoints for even faster A*
 - [ ] Better default choice of magnets / slots for connections
+- [ ] Open up the routing config to the user if they want to
