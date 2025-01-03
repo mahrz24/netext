@@ -11,7 +11,7 @@ num_nodes = 6
 
 g = nx.complete_graph(num_nodes)
 
-nx.set_node_attributes(g, JustContent(), "$shape")
+nx.set_node_attributes(g, "just-content", "$shape")
 nx.set_node_attributes(g, Style(color="purple", bold=True), "$content-style")
 
 nx.set_edge_attributes(g, EdgeSegmentDrawingMode.BRAILLE, "$edge-segment-drawing-mode")

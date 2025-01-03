@@ -99,7 +99,7 @@ class ConsoleGraph:
     def __init__(
         self,
         graph: DiGraph,
-        layout_engine: core.LayoutEngine = core.SugiyamaLayout(),
+        layout_engine: core.LayoutEngine = core.SugiyamaLayout(core.LayoutDirection.TOP_DOWN),
         console: Console = Console(),
         viewport: Region | None = None,
         max_width: int | None = None,

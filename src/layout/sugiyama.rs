@@ -14,14 +14,30 @@ use crate::{geometry::Point, graph::CoreGraph};
 
 use super::LayoutEngine;
 
+#[pyclass]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+pub enum LayoutDirection {
+    #[pyo3(name = "TOP_DOWN")]
+    TopDown = 0,
+    #[pyo3(name = "LEFT_RIGHT")]
+    LeftRight = 1,
+}
+
 #[pyclass(extends=LayoutEngine, subclass)]
-pub struct SugiyamaLayout {}
+pub struct SugiyamaLayout {
+    direction: LayoutDirection,
+}
 
 #[pymethods]
 impl SugiyamaLayout {
     #[new]
-    fn new() -> (Self, LayoutEngine) {
-        (SugiyamaLayout {}, LayoutEngine {})
+    fn new(direction: LayoutDirection) -> (Self, LayoutEngine) {
+        (
+            SugiyamaLayout {
+                direction: direction,
+            },
+            LayoutEngine {},
+        )
     }
 
     fn layout(&self, py: Python<'_>, graph: &CoreGraph) -> PyResult<Vec<(PyObject, Point)>> {
@@ -103,7 +119,7 @@ impl SugiyamaLayout {
             layer_widths.insert(layer_index, x);
         }
 
-        // Adjust nodes to center layers
+        // Adjust nodes to center layers (TODO we should make sure to align the nodes to some kind of grid, not just center them)
         for (layer_index, layer) in layers.iter().enumerate() {
             let layer_width = layer_widths[&layer_index];
             let offset = (max_width - layer_width) / 2.0;
