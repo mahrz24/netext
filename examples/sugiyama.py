@@ -6,6 +6,7 @@ import networkx as nx
 from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
+from netext._core import LayoutDirection, SugiyamaLayout
 
 # g = nx.DiGraph()
 # g.add_node(0)
@@ -61,4 +62,4 @@ nx.set_edge_attributes(g, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
 nx.set_edge_attributes(g, EdgeSegmentDrawingMode.BOX, "$edge-segment-drawing-mode")
 
 
-print(ConsoleGraph(g))
+print(ConsoleGraph(g, layout_engine=SugiyamaLayout(direction=LayoutDirection.LEFT_RIGHT)))

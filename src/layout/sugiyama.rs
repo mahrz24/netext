@@ -69,7 +69,24 @@ impl SugiyamaLayout {
         let ordered_layers = self.barycenter_ordering(&raw_graph, &layers);
         let coordinates = self.brandes_koepf_coordinates(&ordered_layers, graph);
 
-        Ok(coordinates
+        // In case of left right layout, we need to rotate the coordinates
+        let final_coordinates: HashMap<usize, Point> =
+            if self.direction == LayoutDirection::LeftRight {
+                let max_y = coordinates.values().map(|p| p.y).max().unwrap_or(0);
+                let max_x = coordinates.values().map(|p| p.x).max().unwrap_or(0);
+
+                coordinates
+                    .into_iter()
+                    .map(|(node, point)| {
+                        let new_point = Point::new(point.y, point.x);
+                        (node, new_point)
+                    })
+                    .collect()
+            } else {
+                coordinates
+            };
+
+        Ok(final_coordinates
             .into_iter()
             .filter_map(|(node, point)| {
                 let object = graph
@@ -78,6 +95,20 @@ impl SugiyamaLayout {
                 object.map(|object| (object.clone_ref(py), point))
             })
             .collect())
+    }
+}
+
+fn width_in_direction(direction: LayoutDirection, size: &Size) -> i32 {
+    match direction {
+        LayoutDirection::TopDown => size.width(),
+        LayoutDirection::LeftRight => size.height(),
+    }
+}
+
+fn height_in_direction(direction: LayoutDirection, size: &Size) -> i32 {
+    match direction {
+        LayoutDirection::TopDown => size.height(),
+        LayoutDirection::LeftRight => size.width(),
     }
 }
 
@@ -101,7 +132,7 @@ impl SugiyamaLayout {
                 .collect();
 
             let layer_height = node_sizes.iter().fold(0, |acc, size| {
-                acc.max(size.unwrap_or(&Size::new(0, 0)).height())
+                acc.max(height_in_direction(self.direction, size.unwrap_or(&Size::new(0, 0))))
             });
 
             let y = layer_index as f32 * layer_height as f32;
@@ -109,7 +140,7 @@ impl SugiyamaLayout {
 
             for (&node, size) in layer.into_iter().zip(node_sizes) {
                 positions.insert(node, (x, y));
-                x += size.unwrap_or(&Size::new(0, 0)).width() as f32;
+                x += width_in_direction(self.direction, size.unwrap_or(&Size::new(0, 0))) as f32;
             }
 
             if x > max_width {
