@@ -1,3 +1,5 @@
+use std::ops::{Mul, Sub};
+
 use pyo3::{exceptions::PyIndexError, prelude::*, types::PyType, PyClass};
 
 pub trait PointLike {
@@ -55,6 +57,29 @@ impl Size {
 pub struct Point {
     pub x: i32,
     pub y: i32,
+}
+
+impl Sub for Point {
+    type Output = Point;
+
+    fn sub(self, other: Point) -> Point {
+        Point {
+            x: self.x - other.x,
+            y: self.y - other.y,
+        }
+    }
+}
+
+impl<Scalar> Mul<Scalar> for Point where Scalar: std::convert::Into<f64> {
+    type Output = Point;
+
+    fn mul(self, other: Scalar) -> Point {
+        let other = other.into() as f64;
+        Point {
+            x: (self.x as f64 * other).round() as i32,
+            y: (self.y as f64 * other).round() as i32,
+        }
+    }
 }
 
 #[pymethods]
@@ -124,6 +149,18 @@ impl Point {
         let x_diff = (self.x - other.x) as i32;
         let y_diff = (self.y - other.y) as i32;
         x_diff.pow(2) + y_diff.pow(2)
+    }
+
+    pub fn distance(&self, other: &Point) -> f64 {
+        let x_diff = (self.x - other.x) as f64;
+        let y_diff = (self.y - other.y) as f64;
+        (x_diff.powi(2) + y_diff.powi(2)).sqrt()
+    }
+
+    pub fn length_as_vector(&self) -> f64 {
+        let x = self.x as f64;
+        let y = self.y as f64;
+        (x.powi(2) + y.powi(2)).sqrt()
     }
 
     fn distance_to_max(&self, other: &Point) -> i32 {

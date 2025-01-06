@@ -1,5 +1,6 @@
 pub mod sugiyama;
 pub mod static_;
+pub mod force_directed;
 use pyo3::prelude::*;
 
 use crate::{geometry::Point, graph::CoreGraph};

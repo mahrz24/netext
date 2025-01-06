@@ -10,6 +10,7 @@
 - [ ] Line dashing
 - [ ] Support for all box modes from rich
 - [ ] Remove braille option
+- [ ] Check if z-ordering for routing is correct (it does not seem like it)
 
 
 # Release pipeline
@@ -25,3 +26,9 @@
 - [ ] Waypoints for even faster A*
 - [ ] Better default choice of magnets / slots for connections
 - [ ] Open up the routing config to the user if they want to
+- [ ] Other shapes
+- [ ] Overlay edges in rendering
+- [ ] Improve edge routing
+    - Crossing corners should be avoided (cost term) (unless sharing node)
+    - Crossling lines for more then 1 unit should be avoided (additional penalty) (unless sharing node)
+    - Prefer distance to node

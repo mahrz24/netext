@@ -11,9 +11,9 @@ def _edge_routing_mode_to_routing_config(
         case EdgeRoutingMode.ORTHOGONAL:
             return core.RoutingConfig(
                 neighborhood=core.Neighborhood.ORTHOGONAL,
-                corner_cost=25,
+                corner_cost=10,
                 diagonal_cost=1000,
-                line_cost=50,
+                line_cost=20,
                 shape_cost=150,
                 direction_change_margin=1,
             )
