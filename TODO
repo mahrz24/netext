@@ -5,8 +5,8 @@
     - [X] Ports (with labels)
 - [X] Propagate the setting for how long to keep straight lines from a node
 - [X] Fix properties with level of detail
-- [ ] Sugiyama LR / TB layout
-- [ ] Force directed layout
+- [X] Sugiyama LR / TB layout
+- [X] Force directed layout
 - [ ] Line dashing
 - [ ] Support for all box modes from rich
 - [ ] Remove braille option
@@ -16,11 +16,13 @@
 # Release pipeline
 
 - [ ] Add tests for new features and the rust code
+- [ ] Organize imports
 - [ ] Add maturin to build part of the CI
 - [ ] Update documentation
 - [ ] Make release pipeline
 
 # Past release
+
 
 - [ ] Sugiyama better alignment of nodes
 - [ ] Waypoints for even faster A*
@@ -28,7 +30,9 @@
 - [ ] Open up the routing config to the user if they want to
 - [ ] Other shapes
 - [ ] Overlay edges in rendering
-- [ ] Improve edge routing
+- [ ] Tree layout
+- [ ] Git Branch layout
+- [ ] Improve edge routing:
     - Crossing corners should be avoided (cost term) (unless sharing node)
     - Crossling lines for more then 1 unit should be avoided (additional penalty) (unless sharing node)
     - Prefer distance to node

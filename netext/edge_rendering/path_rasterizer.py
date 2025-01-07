@@ -1,3 +1,4 @@
+import itertools
 import sys
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.edge import EdgePath
@@ -121,18 +122,35 @@ def rasterize_point(
     return Segment("*", style=style)
 
 
-def rasterize_edge_path(path: EdgePath, style: Style, edge_segment_drawing_mode: EdgeSegmentDrawingMode) -> list[Strip]:
+def rasterize_edge_path(path: EdgePath, style: Style, edge_segment_drawing_mode: EdgeSegmentDrawingMode, dash_pattern: list[int] | None) -> list[Strip]:
     # Convert path to characters and points using the specified drawing mode
     character_path = []
     directions = []
     current_point = path.directed_points[0].point
+
+    pattern = itertools.cycle(dash_pattern or [len(path.distinct_points)])
+
+    pen_down = True
+    offset = next(pattern)
+
     for directed_point in path.directed_points:
         if directed_point.point == current_point:
             directions.append(directed_point.direction)
         else:
-            character_path.append((current_point, rasterize_point(directions, style, edge_segment_drawing_mode)))
+            if pen_down:
+                segment = rasterize_point(directions, style, edge_segment_drawing_mode)
+            else:
+                segment = Spacer(width=1)
+            offset -= 1
+            character_path.append((current_point, segment))
+
+            if offset == 0:
+                pen_down = not pen_down
+                offset = next(pattern)
+
             current_point = directed_point.point
             directions = [directed_point.direction]
+
     character_path.append((current_point, rasterize_point(directions, style, edge_segment_drawing_mode)))
     assert len(character_path) == len(path.distinct_points)
     strips = []

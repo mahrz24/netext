@@ -146,7 +146,7 @@ def rasterize_edge(
 
 def rasterize_path_and_label(console, u_buffer, v_buffer, properties, edge_input, edge_path):
     strips = rasterize_edge_path(
-        edge_path, style=properties.style, edge_segment_drawing_mode=properties.segment_drawing_mode
+        edge_path, style=properties.style, edge_segment_drawing_mode=properties.segment_drawing_mode, dash_pattern=properties.dash_pattern
     )
 
     z_index = ZIndex(layer=Layer.EDGES)

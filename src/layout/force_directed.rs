@@ -8,21 +8,28 @@ use crate::{geometry::{Point, Size}, graph::CoreGraph};
 use super::LayoutEngine;
 
 #[pyclass(extends=LayoutEngine, subclass)]
-pub struct ForceDirectedLayout {}
+pub struct ForceDirectedLayout {
+    width: i32,
+    height: i32,
+    iterations: i32,
+    optimal_distance: i32,
+    force_constant: f64,
+}
 
 #[pymethods]
 impl ForceDirectedLayout {
     #[new]
     fn new() -> (Self, LayoutEngine) {
-        (ForceDirectedLayout {}, LayoutEngine {})
+        (ForceDirectedLayout {
+            width: 120,
+            height: 40,
+            iterations: 50,
+            optimal_distance: 3,
+            force_constant: 0.005,
+        }, LayoutEngine {})
     }
 
     fn layout(&self, py: Python<'_>, graph: &CoreGraph) -> PyResult<Vec<(PyObject, Point)>> {
-        let width = 100;
-        let height = 100;
-        let iterations = 50;
-        let k: i32 = 3;
-
         let mut positions: HashMap<NodeIndex, Point> = graph
             .graph
             .nodes()
@@ -30,16 +37,14 @@ impl ForceDirectedLayout {
                 (
                     node,
                     Point {
-                        x: (rand::random::<f64>() * width as f64).round() as i32,
-                        y: (rand::random::<f64>() * height as f64).round() as i32,
+                        x: (rand::random::<f64>() * self.width as f64).round() as i32,
+                        y: (rand::random::<f64>() * self.height as f64).round() as i32,
                     },
                 )
             })
             .collect();
 
-        println!("{:?}", positions);
-
-        for _ in 0..iterations {
+        for _ in 0..self.iterations {
             let mut displacements: HashMap<NodeIndex, Point> = HashMap::new();
 
             // Calculate repulsive forces
@@ -57,8 +62,8 @@ impl ForceDirectedLayout {
                         let min_distance = cmp::max(size_u.height + size_v.height, size_u.width + size_v.width);
 
                         if distance > 0.0 {
-                            let repulsive_force = (k.pow(2) as f64) / (distance as f64);
-                            let adjustment = delta * (repulsive_force / distance * 0.01);
+                            let repulsive_force = (self.optimal_distance.pow(2) as f64) / (distance as f64);
+                            let adjustment = delta * (repulsive_force / distance * self.force_constant);
                             let adjustment_min = delta * (repulsive_force / distance);
                             if distance < min_distance as f64 {
                                 displacements.get_mut(&u).unwrap().x += adjustment_min.x;
@@ -72,21 +77,18 @@ impl ForceDirectedLayout {
                 }
             }
 
-            // Calculate attractive forces
             for (u, v, _) in graph.graph.all_edges() {
                 let delta = positions[&u] - positions[&v];
                 let distance = delta.distance(&Point { x: 0, y: 0 });
                 if distance > 0.0 {
-                    let attractive_force = ((distance.powi(2)) as f64) / (k as f64);
-                    let adjustment = delta * (attractive_force / distance * 0.01);
+                    let attractive_force = ((distance.powi(2)) as f64) / (self.optimal_distance as f64);
+                    let adjustment = delta * (attractive_force / distance * self.force_constant);
                     displacements.get_mut(&u).unwrap().x -= adjustment.x;
                     displacements.get_mut(&u).unwrap().y -= adjustment.y;
                     displacements.get_mut(&v).unwrap().x += adjustment.x;
                     displacements.get_mut(&v).unwrap().y += adjustment.y;
                 }
             }
-
-            println!("{:?}", displacements);
 
             // Update positions
             for node in graph.graph.nodes() {
@@ -95,12 +97,9 @@ impl ForceDirectedLayout {
                 positions.get_mut(&node).unwrap().y += displacement.y;
 
                 // Keep nodes within bounds
-                positions.get_mut(&node).unwrap().x = positions[&node].x.clamp(0, width);
-                positions.get_mut(&node).unwrap().y = positions[&node].y.clamp(0, height);
+                positions.get_mut(&node).unwrap().x = positions[&node].x.clamp(0, self.width);
+                positions.get_mut(&node).unwrap().y = positions[&node].y.clamp(0, self.height);
             }
-
-            println!("{:?}", positions);
-            println!("=====================");
         }
 
         Ok(positions

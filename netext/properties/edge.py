@@ -14,12 +14,14 @@ class EdgeProperties:
     show: bool = True
     label: str | None = None
     style: Style = Style()
+    dash_pattern: list[int] | None = None
 
     routing_mode: EdgeRoutingMode = EdgeRoutingMode.STRAIGHT
     segment_drawing_mode: EdgeSegmentDrawingMode = EdgeSegmentDrawingMode.SINGLE_CHARACTER
 
     start_arrow_tip: ArrowTip | None = None
     end_arrow_tip: ArrowTip | None = None
+
 
     start_port: str | None = None
     end_port: str | None = None
@@ -44,6 +46,7 @@ class EdgeProperties:
     ) -> "EdgeProperties":
         fallback = fallback or cls()
         style: Style = data.get(f"$style{suffix}", fallback.style)
+        dash_pattern: list[int] | None = data.get(f"$dash-pattern{suffix}", fallback.dash_pattern)
         show: bool = data.get(f"$show{suffix}", fallback.show)
         label: str | None = data.get(f"$label{suffix}", fallback.label)
         routing_mode: EdgeRoutingMode = data.get(f"$edge-routing-mode{suffix}", fallback.routing_mode)
@@ -62,6 +65,7 @@ class EdgeProperties:
 
         result = cls(
             style=style,
+            dash_pattern=dash_pattern,
             show=show,
             label=label,
             routing_mode=routing_mode,
