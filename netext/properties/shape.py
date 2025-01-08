@@ -33,10 +33,4 @@ class Box(ShapeProperties):
     def parse(cls, value: dict[str, Any], suffix: str, fallback: "ShapeProperties") -> "Box":
         assert isinstance(fallback, Box)
         box_type = value.get(f"$box-type{suffix}", fallback.box_type)
-        match box_type:
-            case "rounded":
-                return Box(box_type=ROUNDED)
-            case RichBox():
-                return Box(box_type=box_type)
-            case _:
-                raise ValueError(f"Unknown box type: {box_type}")
+        return Box(box_type=box_type)

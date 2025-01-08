@@ -359,7 +359,8 @@ class ConsoleGraph:
             self.node_buffers[u],
             self.node_buffers[v],
             properties,
-            edge_lod
+            edge_lod,
+            edge_index=len(self.edge_buffers),
         )
         if result is not None:
             edge_buffer, label_nodes = result
@@ -628,6 +629,8 @@ class ConsoleGraph:
         self.node_buffers[v].disconnect(u)
         self.node_buffers[u].disconnect(v)
 
+        old_z_index = self.edge_buffers[(u, v)].z_index.layer_index
+
         del self.edge_buffers[(u, v)]
         del self.edge_label_buffers[(u, v)]
 
@@ -640,6 +643,7 @@ class ConsoleGraph:
             self.node_buffers[v],
             properties,
             edge_lod,
+            edge_index=int(old_z_index),
         )
         self._render_port_buffer_for_node(u)
         self._render_port_buffer_for_node(v)

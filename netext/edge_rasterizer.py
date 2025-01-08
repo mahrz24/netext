@@ -65,16 +65,18 @@ def rasterize_edges(
     edge_buffers = dict()
     label_buffers = dict()
 
-    for request, edge_input, edge_path in zip(edge_route_requests, edge_inputs, edge_paths):
+    for edge_index, (request, edge_input, edge_path) in enumerate(zip(edge_route_requests, edge_inputs, edge_paths)):
         if not edge_path.directed_points or edge_path.start == edge_path.end:
             continue
 
-        strips, z_index, edge_label_buffers, boundary_1, boundary_2 = rasterize_path_and_label(
+        strips, edge_label_buffers, boundary_1, boundary_2 = rasterize_path_and_label(
             console, request.u_buffer, request.v_buffer, request.properties, edge_input, edge_path
         )
 
         if boundary_1 == boundary_2:
             continue
+
+        z_index = ZIndex(layer=Layer.EDGES, layer_index=edge_index)
 
         edge_buffer = EdgeBuffer(
             path=edge_path,
@@ -98,6 +100,7 @@ def rasterize_edge(
     v_buffer: NodeBuffer,
     properties: EdgeProperties,
     lod: int = 1,
+    edge_index: int = 0,
 ) -> tuple[EdgeBuffer, list[StripBuffer]] | None:
     if not properties.show:
         return None
@@ -125,12 +128,14 @@ def rasterize_edge(
     if not edge_path.directed_points or edge_path.start == edge_path.end:
         return None
 
-    strips, z_index, label_buffers, boundary_1, boundary_2 = rasterize_path_and_label(
+    strips, label_buffers, boundary_1, boundary_2 = rasterize_path_and_label(
         console, u_buffer, v_buffer, properties, edge_input, edge_path
     )
 
     if boundary_1 == boundary_2:
         return None
+
+    z_index = ZIndex(layer=Layer.EDGES, layer_index=edge_index)
 
     edge_buffer = EdgeBuffer(
         path=edge_path,
@@ -148,12 +153,6 @@ def rasterize_path_and_label(console, u_buffer, v_buffer, properties, edge_input
     strips = rasterize_edge_path(
         edge_path, style=properties.style, edge_segment_drawing_mode=properties.segment_drawing_mode, dash_pattern=properties.dash_pattern
     )
-
-    z_index = ZIndex(layer=Layer.EDGES)
-
-    # TODO Need to add this back in somehow
-    # if routed_edges:
-    #     z_index.layer_index += len(routed_edges)
 
     label_buffers: list[StripBuffer] = []
 
@@ -189,7 +188,7 @@ def rasterize_path_and_label(console, u_buffer, v_buffer, properties, edge_input
     boundary_1 = edge_path.min_bound
     boundary_2 = edge_path.max_bound
 
-    return strips, z_index, label_buffers, boundary_1, boundary_2
+    return strips, label_buffers, boundary_1, boundary_2
 
 
 def determine_edge_anchors(

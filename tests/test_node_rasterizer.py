@@ -57,7 +57,7 @@ def test_trivial_node_with_style_and_custom_renderer(console: Console) -> None:
 
 
 def test_plain_shape(console: Console) -> None:
-    node_buffer = rasterize_node(console, node="foo", data={"$shape": JustContent()})
+    node_buffer = rasterize_node(console, node="foo", data={"$shape": "just-content"})
 
     assert node_buffer.shape_width == 3
     assert node_buffer.shape_height == 1

@@ -56,12 +56,6 @@ ARROW_TIPS = {
             ArrowDirections.RIGHT: "🭬",
             ArrowDirections.UP: "🭯",
             ArrowDirections.DOWN: "🭭",
-        },
-        EdgeSegmentDrawingMode.BRAILLE: {
-            ArrowDirections.LEFT: "🭮",
-            ArrowDirections.RIGHT: "🭬",
-            ArrowDirections.UP: "🭯",
-            ArrowDirections.DOWN: "🭭",
-        },
+        }
     }
 }

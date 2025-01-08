@@ -7,10 +7,10 @@
 - [X] Fix properties with level of detail
 - [X] Sugiyama LR / TB layout
 - [X] Force directed layout
-- [ ] Line dashing
-- [ ] Support for all box modes from rich
-- [ ] Remove braille option
-- [ ] Check if z-ordering for routing is correct (it does not seem like it)
+- [X] Line dashing
+- [X] Support for all box modes from rich
+- [X] Remove braille option
+- [X] Check if z-ordering for routing is correct (it does not seem like it)
 
 
 # Release pipeline
@@ -20,10 +20,12 @@
 - [ ] Add maturin to build part of the CI
 - [ ] Update documentation
 - [ ] Make release pipeline
+- [ ] Add benchmarks
 
 # Past release
 
-
+- [ ] Strict typechecking
+- [ ] Add benchmark comparison to PRs
 - [ ] Sugiyama better alignment of nodes
 - [ ] Waypoints for even faster A*
 - [ ] Better default choice of magnets / slots for connections

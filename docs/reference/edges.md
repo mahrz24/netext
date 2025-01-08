@@ -57,14 +57,6 @@ g.add_edge("E", "F", **{"$end-arrow-tip": ArrowTip.ARROW,
                         "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL}
 )
 
-
-g.add_node("G", **{"$x": 35, "$y": 0})
-g.add_node("H", **{"$x": 35, "$y": 9})
-g.add_edge("G", "H", **{"$end-arrow-tip": ArrowTip.ARROW,
-                        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BRAILLE,
-                        "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL}
-)
-
 output = ConsoleGraph(g, layout_engine=StaticLayout())
 ```
 
@@ -208,7 +200,6 @@ Possible values are:
 | Heavy Box                 | [EdgeSegmentDrawingMode.BOX_HEAVY][netext.edge_rendering.modes.EdgeSegmentDrawingMode.BOX_HEAVY]               | Uses thicker box drawing characters to draw lines. Corners between edge segments are merged. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.EdgeRoutingMode.ORTHOGONAL].                      |
 | Double Box                | [EdgeSegmentDrawingMode.BOX_DOUBLE][netext.edge_rendering.modes.EdgeSegmentDrawingMode.BOX_DOUBLE]             | Uses double line box drawing characters to draw lines. Corners between edge segments are merged. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.EdgeRoutingMode.ORTHOGONAL].                  |
 | ASCII compatible          | [EdgeSegmentDrawingMode.ASCII][netext.edge_rendering.modes.EdgeSegmentDrawingMode.ASCII]                       | Uses ASCII characters to draw orthogonal lines. Corners between edge segments are merged with plus signs. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.EdgeRoutingMode.ORTHOGONAL].         |
-| Braille                   | [EdgeSegmentDrawingMode.BRAILLE][netext.edge_rendering.modes.EdgeSegmentDrawingMode.BRAILLE]                   | Uses braille characters to draw the whole edge.                                                                                                                                                                       |
 | Block                     | [EdgeSegmentDrawingMode.BLOCK][netext.edge_rendering.modes.EdgeSegmentDrawingMode.BLOCK]                       | Uses 2x3 block characters to draw the whole edge.                                                                                                                                                                     |
 
 ### Examples
@@ -251,11 +242,6 @@ g.add_edge("I", "J", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX
 g.add_node("K", **{"$x": 25, "$y": 13})
 g.add_node("L", **{"$x": 35, "$y": 22})
 g.add_edge("K", "L", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.ASCII,"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
-
-
-g.add_node("M", **{"$x": 45, "$y": 13})
-g.add_node("N", **{"$x": 55, "$y": 22})
-g.add_edge("M", "N", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BRAILLE,"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
 
 g.add_node("O", **{"$x": 65, "$y": 13})
 g.add_node("P", **{"$x": 75, "$y": 22})

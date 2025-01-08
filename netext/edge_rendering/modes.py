@@ -8,5 +8,4 @@ class EdgeSegmentDrawingMode(Enum):
     BOX_DOUBLE = "box_double"
     ASCII = "ascii"
     SINGLE_CHARACTER = "single_character"
-    BRAILLE = "braille"
     BLOCK = "block"
