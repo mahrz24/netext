@@ -844,6 +844,7 @@ class ConsoleGraph:
             self._render_port_buffer_for_node(node)
 
     def _render_port_buffer_for_node(self, node):
+        self._require(RenderState.ZOOMED_POSITIONS_COMPUTED)
         if self._zoom_factor is None:
             raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
 
