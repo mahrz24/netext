@@ -6,7 +6,7 @@ edition = "2021"
 [lib]
 name = "netext_core"
 # "cdylib" is necessary to produce a shared library for Python to import from.
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "lib"]
 
 [dependencies]
 hashbrown = { version = "0.14.5", default-features = false, features = ["allocator-api2", "inline-more"] }

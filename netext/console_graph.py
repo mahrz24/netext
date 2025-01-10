@@ -30,6 +30,7 @@ from rich.traceback import install
 
 install(show_locals=False)
 
+
 class RenderState(Enum):
     INITIAL = "initial"
     """The initial state, no rendering has happened yet."""
@@ -335,8 +336,9 @@ class ConsoleGraph:
         edge_buffer: EdgeBuffer | None = None
         label_nodes: list[StripBuffer] | None = None
 
-        if self._zoom_factor is None:
-            raise RuntimeError("You can only add edges once the zoom factor has been computed")
+        assert (
+            self._zoom_factor is not None
+        ), "You tried to add an edge without a computed zoom factor. This should never happen."
 
         if not self._core_graph.contains_node(u):
             raise ValueError(f"Node {u} does not exist in graph")
@@ -478,7 +480,7 @@ class ConsoleGraph:
                 node_anchors=node_buffer.node_anchors,
             )
 
-            #old_node = self.node_buffers[node]
+            # old_node = self.node_buffers[node]
             new_node_buffer.center = old_position
             self.node_buffers[node] = new_node_buffer
 
@@ -533,14 +535,13 @@ class ConsoleGraph:
         self.node_buffers[node].center = position_view_space
         self._core_graph.update_node_data(node, dict(data, **{"$properties": properties}))
 
-
         node_buffer = self.node_buffers[node]
         placed_node = core.PlacedRectangularNode(
-                center=core.Point(node_buffer.center.x, node_buffer.center.y),
-                node=core.RectangularNode(
-                    size=core.Size(node_buffer.width, node_buffer.height),
-                ),
-            )
+            center=core.Point(node_buffer.center.x, node_buffer.center.y),
+            node=core.RectangularNode(
+                size=core.Size(node_buffer.width, node_buffer.height),
+            ),
+        )
         self._edge_router.add_node(node, placed_node)
 
         for v in self._core_graph.neighbors(node):
@@ -548,7 +549,6 @@ class ConsoleGraph:
                 affected_edges.append((node, v))
             if (v, node) in self.edge_buffers:
                 affected_edges.append((v, node))
-
 
         if affected_edges and force_edge_rerender:
             for u, v in affected_edges:
@@ -679,7 +679,9 @@ class ConsoleGraph:
 
     def _transition_compute_node_layout(self) -> None:
         # Position the nodes and store these original positions
-        self.node_positions = dict([(n, FloatPoint(p.x, p.y)) for (n, p) in self._layout_engine.layout(self._core_graph)])
+        self.node_positions = dict(
+            [(n, FloatPoint(p.x, p.y)) for (n, p) in self._layout_engine.layout(self._core_graph)]
+        )
 
         self.offset: FloatPoint = FloatPoint(0, 0)
 
@@ -704,12 +706,20 @@ class ConsoleGraph:
 
         # Compute the port sides for each node
         for node, node_buffer in self.node_buffers_for_layout.items():
-            out_neighbors = [(self.node_buffers_for_layout[other], EdgeProperties.from_data_dict(
-                                    self._core_graph.edge_data_or_default(node, other, dict())
-                                )) for other in self._core_graph.neighbors_outgoing(node)]
-            in_neighbors = [(self.node_buffers_for_layout[other], EdgeProperties.from_data_dict(
-                                    self._core_graph.edge_data_or_default(other, node, dict())
-                                )) for other in self._core_graph.neighbors_incoming(node)]
+            out_neighbors = [
+                (
+                    self.node_buffers_for_layout[other],
+                    EdgeProperties.from_data_dict(self._core_graph.edge_data_or_default(node, other, dict())),
+                )
+                for other in self._core_graph.neighbors_outgoing(node)
+            ]
+            in_neighbors = [
+                (
+                    self.node_buffers_for_layout[other],
+                    EdgeProperties.from_data_dict(self._core_graph.edge_data_or_default(other, node, dict())),
+                )
+                for other in self._core_graph.neighbors_incoming(node)
+            ]
 
             node_buffer.determine_edge_sides(out_neighbors=out_neighbors, in_neighbors=in_neighbors)
 
@@ -796,7 +806,6 @@ class ConsoleGraph:
 
             node_buffer.determine_edge_positions()
 
-
     def _transition_render_edges(self) -> None:
         if self._zoom_factor is None:
             raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
@@ -813,25 +822,23 @@ class ConsoleGraph:
             properties = EdgeProperties.from_data_dict(data)
             edge_lod = properties.lod_map(self._zoom_factor)
 
-            edge_routing_requests.append(EdgeRoutingRequest(
-                u=u,
-                v=v,
-                u_buffer=self.node_buffers[u],
-                v_buffer=self.node_buffers[v],
-                properties=properties,
-                lod=edge_lod,
-            ))
+            edge_routing_requests.append(
+                EdgeRoutingRequest(
+                    u=u,
+                    v=v,
+                    u_buffer=self.node_buffers[u],
+                    v_buffer=self.node_buffers[v],
+                    properties=properties,
+                    lod=edge_lod,
+                )
+            )
 
-        edge_buffers, label_buffers = rasterize_edges(
-            self.console,
-            self._edge_router,
-            edge_routing_requests
-        )
+        edge_buffers, label_buffers = rasterize_edges(self.console, self._edge_router, edge_routing_requests)
 
-        for (u,v), edge_buffer in edge_buffers.items():
+        for (u, v), edge_buffer in edge_buffers.items():
             self.edge_buffers[(u, v)] = edge_buffer
 
-        for (u,v), label_nodes in label_buffers.items():
+        for (u, v), label_nodes in label_buffers.items():
             self.edge_label_buffers[(u, v)] = label_nodes
 
         self._render_port_buffers()
@@ -844,7 +851,6 @@ class ConsoleGraph:
             self._render_port_buffer_for_node(node)
 
     def _render_port_buffer_for_node(self, node):
-        self._require(RenderState.ZOOMED_POSITIONS_COMPUTED)
         if self._zoom_factor is None:
             raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
 

@@ -15,7 +15,7 @@
 
 # Release pipeline
 
-- [ ] Add tests for new features and the rust code
+- [ ] Move to uv
 - [ ] Organize imports
 - [ ] Add maturin to build part of the CI
 - [ ] Update documentation
@@ -24,6 +24,7 @@
 
 # Past release
 
+- [ ] Add tests for the rust library as well
 - [ ] Strict typechecking
 - [ ] Add benchmark comparison to PRs
 - [ ] Sugiyama better alignment of nodes
