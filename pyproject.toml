@@ -1,5 +1,26 @@
-[tool.rye]
-managed = true
+[project]
+name = "netext"
+version = "0.2.2dev0"
+description = "A graph (network) rendering library for the terminal."
+authors = [{ name = "Malte Klemm", email = "me@malteklemm.de" }]
+license = { text = "MIT Licence" }
+readme = "README.md"
+keywords = ["network", "graph", "terminal", "rich"]
+requires-python = ">=3.10"
+dependencies = [
+    "rich>=13",
+    "networkx[default]~=3.0",
+    "cachetools>=5.3.0",
+]
+
+[project.optional-dependencies]
+textual = ["textual>=1"]
+
+[project.urls]
+"Source code" = "https://github.com/mahrz24/netext"
+Documentation = "https://github.com/mahrz24/netext"
+
+[tool.uv]
 dev-dependencies = [
     "pytest>=8.0.0",
     "syrupy>=4.0.1",
@@ -49,27 +70,3 @@ format = "md"
 
 [tool.setuptools]
 py-modules = ["netext"]
-
-[project]
-name = "netext"
-version = "0.2.2dev0"
-description = "A graph (network) rendering library for the terminal."
-authors = [{ name = "Malte Klemm", email = "me@malteklemm.de" }]
-license = { text = "MIT Licence" }
-readme = "README.md"
-keywords = ["network", "graph", "terminal", "rich"]
-requires-python = ">=3.10"
-dependencies = [
-    "rich>=13",
-    "networkx[default]~=3.0",
-    "cachetools>=5.3.0",
-    "plum-dispatch >=2.1.1",
-]
-
-[project.optional-dependencies]
-textual = ["textual>=0.40"]
-
-
-[project.urls]
-"Source code" = "https://github.com/mahrz24/netext"
-Documentation = "https://github.com/mahrz24/netext"
