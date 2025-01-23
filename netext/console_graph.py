@@ -147,7 +147,7 @@ class ConsoleGraph:
 
         # Move efficient transformation into the core graph
         self._core_graph = core.CoreGraph.from_edges(
-            graph.edges(),
+            cast(list[tuple[Hashable, Hashable]], graph.edges()),
         )
 
         for node, data in graph.nodes(data=True):
