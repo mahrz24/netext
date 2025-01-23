@@ -1,10 +1,10 @@
 from textual.app import App, ComposeResult
 from textual.widgets import Header
-from netext.textual.widget import GraphView
+from netext.textual_widget.widget import GraphView
 
 import networkx as nx
 
-g = nx.Graph()
+g = nx.DiGraph()
 g.add_node("Hello")
 g.add_node("World")
 g.add_edge("Hello", "World")

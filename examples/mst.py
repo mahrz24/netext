@@ -9,7 +9,7 @@ import networkx as nx
 from rich import print
 
 # Create a graph
-G = nx.Graph()
+G = nx.DiGraph()
 G.add_edges_from(
     [
         (0, 1, {"weight": 4}),

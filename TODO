@@ -15,7 +15,7 @@
 
 # Release pipeline
 
-- [ ] Move to uv
+- [X] Move to uv
 - [ ] Organize imports
 - [ ] Add maturin to build part of the CI
 - [ ] Update documentation

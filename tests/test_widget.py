@@ -1,6 +1,6 @@
 from textual.app import App, ComposeResult
 from netext.geometry.point import FloatPoint
-from netext.textual.widget import GraphView
+from netext.textual_widget.widget import GraphView
 
 import networkx as nx
 import pytest
