@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyAny;
 use std::collections::HashMap;
 
-use crate::geometry::{Layoutable, Size};
+use crate::geometry::{Size};
 use crate::pyindexset::PyIndexSet;
 
 #[pyclass]

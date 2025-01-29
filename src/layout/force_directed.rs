@@ -1,7 +1,7 @@
 use petgraph::graph::NodeIndex;
-use std::{cmp, collections::HashMap, ops::Sub};
+use std::{cmp, collections::HashMap};
 
-use pyo3::{exceptions, prelude::*, types::PyDict};
+use pyo3::{prelude::*};
 
 use crate::{geometry::{Point, Size}, graph::CoreGraph};
 

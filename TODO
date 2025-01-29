@@ -16,10 +16,12 @@
 # Release pipeline
 
 - [X] Move to uv
-- [ ] Organize imports
 - [ ] Add maturin to build part of the CI
-- [ ] Update documentation
 - [ ] Make release pipeline
+    - Add depdendency groups
+    -
+- [ ] Organize imports
+- [ ] Update documentation
 - [ ] Add benchmarks
 
 # Past release
