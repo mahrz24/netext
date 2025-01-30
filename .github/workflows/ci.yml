@@ -35,7 +35,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: install deps
-        run: uv sync --group testing
+        run: uv sync --group testing --all-extras
 
       - run: rustc --version --verbose
 
@@ -90,7 +90,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: install deps
-        run: uv sync --group testing
+        run: uv sync --group testing --all-extras
 
       - run: uv pip install -e .
         env:
@@ -122,7 +122,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: install deps
-        run: uv sync --group testing
+        run: uv sync --group testing --all-extras
 
       - run: uv pip install -e .
         env:
@@ -421,9 +421,9 @@ jobs:
           merge-multiple: true
           path: dist
 
-      - run: uv sync --group testing
+      - run: uv sync --group testing --all-extras
       - run: uv pip install pydantic-core --no-index --no-deps --find-links dist --force-reinstall
-      - run: uv run pytest --ignore=tests/test_docstrings.py
+      - run: uv run pytest
 
   release:
     needs: [test-builds-arch, test-builds-os, build-sdist]
