@@ -27,6 +27,7 @@ testing = [
     "pytest-asyncio>=0.21.1",
     "aiohttp>=3.9.0b6",
     "importlib-metadata",
+    "textual>=1"
 ]
 documentation = [
     "mkdocstrings[python]>=0.20.0",
