@@ -1,6 +1,6 @@
 from netext.geometry.magnet import Magnet
 from netext.layout_engines import StaticLayout
-from netext.textual.widget import GraphView
+from netext.textual_widget.widget import GraphView
 from textual.app import App, ComposeResult
 from rich.style import Style
 from netext.edge_routing.modes import EdgeRoutingMode

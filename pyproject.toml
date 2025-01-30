@@ -35,6 +35,7 @@ documentation = [
 linting = [
     "pyright",
     "ruff",
+    "maturin>=1,<2",
 ]
 
 [build-system]
