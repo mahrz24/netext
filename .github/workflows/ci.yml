@@ -39,7 +39,9 @@ jobs:
 
       - run: rustc --version --verbose
 
-      - run: make build-dev
+      - run: |
+          rm -f netext/*.so
+          uv run maturin develop --uv
         env:
           RUST_BACKTRACE: 1
           RUSTFLAGS: '-C instrument-coverage'
@@ -161,7 +163,10 @@ jobs:
       - name: install deps
         run: uv sync --group testing
 
-      - run: make build-dev
+      - run: |
+          rm -f netext/*.so
+          uv run maturin develop --uv
+
 
       - run: uv pip freeze
       - run: uv run pytest
@@ -186,7 +191,8 @@ jobs:
       - name: install deps
         run: |
           uv sync --group linting
-          make build-dev
+          rm -f netext/*.so
+          uv run maturin develop --uv
           uv pip freeze
 
       - run: uv run ruff netext
@@ -291,9 +297,6 @@ jobs:
           architecture: ${{ matrix.python-architecture || 'x64' }}
 
       - run: pip install -U twine 'ruff==0.5.0' typing_extensions
-
-      # generate self-schema now, so we don't have to do so inside docker in maturin build
-      - run: python generate_self_schema.py
 
       - name: build wheels
         uses: PyO3/maturin-action@v1
