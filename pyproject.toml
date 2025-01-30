@@ -66,3 +66,7 @@ format = "md"
 
 [tool.setuptools]
 py-modules = ["netext"]
+
+[tool.uv]
+# this ensures that `uv run` doesn't actually build the package
+package = false
