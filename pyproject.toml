@@ -18,6 +18,7 @@ Documentation = "https://github.com/mahrz24/netext"
 
 [dependency-groups]
 testing = [
+    "maturin>=1,<2",
     "pytest>=8.0.0",
     "syrupy>=4.0.1",
     "jinja2>=3.1.2",
