@@ -157,10 +157,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: install deps
-        run: uv sync --group testing
+        run: uv sync --group testing --all-extras
 
       - run: |
           rm -f netext/*.so
+
           uv run maturin develop --uv
 
 
@@ -186,7 +187,7 @@ jobs:
 
       - name: install deps
         run: |
-          uv sync --group linting
+          uv sync --group linting --all-extras
           rm -f netext/*.so
           uv run maturin develop --uv
           uv pip freeze
