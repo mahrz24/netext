@@ -7,7 +7,6 @@ from typing import Any, Iterable, cast
 from networkx import DiGraph  # type: ignore
 
 import networkx as nx  # type: ignore
-from rich import inspect
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.measure import Measurement
 

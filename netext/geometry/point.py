@@ -1,5 +1,4 @@
-from dataclasses import dataclass, field
-from netext._core import Point
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True, slots=True)

@@ -13,7 +13,6 @@ from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.geometry import Region
 from netext.console_graph import AutoZoom
-from netext.properties.shape import JustContent
 
 g = cast(nx.DiGraph, nx.binomial_tree(5))
 nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")

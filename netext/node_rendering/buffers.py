@@ -7,7 +7,7 @@ from typing_extensions import Self
 from rich.console import Console
 from rich.style import Style
 
-from netext._core import Direction, Point, DirectedPoint
+from netext._core import Point, DirectedPoint
 from netext.edge_routing.node_anchors import NodeAnchors
 from netext.geometry import Magnet
 from netext.geometry.magnet import ShapeSide

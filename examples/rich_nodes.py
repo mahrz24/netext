@@ -6,7 +6,6 @@ from rich.text import Text
 from netext import ConsoleGraph
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
-from netext.properties.shape import JustContent
 
 
 def read_file(file_path):

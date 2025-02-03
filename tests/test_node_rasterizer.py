@@ -5,7 +5,6 @@ from rich.style import Style
 from rich.text import Text
 
 from netext.node_rasterizer import rasterize_node
-from netext.properties.shape import JustContent
 
 
 @pytest.fixture

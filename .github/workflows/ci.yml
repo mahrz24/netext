@@ -192,7 +192,7 @@ jobs:
           uv run maturin develop --uv
           uv pip freeze
 
-      - run: uv run ruff netext
+      - run: uv run ruff check
       - run: uv run ruff format --check
       - run: pyright netext
 

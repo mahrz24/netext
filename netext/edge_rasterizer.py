@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Hashable
 
 from rich.console import Console
@@ -9,7 +9,6 @@ from netext.edge_rendering.path_rasterizer import rasterize_edge_path
 from netext.edge_routing.edge import EdgeInput
 from netext.edge_routing.route import route_edge, route_edges
 from netext.geometry.magnet import Magnet, ShapeSide
-from netext._core import Point
 
 from netext.node_rendering.buffers import EdgeLabelBuffer, NodeBuffer
 from netext.properties.edge import EdgeProperties
@@ -17,7 +16,7 @@ from netext.properties.shape import JustContent
 from netext.shapes.shape import JustContentShape
 from netext.rendering.segment_buffer import Layer, StripBuffer, ZIndex
 import netext._core as core
-from netext._core import DirectedPoint, Direction
+from netext._core import DirectedPoint
 
 
 @dataclass

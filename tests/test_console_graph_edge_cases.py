@@ -2,9 +2,6 @@ import pytest
 from networkx import DiGraph
 from netext.console_graph import ConsoleGraph, AutoZoom, RenderState
 from netext.geometry.point import FloatPoint
-from netext.geometry.region import Region
-from netext.layout_engines import StaticLayout
-from netext.testing.assertions import assert_output_equal
 from rich.console import Console
 
 @pytest.fixture
@@ -39,7 +36,7 @@ def test_zoom_factor_is_recomputed(console):
     graph.add_edge(1, 2)
     cg = ConsoleGraph(graph, max_width=100, max_height=100, zoom=AutoZoom.FIT)
 
-    with console.capture() as capture:
+    with console.capture():
         console.print(cg)
 
     old_zoom_factor = cg._zoom_factor
@@ -57,7 +54,7 @@ def test_line_319(console):
     graph.add_node(1)
     cg = ConsoleGraph(graph)
 
-    with console.capture() as capture:
+    with console.capture():
         console.print(cg)
 
     cg.add_node(2)
