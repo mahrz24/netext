@@ -1,4 +1,4 @@
-name: ci
+name: CI
 
 on:
   push:
@@ -101,6 +101,7 @@ jobs:
 
   test-os:
     name: test on ${{ matrix.os }}
+    needs: [test-python]
 
     strategy:
       fail-fast: false
