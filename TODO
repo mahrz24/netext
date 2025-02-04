@@ -37,6 +37,8 @@
 - [ ] Overlay edges in rendering
 - [ ] Tree layout
 - [ ] Git Branch layout
+- [ ] Remove networkx dependency
+
 - [ ] Improve edge routing:
     - Crossing corners should be avoided (cost term) (unless sharing node)
     - Crossling lines for more then 1 unit should be avoided (additional penalty) (unless sharing node)

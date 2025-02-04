@@ -4,7 +4,7 @@ from netext.geometry.magnet import Magnet
 from netext.properties.node import NodeProperties
 from netext.properties.shape import Box, JustContent
 from netext.rendering.segment_buffer import Reference
-from netext.textual.widget import GraphView
+from netext.textual_widget.widget import GraphView
 from textual import events
 from textual.app import App, ComposeResult
 from typing import Any, Hashable, cast
