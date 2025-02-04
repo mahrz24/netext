@@ -236,15 +236,12 @@ jobs:
           - os: linux
             manylinux: auto
             target: armv7
-            interpreter: 3.10 3.11 3.12 3.13
           - os: linux
             manylinux: auto
             target: ppc64le
-            interpreter: 3.10 3.11 3.12 3.13
           - os: linux
             manylinux: auto
             target: s390x
-            interpreter: 3.10 3.11 3.12 3.13
 
           # musllinux
           - os: linux
@@ -262,17 +259,12 @@ jobs:
             target: x86_64
           - os: macos
             target: aarch64
-            interpreter: 3.10 3.11 3.12 3.13
+
           - os: windows
             target: x86_64
-            interpreter: 3.10 3.11 3.12 3.13
           - os: windows
             target: i686
             python-architecture: x86
-            interpreter: 3.10 3.11 3.12 3.13
-          - os: windows
-            target: aarch64
-            interpreter: 3.11 3.12 3.13
 
         exclude:
           # See above; disabled for now.
