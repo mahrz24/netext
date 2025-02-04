@@ -10,28 +10,25 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python 3.12
-      uses: actions/setup-python@v3
-      with:
-        python-version: "3.12"
-    - name: Install Pipx
-      run: |
-        pip install --upgrade pip
-        python3.12 -m pip install --user pipx
-        python3.12 -m pipx ensurepath
-    - name: Install Hatch
-      run: |
-        pipx install hatch
-        hatch config set dirs.env.virtual .hatch
-        hatch env create lint
-    - name: Cache hatch virtualenvs
-      uses: actions/cache@v2
-      id: cache
-      with:
-        path: .hatch
-        key: ubuntu-latest-hatch-${{ hashFiles('pyproject.toml') }}
-        restore-keys: |
-          ubuntu-latest-hatch-${{ hashFiles('pyproject.toml') }}
-    - name: Deploy documentation
-      run: hatch run docs:mkdocs gh-deploy --force
+      - uses: actions/checkout@v4
+
+      - name: install rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+
+      - id: cache-rust
+        name: cache rust
+        uses: Swatinem/rust-cache@v2
+
+      - run: cargo install rustfilt coverage-prepare
+        if: steps.cache-rust.outputs.cache-hit != 'true'
+
+      - run: rustup component add llvm-tools-preview
+
+      - name: install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: install deps
+        run: uv sync --group docs --all-extras
+
+      - name: Deploy documentation
+        run: uv run mkdocs gh-deploy --force

@@ -1,10 +1,5 @@
 # Console Graph
 
-::: netext.console_graph.G
-    handler: python
-    options:
-      show_source: false
-
 ::: netext.ZoomSpec
     handler: python
     options:
