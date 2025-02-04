@@ -26,7 +26,6 @@ testing = [
     "coverage[toml]>=6.4.2",
     "pyright",
     "pytest-asyncio>=0.21.1",
-    "aiohttp>=3.9.0b6",
     "importlib-metadata",
 ]
 documentation = [
