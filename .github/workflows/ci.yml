@@ -134,7 +134,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: pypi_files_sdist
+          name: snapshot_report
           path: tests/snapshot_tests/output/snapshot_report.html
 
   # test with a debug build as it picks up errors which optimised release builds do not
