@@ -4,9 +4,11 @@ from netext.console_graph import ConsoleGraph, AutoZoom, RenderState
 from netext.geometry.point import FloatPoint
 from rich.console import Console
 
+
 @pytest.fixture
 def console():
     return Console()
+
 
 def test_line_remove_of_non_existing_nodes():
     graph = DiGraph()
@@ -14,6 +16,7 @@ def test_line_remove_of_non_existing_nodes():
     # Force internal requirement check by calling remove_node
     with pytest.raises(KeyError):
         cg.remove_node("non_existent")
+
 
 def test_zoom_fig():
     graph = DiGraph()
@@ -27,6 +30,7 @@ def test_zoom_fig():
     cg.add_edge(2, 3)
     assert cg.zoom == AutoZoom.FIT
     assert cg._zoom_factor != 1.0
+
 
 def test_zoom_factor_is_recomputed(console):
     """Covers another state transition (lines 307-309)."""
@@ -47,6 +51,7 @@ def test_zoom_factor_is_recomputed(console):
         cg.add_edge(2, i)
     assert cg.zoom == AutoZoom.FIT
     assert cg._zoom_factor != old_zoom_factor
+
 
 def test_line_319(console):
     """Covers code around line 319, likely requiring transitions to EDGES_RENDERED."""
@@ -70,6 +75,7 @@ def test_line_447():
     with pytest.raises(KeyError):
         cg.remove_node("does_not_exist")
 
+
 def test_line_456():
     """Covers code for removing an edge near line 456."""
     graph = DiGraph()
@@ -78,6 +84,7 @@ def test_line_456():
     cg = ConsoleGraph(graph)
     cg.remove_edge(1, 2)
     assert (1, 2) not in cg._core_graph.all_edges()
+
 
 def test_line_459():
     """Covers code verifying internal references after removing edges (line 459)."""
@@ -89,6 +96,7 @@ def test_line_459():
     # Attempt another operation to ensure references are cleaned up
     with pytest.raises(KeyError):
         _ = cg.edge_buffers[(1, 2)]
+
 
 def test_line_501_502():
     """Covers code around lines 501-502 (updating node data)."""

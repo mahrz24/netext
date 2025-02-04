@@ -1,6 +1,7 @@
 from enum import Enum
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 
+
 class ArrowTip(Enum):
     ARROW = "arrow"
     NONE = "none"
@@ -56,6 +57,6 @@ ARROW_TIPS = {
             ArrowDirections.RIGHT: "🭬",
             ArrowDirections.UP: "🭯",
             ArrowDirections.DOWN: "🭭",
-        }
+        },
     }
 }

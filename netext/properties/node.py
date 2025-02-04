@@ -7,6 +7,7 @@ from rich.padding import PaddingDimensions
 from rich.text import Text
 from rich.console import RenderableType
 
+
 def remove_none_values(data: dict[str, Any]) -> dict[str, Any]:
     result_data = dict(**data)
     to_be_ignored = []

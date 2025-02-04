@@ -25,6 +25,7 @@ class EdgeInput:
             )
         )
 
+
 @dataclass(frozen=True)
 class EdgePath:
     start: Point

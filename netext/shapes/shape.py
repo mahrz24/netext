@@ -18,11 +18,7 @@ from netext.rendering.segment_buffer import StripBuffer
 
 class Shape(Protocol):
     def get_side_position(
-        self,
-        shape_buffer: "ShapeBuffer",
-        side: ShapeSide,
-        offset: int = 0,
-        extrude: int = 0
+        self, shape_buffer: "ShapeBuffer", side: ShapeSide, offset: int = 0, extrude: int = 0
     ) -> DirectedPoint:
         return NotImplemented
 
@@ -76,25 +72,29 @@ class RectangularShapeMixin:
         return closest_side
 
     def get_side_position(
-        self,
-        shape_buffer: "ShapeBuffer",
-        side: ShapeSide,
-        offset: int = 0,
-        extrude: int = 0
+        self, shape_buffer: "ShapeBuffer", side: ShapeSide, offset: int = 0, extrude: int = 0
     ) -> DirectedPoint:
         match side:
             case ShapeSide.TOP:
                 direction = Direction.UP
-                return DirectedPoint(x=shape_buffer.center.x + offset, y=shape_buffer.top_y - extrude, direction=direction)
+                return DirectedPoint(
+                    x=shape_buffer.center.x + offset, y=shape_buffer.top_y - extrude, direction=direction
+                )
             case ShapeSide.LEFT:
                 direction = Direction.LEFT
-                return DirectedPoint(x=shape_buffer.left_x - extrude, y=shape_buffer.center.y + offset, direction=direction)
+                return DirectedPoint(
+                    x=shape_buffer.left_x - extrude, y=shape_buffer.center.y + offset, direction=direction
+                )
             case ShapeSide.BOTTOM:
                 direction = Direction.DOWN
-                return DirectedPoint(x=shape_buffer.center.x - offset, y=shape_buffer.bottom_y + extrude, direction=direction)
+                return DirectedPoint(
+                    x=shape_buffer.center.x - offset, y=shape_buffer.bottom_y + extrude, direction=direction
+                )
             case ShapeSide.RIGHT:
                 direction = Direction.RIGHT
-                return DirectedPoint(x=shape_buffer.right_x + extrude, y=shape_buffer.center.y - offset, direction=direction)
+                return DirectedPoint(
+                    x=shape_buffer.right_x + extrude, y=shape_buffer.center.y - offset, direction=direction
+                )
         raise RuntimeError(side)
 
 

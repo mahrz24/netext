@@ -5,6 +5,7 @@ from netext._core import DirectedPoint
 from netext.geometry.magnet import ShapeSide
 from netext._core import Point
 
+
 @dataclass
 class NodeAnchors:
     port_sides: dict[str, ShapeSide] = field(default_factory=dict)

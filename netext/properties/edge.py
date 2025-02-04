@@ -22,7 +22,6 @@ class EdgeProperties:
     start_arrow_tip: ArrowTip | None = None
     end_arrow_tip: ArrowTip | None = None
 
-
     start_port: str | None = None
     end_port: str | None = None
 

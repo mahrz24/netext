@@ -58,7 +58,7 @@ def render_arrow_tip_buffers(
 ) -> list[StripBuffer]:
     buffers: list[StripBuffer] = []
 
-    start_arrow_tip_position, start_arrow_tip_dir  = edge_path.directed_points[0]
+    start_arrow_tip_position, start_arrow_tip_dir = edge_path.directed_points[0]
 
     if start_arrow_tip is not None and start_arrow_tip != ArrowTip.NONE:
         buffers.append(

@@ -429,8 +429,9 @@ class GraphArea(Widget):
         if new_value is not None and new_value.type == "node":
             g.update_node(new_value.ref, data={"$style": Style(color="blue")})
             element_message = self.ElementSelected(
-                element=new_value, element_data=g.graph.nodes(data=True)[new_value.ref],
-                element_properties=g.node_properties(new_value.ref)
+                element=new_value,
+                element_data=g.graph.nodes(data=True)[new_value.ref],
+                element_properties=g.node_properties(new_value.ref),
             )
 
         self.post_message(element_message)

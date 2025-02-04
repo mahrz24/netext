@@ -173,7 +173,7 @@ class NodeBuffer(ShapeBuffer):
                 port_name=current_port_name,
                 port_side=port_side,
                 ports_on_side=self.node_anchors.ports_per_side[port_side],
-                slotted_edges_on_side=slotted_edges_on_side
+                slotted_edges_on_side=slotted_edges_on_side,
             )
             self.node_anchors.all_positions[current_port_name] = pos
             self.node_anchors.port_positions[current_port_name] = pos.point
@@ -189,12 +189,13 @@ class NodeBuffer(ShapeBuffer):
                     # TODO Duplication with port offset computation
                     # Also should be moved to the shape
                     if side == ShapeSide.TOP or side == ShapeSide.BOTTOM:
-                        edge_offset = math.ceil((float(ports_on_side+edge_index) / (edges_on_side - 1)) * (self.width - 3)) - math.floor(
-                            (self.width - 2) / 2
-                        )
+                        edge_offset = math.ceil(
+                            (float(ports_on_side + edge_index) / (edges_on_side - 1)) * (self.width - 3)
+                        ) - math.floor((self.width - 2) / 2)
                     else:
                         edge_offset = math.ceil(
-                            (float(ports_on_side+edge_index) / (ports_on_side + edges_on_side - 1)) * (self.height - 3)
+                            (float(ports_on_side + edge_index) / (ports_on_side + edges_on_side - 1))
+                            * (self.height - 3)
                         ) - math.floor((self.height - 2) / 2)
 
                 start = self.get_side_position(
@@ -230,9 +231,9 @@ class NodeBuffer(ShapeBuffer):
                     (self.width - 2) / 2
                 )
             else:
-                port_offset = math.ceil(
-                    (float(port_index) / (edges_on_side - 1)) * (self.height - 3)
-                ) - math.floor((self.height - 2) / 2)
+                port_offset = math.ceil((float(port_index) / (edges_on_side - 1)) * (self.height - 3)) - math.floor(
+                    (self.height - 2) / 2
+                )
 
         # The magnet has been derived from the shape side, so it's determined and the target point
         # does not matter
@@ -299,11 +300,11 @@ class NodeBuffer(ShapeBuffer):
 
             match self.node_anchors.port_sides[port_name]:
                 case ShapeSide.TOP:
-                    label_position = Point(x=port_position.x, y=port_position.y + port_label_length//2 + 1)
+                    label_position = Point(x=port_position.x, y=port_position.y + port_label_length // 2 + 1)
                 case ShapeSide.LEFT:
                     label_position = Point(x=port_position.x + port_label_length // 2 + 2, y=port_position.y)
                 case ShapeSide.BOTTOM:
-                    label_position = Point(x=port_position.x, y=port_position.y - port_label_length//2 -1)
+                    label_position = Point(x=port_position.x, y=port_position.y - port_label_length // 2 - 1)
                 case ShapeSide.RIGHT:
                     label_position = Point(x=port_position.x - port_label_length // 2 - 2, y=port_position.y)
 

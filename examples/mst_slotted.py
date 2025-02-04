@@ -32,7 +32,6 @@ G.add_edges_from(
 T = nx.minimum_spanning_tree(G)
 
 
-
 nx.set_node_attributes(G, Style(color="blue", bold=True), "$content-style")
 nx.set_node_attributes(G, Style(color="green"), "$style")
 nx.set_node_attributes(G, True, "$show")

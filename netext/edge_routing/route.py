@@ -4,9 +4,8 @@ from netext._core import DirectedPoint
 from netext.edge_routing.edge import EdgePath
 from netext.edge_routing.modes import EdgeRoutingMode
 
-def _edge_routing_mode_to_routing_config(
-    edge_routing_mode: EdgeRoutingMode
-) -> core.RoutingConfig:
+
+def _edge_routing_mode_to_routing_config(edge_routing_mode: EdgeRoutingMode) -> core.RoutingConfig:
     match edge_routing_mode:
         case EdgeRoutingMode.ORTHOGONAL:
             return core.RoutingConfig(
@@ -26,6 +25,7 @@ def _edge_routing_mode_to_routing_config(
                 shape_cost=150,
                 direction_change_margin=1,
             )
+
 
 def route_edge(
     start: DirectedPoint,
@@ -47,7 +47,8 @@ def route_edge(
 
 
 def route_edges(
-    edge_router: core.EdgeRouter, edge_anchors: list[tuple[Hashable, Hashable, DirectedPoint, DirectedPoint, EdgeRoutingMode]]
+    edge_router: core.EdgeRouter,
+    edge_anchors: list[tuple[Hashable, Hashable, DirectedPoint, DirectedPoint, EdgeRoutingMode]],
 ) -> list[EdgePath]:
     core_anchors = [
         (

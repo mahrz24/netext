@@ -48,7 +48,6 @@ for routing, drawing in [
     g.add_node(6, **{"$x": 10, "$y": -5})
     g.add_node(7, **{"$x": 1, "$y": 1})
 
-
     g.add_edge(
         "FOOOOOO",
         2,

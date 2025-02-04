@@ -122,7 +122,9 @@ def rasterize_point(
     return Segment("*", style=style)
 
 
-def rasterize_edge_path(path: EdgePath, style: Style, edge_segment_drawing_mode: EdgeSegmentDrawingMode, dash_pattern: list[int] | None) -> list[Strip]:
+def rasterize_edge_path(
+    path: EdgePath, style: Style, edge_segment_drawing_mode: EdgeSegmentDrawingMode, dash_pattern: list[int] | None
+) -> list[Strip]:
     # Convert path to characters and points using the specified drawing mode
     character_path = []
     directions = []

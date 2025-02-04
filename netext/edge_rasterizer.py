@@ -28,6 +28,7 @@ class EdgeRoutingRequest:
     properties: EdgeProperties
     lod: int = 1
 
+
 def rasterize_edges(
     console: Console,
     edge_router: core.EdgeRouter,
@@ -46,9 +47,7 @@ def rasterize_edges(
         if request.lod != 1:
             request.properties = request.properties.lod_properties.get(request.lod, request.properties)
 
-        start, end = determine_edge_anchors(
-            request.u_buffer, request.v_buffer, request.properties
-        )
+        start, end = determine_edge_anchors(request.u_buffer, request.v_buffer, request.properties)
         edge_input = EdgeInput(
             start=start.point,
             end=end.point,
@@ -107,7 +106,10 @@ def rasterize_edge(
     if lod != 1:
         properties = properties.lod_properties.get(lod, properties)
 
-    start, end, = determine_edge_anchors(u_buffer, v_buffer, properties)
+    (
+        start,
+        end,
+    ) = determine_edge_anchors(u_buffer, v_buffer, properties)
 
     edge_input = EdgeInput(
         start=start.point,
@@ -117,12 +119,7 @@ def rasterize_edge(
         edge_segment_drawing_mode=properties.segment_drawing_mode,
     )
 
-    edge_path = route_edge(
-        start=start,
-        end=end,
-        edge_router=edge_router,
-        edge_routing_mode=properties.routing_mode
-    )
+    edge_path = route_edge(start=start, end=end, edge_router=edge_router, edge_routing_mode=properties.routing_mode)
 
     if not edge_path.directed_points or edge_path.start == edge_path.end:
         return None
@@ -150,7 +147,10 @@ def rasterize_edge(
 
 def rasterize_path_and_label(console, u_buffer, v_buffer, properties, edge_input, edge_path):
     strips = rasterize_edge_path(
-        edge_path, style=properties.style, edge_segment_drawing_mode=properties.segment_drawing_mode, dash_pattern=properties.dash_pattern
+        edge_path,
+        style=properties.style,
+        edge_segment_drawing_mode=properties.segment_drawing_mode,
+        dash_pattern=properties.dash_pattern,
     )
 
     label_buffers: list[StripBuffer] = []

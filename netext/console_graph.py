@@ -335,9 +335,9 @@ class ConsoleGraph:
         edge_buffer: EdgeBuffer | None = None
         label_nodes: list[StripBuffer] | None = None
 
-        assert (
-            self._zoom_factor is not None
-        ), "You tried to add an edge without a computed zoom factor. This should never happen."
+        assert self._zoom_factor is not None, (
+            "You tried to add an edge without a computed zoom factor. This should never happen."
+        )
 
         if not self._core_graph.contains_node(u):
             raise ValueError(f"Node {u} does not exist in graph")
@@ -749,14 +749,14 @@ class ConsoleGraph:
                 case AutoZoom.FIT:
                     if self.max_width is None or self.max_height is None:
                         raise ValueError(
-                            "AutoZoom.FIT is onlye allowed if the maximum renderable" " width and height is known."
+                            "AutoZoom.FIT is onlye allowed if the maximum renderable width and height is known."
                         )
                     zoom_x = self.max_width / max_width
                     zoom_y = self.max_height / max_height
                 case AutoZoom.FIT_PROPORTIONAL:
                     if self.max_width is None or self.max_height is None:
                         raise ValueError(
-                            "AutoZoom.FIT is only allowed if the maximum renderable" " width and height is known."
+                            "AutoZoom.FIT is only allowed if the maximum renderable width and height is known."
                         )
                     zoom_x = self.max_width / max_width
                     zoom_y = self.max_height / max_height
@@ -773,7 +773,7 @@ class ConsoleGraph:
 
     def _transition_render_node_buffers(self) -> None:
         if self._zoom_factor is None:
-            raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
+            raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is computed.")
 
         for node in self._core_graph.all_nodes():
             data = self._core_graph.node_data_or_default(node, dict())
@@ -807,7 +807,7 @@ class ConsoleGraph:
 
     def _transition_render_edges(self) -> None:
         if self._zoom_factor is None:
-            raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
+            raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is computed.")
 
         # Now we rasterize the edges
         all_node_buffers = []
@@ -844,14 +844,14 @@ class ConsoleGraph:
 
     def _render_port_buffers(self) -> None:
         if self._zoom_factor is None:
-            raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
+            raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is computed.")
 
         for node in self._core_graph.all_nodes():
             self._render_port_buffer_for_node(node)
 
     def _render_port_buffer_for_node(self, node):
         if self._zoom_factor is None:
-            raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is" " computed.")
+            raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is computed.")
 
         node_buffer = self.node_buffers[node]
         self.port_buffers[node] = node_buffer.get_port_buffers(
