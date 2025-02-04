@@ -14,11 +14,13 @@ from netext.buffer_renderer import render_buffers
 from netext.console_graph import AutoZoom, ZoomSpec
 from rich.segment import Segment
 from netext.geometry.region import Region as NetextRegion
-from netext.geometry.point import FloatPoint, Point
+from netext.geometry.point import FloatPoint
 from textual.message import Message
 
 from netext.properties.node import NodeProperties
 from netext.rendering.segment_buffer import Reference
+
+from netext._core import Point
 
 
 class GraphView(ScrollView):
