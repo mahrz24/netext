@@ -37,6 +37,7 @@ plugins:
             show_root_heading: true
             show_root_full_path: false
             separate_signature: true
+            allow_inspection: false
           import:
             - https://rich.readthedocs.io/en/stable/objects.inv
             - https://networkx.org/documentation/stable/objects.inv

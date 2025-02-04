@@ -1,6 +1,6 @@
 # Textual Widget
 
-::: netext.textual.widget.GraphView
+::: netext.textual_widget.widget.GraphView
     handler: python
     options:
       show_source: false
