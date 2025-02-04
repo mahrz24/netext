@@ -331,7 +331,7 @@ jobs:
       - name: extract and list wheel file
         run: |
           ls dist/*cp310-manylinux*x86_64.whl | head -n 1
-          python -m zipfile --list `ls dist/*cp310-manylinux*x86_64.whl | head -n 1`
+          python -m zipfile --list `ls dist/*cp310-abi3-manylinux*x86_64.whl | head -n 1`
 
   test-builds-arch:
     name: test build on ${{ matrix.target }}-${{ matrix.distro }}
@@ -407,7 +407,7 @@ jobs:
           path: dist
 
       - run: uv sync --group testing --all-extras
-      - run: uv pip install pydantic-core --no-index --no-deps --find-links dist --force-reinstall
+      - run: uv pip install netext --no-index --no-deps --find-links dist --force-reinstall
       - run: uv run pytest
 
   release:
