@@ -1,7 +1,4 @@
-from netext import ConsoleGraph
-from netext.edge_rendering.arrow_tips import ArrowTip
-from netext.edge_routing.modes import EdgeRoutingMode
-from netext.edge_rendering.modes import EdgeSegmentDrawingMode
+from netext import ConsoleGraph, ArrowTip, EdgeSegmentDrawingMode, EdgeRoutingMode
 
 from rich import print
 

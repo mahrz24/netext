@@ -3,9 +3,7 @@ import networkx as nx
 from rich import print
 from rich.table import Table
 from rich.text import Text
-from netext import ConsoleGraph
-from netext.edge_rendering.modes import EdgeSegmentDrawingMode
-from netext.edge_routing.modes import EdgeRoutingMode
+from netext import ConsoleGraph, EdgeSegmentDrawingMode, EdgeRoutingMode
 
 
 def read_file(file_path):

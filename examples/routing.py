@@ -1,6 +1,4 @@
-from netext import ConsoleGraph
-from netext.edge_rendering.modes import EdgeSegmentDrawingMode
-from netext.edge_routing.modes import EdgeRoutingMode
+from netext import ConsoleGraph, EdgeRoutingMode, EdgeSegmentDrawingMode
 from netext.layout_engines import StaticLayout
 from rich import print
 from rich.style import Style

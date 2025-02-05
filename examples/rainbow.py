@@ -1,11 +1,9 @@
 # Minimum Spanning Tree Example
 import itertools
 import networkx as nx
-from netext import ConsoleGraph
+from netext import ConsoleGraph, EdgeSegmentDrawingMode
 from rich.style import Style
 from rich import print
-
-from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 
 G = nx.star_graph(10)
 

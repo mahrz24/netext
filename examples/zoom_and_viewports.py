@@ -7,10 +7,7 @@ from rich.panel import Panel
 from rich.style import Style
 from rich.layout import Layout
 
-from netext import ConsoleGraph
-from netext.edge_routing.modes import EdgeRoutingMode
-from netext.edge_rendering.modes import EdgeSegmentDrawingMode
-from netext.edge_rendering.arrow_tips import ArrowTip
+from netext import ConsoleGraph, EdgeSegmentDrawingMode, EdgeRoutingMode, ArrowTip
 from netext.geometry import Region
 from netext.console_graph import AutoZoom
 
