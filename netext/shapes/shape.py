@@ -55,6 +55,7 @@ class RectangularShapeMixin:
         closest_point, _ = self.get_side_position(
             shape_buffer=shape_buffer,
             side=closest_side,
+            extrude=1
         )
 
         closest_distance = closest_point.distance_to_sqrd(target_point)
@@ -63,6 +64,7 @@ class RectangularShapeMixin:
             point, _ = self.get_side_position(
                 shape_buffer=shape_buffer,
                 side=side,
+                extrude=1
             )
             distance = point.distance_to_sqrd(target_point)
             if distance < closest_distance:

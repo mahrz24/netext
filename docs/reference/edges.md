@@ -32,7 +32,7 @@ from netext import ConsoleGraph
 from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
-from netext.layout_engines.static import StaticLayout
+from netext.layout_engines import StaticLayout
 from rich import print
 
 
@@ -70,7 +70,7 @@ Type: str | None.
 
 ```{.rich title='Label' }
 from netext import ConsoleGraph
-from netext.layout_engines.static import StaticLayout
+from netext.layout_engines import StaticLayout
 from rich import print
 
 
@@ -94,7 +94,7 @@ Type: [Style][rich.style.Style] | None.
 
 ```{.rich title='Style' }
 from netext import ConsoleGraph
-from netext.layout_engines.static import StaticLayout
+from netext.layout_engines import StaticLayout
 from rich import print
 from rich.style import Style
 
@@ -168,7 +168,7 @@ from netext import ConsoleGraph
 from netext.edge_rendering.arrow_tips import ArrowTip
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
-from netext.layout_engines.static import StaticLayout
+from netext.layout_engines import StaticLayout
 from rich import print
 
 
@@ -208,7 +208,7 @@ Possible values are:
 from netext import ConsoleGraph
 from netext.edge_routing.modes import EdgeRoutingMode
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
-from netext.layout_engines.static import StaticLayout
+from netext.layout_engines import StaticLayout
 from rich import print
 from rich.style import Style
 

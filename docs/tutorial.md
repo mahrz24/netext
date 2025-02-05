@@ -42,8 +42,7 @@ import networkx as nx
 from rich.style import Style
 from rich import box, print
 
-from netext import ConsoleGraph
-from netext.edge_rasterizer import EdgeRoutingMode
+from netext import ConsoleGraph, EdgeRoutingMode
 
 g = nx.binomial_tree(3)
 
@@ -62,8 +61,7 @@ import networkx as nx
 from rich.style import Style
 from rich import box
 
-from netext import ConsoleGraph
-from netext.edge_rasterizer import EdgeRoutingMode
+from netext import ConsoleGraph, EdgeRoutingMode
 
 g = nx.binomial_tree(3)
 

@@ -31,7 +31,7 @@ The zoom level by default only changes how nodes are placed, but not the size or
 # Add a mapping from zoom level ot level of detail.
 nx.set_node_attributes(g, lambda zoom: 0 if zoom < 0.5 else 1, "$lod-map")
 # For lod 0, remove the shape.
-nx.set_node_attributes(g, JustContent(), "$shape-0")
+nx.set_node_attributes(g, "just-content", "$shape-0")
 # For lod 0, replace the content by a circle.
 nx.set_node_attributes(g, lambda _, __, ___: "⏺", "$content-renderer-0")
 ```

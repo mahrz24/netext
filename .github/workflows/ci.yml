@@ -1,4 +1,4 @@
-name: CI
+name: CI Pipeline
 
 on:
   push:
@@ -214,6 +214,34 @@ jobs:
       - run: uv run ruff format --check
       - run: uv run pyright netext
 
+  build-docs:
+    name: Build documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: cache rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: test-v3
+
+      - name: install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: 3.13
+
+      - name: install deps
+        run: uv sync --group testing --all-extras
+
+      - run: uv pip install -e .
+        env:
+          RUST_BACKTRACE: 1
+
+      - run: uv run mkdocs build
 
   build-sdist:
     name: build sdist
@@ -463,3 +491,34 @@ jobs:
       #   env:
       #     TWINE_USERNAME: __token__
       #     TWINE_PASSWORD: ${{ secrets.pypi_token }}
+
+
+  publish-docs:
+    name: Publish documentation
+    needs: [release]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: install rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: cache rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: test-v3
+
+      - name: install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: 3.13
+
+      - name: install deps
+        run: uv sync --group testing --all-extras
+
+      - run: uv pip install -e .
+        env:
+          RUST_BACKTRACE: 1
+
+      - run: uv run mkdocs gh-deploy --force

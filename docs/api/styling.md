@@ -27,20 +27,20 @@
       show_source: false
       members: ["TOP", "LEFT", "RIGHT", "BOTTOM", "CENTER", "CLOSEST"]
 
-::: netext.edge_rendering.arrow_tips.ArrowTip
+::: netext.ArrowTip
     handler: python
     options:
       show_source: false
       members: ["ARROW"]
 
 
-::: netext.edge_routing.modes.EdgeRoutingMode
+::: netext.EdgeRoutingMode
     handler: python
     options:
       show_source: false
       members: ["STRAIGHT", "ORTHOGONAL"]
 
-::: netext.edge_rendering.modes.EdgeSegmentDrawingMode
+::: netext.EdgeSegmentDrawingMode
     handler: python
     options:
       show_source: false

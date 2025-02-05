@@ -76,7 +76,7 @@ class GraphView(ScrollView):
             disabled: A boolean indicating whether the widget is disabled (optional).
             zoom: A float or tuple of floats representing the zoom level of the widget (optional).
             scroll_via_viewport: A boolean indicating whether the widget should scroll via the viewport (optional).
-            **console_graph_kwargs: Additional keyword arguments to be passed to the ConsoleGraph constructor.
+            console_graph_kwargs: Additional keyword arguments to be passed to the ConsoleGraph constructor.
 
         Raises:
             ValueError: If both viewport and scroll_via_viewport are specified.

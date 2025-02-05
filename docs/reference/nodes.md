@@ -22,22 +22,21 @@ Possible values are:
 
 | Shape |  Value | Description |
 |------|--------|-------------|
-| Box | [Box][netext.node_rasterizer.Box] | Renders a [Panel][rich.panel.Panel] around the content. (*Default*) |
-| None | [JustContent][netext.node_rasterizer.JustContent] | Only renders the content. |
+| Box | box | Renders a [Panel][rich.panel.Panel] around the content. (*Default*) |
+| None | just-content | Only renders the content. |
 
 ### Examples
 
 ```{.rich title='Shapes' }
-from netext.shapes.shape import JustContent
 from netext import ConsoleGraph
-from netext.layout_engines.static import StaticLayout
+from netext.layout_engines import StaticLayout
 from rich import print
 
 
 import networkx as nx
 g = nx.Graph()
-g.add_node("A", **{"$x": 5, "$y": 0}, **{"$shape": JustContent()})
-g.add_node("B", **{"$x": 15, "$y": 0})
+g.add_node("A", **{"$x": 5, "$y": 0}, **{"$shape": "just-content"})
+g.add_node("B", **{"$x": 20, "$y": 0})
 g.add_edge("A", "B")
 
 
@@ -57,9 +56,8 @@ Type: [Box](https://rich.readthedocs.io/en/stable/appendix/box.html#appendix-box
 ##### Example
 
 ```{.rich title='Box Types' }
-from netext.shapes.shape import JustContent
 from netext import ConsoleGraph
-from netext.layout_engines.static import StaticLayout
+from netext.layout_engines import StaticLayout
 from rich import box
 from rich import print
 
@@ -86,9 +84,8 @@ Type: [Style][rich.style.Style] | None
 ##### Example
 
 ```{.rich title='Style' }
-from netext.shapes.shape import JustContent
 from netext import ConsoleGraph
-from netext.layout_engines.static import StaticLayout
+from netext.layout_engines import StaticLayout
 from rich import print
 from rich.style import Style
 
@@ -112,7 +109,7 @@ Type: [Style][rich.style.Style] | None
 
 ```{.rich title='Content Style' }
 from netext import ConsoleGraph
-from netext.layout_engines.static import StaticLayout
+from netext.layout_engines import StaticLayout
 from rich import print
 from rich.style import Style
 
@@ -152,7 +149,7 @@ Ports are optional and a port only needs to be specified if it is used as a targ
 
 ```python
 from netext import ConsoleGraph
-from netext.layout_engines.static import StaticLayout
+from netext.layout_engines import StaticLayout
 from rich import print
 from rich.style import Style
 
@@ -165,7 +162,7 @@ g.add_node("X", **{
     }
 )
 g.add_node("Y", **{
-    "$x": 20,
+    "$x": 25,
     "$y": 0,
     "$ports": {"a": {"label": "a"}, "b": {"label": "b"}}
     }
@@ -177,14 +174,14 @@ print(ConsoleGraph(g, layout_engine=StaticLayout()))
 
 ```{.rich title='Ports' }
 from netext import ConsoleGraph
-from netext.layout_engines.static import StaticLayout
+from netext.layout_engines import StaticLayout
 from rich import print
 from rich.style import Style
 
 import networkx as nx
 g = nx.Graph()
 g.add_node("X", **{"$x": 5, "$y": 0, "$ports": {"a": {"label": "a"}, "b": {"label": "b"}}})
-g.add_node("Y", **{"$x": 20, "$y": 0, "$ports": {"a": {"label": "a"}, "b": {"label": "b"}}})
+g.add_node("Y", **{"$x": 25, "$y": 0, "$ports": {"a": {"label": "a"}, "b": {"label": "b"}}})
 g.add_edge("X", "Y", **{"$start-port": "a", "$end-port": "a"})
 
 output = ConsoleGraph(g, layout_engine=StaticLayout())
