@@ -7,9 +7,7 @@ from rich.panel import Panel
 from rich.style import Style
 from rich.layout import Layout
 
-from netext import ConsoleGraph, EdgeSegmentDrawingMode, EdgeRoutingMode, ArrowTip
-from netext.geometry import Region
-from netext.console_graph import AutoZoom
+from netext import ConsoleGraph, EdgeSegmentDrawingMode, EdgeRoutingMode, ArrowTip, Region, AutoZoom
 
 g = cast(nx.DiGraph, nx.binomial_tree(5))
 nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
