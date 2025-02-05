@@ -99,6 +99,12 @@ jobs:
 
       - run: uv run pytest
 
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: snapshot_report
+          path: tests/snapshot_tests/output/snapshot_report.html
+
   test-os:
     name: test on ${{ matrix.os }}
     needs: [test-python]
@@ -235,7 +241,7 @@ jobs:
           python-version: 3.13
 
       - name: install deps
-        run: uv sync --group testing --all-extras
+        run: uv sync --group docs --all-extras
 
       - run: uv pip install -e .
         env:
@@ -515,7 +521,7 @@ jobs:
           python-version: 3.13
 
       - name: install deps
-        run: uv sync --group testing --all-extras
+        run: uv sync --group docs --all-extras
 
       - run: uv pip install -e .
         env:
