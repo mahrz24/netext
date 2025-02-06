@@ -1,3 +1,14 @@
+<a id='changelog-0.3'></a>
+# The Resurrection v0.3 — 2025-02-06
+
+## Fixed
+
+- A lot of bugs fixed around the layout engine and the rendering of nodes and edges.
+
+## Added
+
+- The whole layout and edge routing engine has been rewritten, now without 3rd party dependencies.
+- Structured properties for nodes and edges.
 
 <a id='changelog-0.2.1'></a>
 # Port Repair v0.2.1 — 2023-11-13

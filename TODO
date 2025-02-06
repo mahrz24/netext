@@ -1,31 +1,6 @@
-- [X] Incremental changes still crash sometimes (KeyError in update_edge)
-- Node connection modes
-    - [X] Directly to magnet
-    - [X] Slots, with growing nodes
-    - [X] Ports (with labels)
-- [X] Propagate the setting for how long to keep straight lines from a node
-- [X] Fix properties with level of detail
-- [X] Sugiyama LR / TB layout
-- [X] Force directed layout
-- [X] Line dashing
-- [X] Support for all box modes from rich
-- [X] Remove braille option
-- [X] Check if z-ordering for routing is correct (it does not seem like it)
-
-
-# Release pipeline
-
-- [X] Move to uv
-- [ ] Add maturin to build part of the CI
-- [ ] Make release pipeline
-    - Add depdendency groups
-    -
-- [ ] Organize imports
-- [ ] Update documentation
-- [ ] Add benchmarks
-
 # Past release
 
+- [ ] Add benchmarks
 - [ ] Add tests for the rust library as well
 - [ ] Strict typechecking
 - [ ] Add benchmark comparison to PRs
