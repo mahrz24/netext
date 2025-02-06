@@ -1,6 +1,8 @@
-from netext._core import StaticLayout, SugiyamaLayout, LayoutDirection
+from netext._core import StaticLayout, SugiyamaLayout, LayoutDirection, ForceDirectedLayout
 
 __all__ = [
     "StaticLayout",
     "SugiyamaLayout",
+    "LayoutDirection",
+    "ForceDirectedLayout",
 ]

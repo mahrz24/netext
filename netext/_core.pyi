@@ -111,3 +111,6 @@ class SugiyamaLayout(LayoutEngine):
 
 class StaticLayout(LayoutEngine):
     def __init__(self) -> None: ...
+
+class ForceDirectedLayout(LayoutEngine):
+    def __init__(self) -> None: ...
