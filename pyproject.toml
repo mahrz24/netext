@@ -24,20 +24,23 @@ testing = [
     "jinja2>=3.1.2",
     "pytest-cov>=3.0.0",
     "coverage[toml]>=6.4.2",
-    "pyright",
+    "pyright>=1.1.391",
     "pytest-asyncio>=0.21.1",
-    "importlib-metadata",
+    "importlib-metadata>=8.5.0",
+    "netext",
 ]
 docs = [
-    "mkdocs",
+    "mkdocs>=1.6.1",
     "mkdocstrings[python]>=0.20.0",
     "mkdocs-material>=9.0.5",
-    "ruff",
+    "ruff>=0.9.1",
+    "netext",
 ]
 linting = [
-    "pyright",
-    "ruff",
+    "pyright>=1.1.391",
+    "ruff>=0.9.1",
     "maturin>=1,<2",
+    "netext",
 ]
 
 [build-system]
@@ -73,3 +76,6 @@ py-modules = ["netext"]
 [tool.uv]
 # this ensures that `uv run` doesn't actually build the package
 package = false
+
+[tool.uv.sources]
+netext = { workspace = true }

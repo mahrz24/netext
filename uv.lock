@@ -99,7 +99,7 @@ name = "click"
 version = "8.1.8"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama", marker = "platform_system == 'Windows'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b9/2e/0090cbf739cee7d23781ad4b89a9894a41538e4fcf4c31dcdd705b78eb8b/click-8.1.8.tar.gz", hash = "sha256:ed53c9d8990d83c2a27deae68e4ee337473f6330c040a31d4225c9574d16096a", size = 226593 }
 wheels = [
@@ -412,7 +412,7 @@ version = "1.6.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "click" },
-    { name = "colorama", marker = "platform_system == 'Windows'" },
+    { name = "colorama", marker = "sys_platform == 'win32'" },
     { name = "ghp-import" },
     { name = "jinja2" },
     { name = "markdown" },
@@ -547,10 +547,12 @@ docs = [
     { name = "mkdocs" },
     { name = "mkdocs-material" },
     { name = "mkdocstrings", extra = ["python"] },
+    { name = "netext" },
     { name = "ruff" },
 ]
 linting = [
     { name = "maturin" },
+    { name = "netext" },
     { name = "pyright" },
     { name = "ruff" },
 ]
@@ -559,6 +561,7 @@ testing = [
     { name = "importlib-metadata" },
     { name = "jinja2" },
     { name = "maturin" },
+    { name = "netext" },
     { name = "pyright" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -576,22 +579,25 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 docs = [
-    { name = "mkdocs" },
+    { name = "mkdocs", specifier = ">=1.6.1" },
     { name = "mkdocs-material", specifier = ">=9.0.5" },
     { name = "mkdocstrings", extras = ["python"], specifier = ">=0.20.0" },
-    { name = "ruff" },
+    { name = "netext", virtual = "." },
+    { name = "ruff", specifier = ">=0.9.1" },
 ]
 linting = [
     { name = "maturin", specifier = ">=1,<2" },
-    { name = "pyright" },
-    { name = "ruff" },
+    { name = "netext", virtual = "." },
+    { name = "pyright", specifier = ">=1.1.391" },
+    { name = "ruff", specifier = ">=0.9.1" },
 ]
 testing = [
     { name = "coverage", extras = ["toml"], specifier = ">=6.4.2" },
-    { name = "importlib-metadata" },
+    { name = "importlib-metadata", specifier = ">=8.5.0" },
     { name = "jinja2", specifier = ">=3.1.2" },
     { name = "maturin", specifier = ">=1,<2" },
-    { name = "pyright" },
+    { name = "netext", virtual = "." },
+    { name = "pyright", specifier = ">=1.1.391" },
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", specifier = ">=0.21.1" },
     { name = "pytest-cov", specifier = ">=3.0.0" },

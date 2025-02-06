@@ -37,7 +37,12 @@ plugins:
             show_root_heading: true
             show_root_full_path: false
             separate_signature: true
+            show_signature: true
+            show_signature_annotations: true
             allow_inspection: false
+            merge_init_into_class: true
+            members: true
+            show_source: false
           import:
             - https://rich.readthedocs.io/en/stable/objects.inv
             - https://networkx.org/documentation/stable/objects.inv

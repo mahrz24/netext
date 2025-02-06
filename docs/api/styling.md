@@ -1,27 +1,51 @@
-# Styling
+# Styling & Properties
+
+## Geometry
+
+::: netext.Region
+    handler: python
+    options:
+      show_source: false
+
 
 ## Nodes
 
-::: netext.node_rasterizer.Shape
+::: netext.NodeProperties
     handler: python
     options:
       show_source: false
 
 
-::: netext.node_rasterizer.Box
+::: netext.Port
     handler: python
     options:
       show_source: false
 
 
-::: netext.node_rasterizer.JustContent
+::: netext.ShapeProperties
+    handler: python
+    options:
+      show_source: false
+
+
+::: netext.JustContent
+    handler: python
+    options:
+      show_source: false
+
+::: netext.Box
     handler: python
     options:
       show_source: false
 
 ## Edges
 
-::: netext.geometry.magnet.Magnet
+::: netext.EdgeProperties
+    handler: python
+    options:
+      show_source: false
+
+::: netext.Magnet
     handler: python
     options:
       show_source: false
@@ -32,7 +56,6 @@
     options:
       show_source: false
       members: ["ARROW"]
-
 
 ::: netext.EdgeRoutingMode
     handler: python
