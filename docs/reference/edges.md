@@ -49,14 +49,6 @@ g.add_edge("C", "D", **{"$end-arrow-tip": ArrowTip.ARROW,
                         "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL}
 )
 
-
-g.add_node("E", **{"$x": 25, "$y": 0})
-g.add_node("F", **{"$x": 25, "$y": 9})
-g.add_edge("E", "F", **{"$end-arrow-tip": ArrowTip.ARROW,
-                        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BLOCK,
-                        "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL}
-)
-
 output = ConsoleGraph(g, layout_engine=StaticLayout())
 ```
 
@@ -124,6 +116,51 @@ g.add_edge("G", "H"
 output = ConsoleGraph(g, layout_engine=StaticLayout())
 ```
 
+## Dash Pattern
+
+The `dash-pattern` attribute determines a dash pattern. You can pass a list of integer values to it and the list will repeat an alternating on-off pattern for edges drawn.
+
+### Examples
+
+```{.rich title='Dashes' }
+
+from netext import ConsoleGraph, EdgeSegmentDrawingMode, EdgeRoutingMode
+from netext.layout_engines import StaticLayout
+from rich import print
+
+import networkx as nx
+g = nx.Graph()
+g.add_node("[1, 1]", **{"$x": 5, "$y": 0})
+g.add_node("B", **{"$x": 5, "$y": 16})
+
+g.add_edge("[1, 1]", "B", **{
+    "$dash-pattern": [1, 1],
+    "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
+    "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL
+})
+
+g.add_node("[2, 1]", **{"$x": 17, "$y": 0})
+g.add_node("D", **{"$x": 17, "$y": 16})
+
+g.add_edge("[2, 1]", "D", **{
+    "$dash-pattern": [2, 1],
+    "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
+    "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL
+})
+
+g.add_node("[3, 2, 1]", **{"$x": 30, "$y": 0})
+g.add_node("F", **{"$x": 30, "$y": 16})
+
+g.add_edge("[3, 2, 1]", "F", **{
+    "$dash-pattern": [3, 2, 1],
+    "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
+    "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL
+})
+
+
+output = ConsoleGraph(g, layout_engine=StaticLayout())
+```
+
 ## Magnets
 
 The `start-magnet` and `end-magnet` attributes determine to which side of the node the edge is connected.
@@ -132,13 +169,13 @@ Type: [Magnet][netext.geometry.magnet.Magnet] | None
 
 Possible values are:
 
-| Magnet | Value | Description |
-| ----------------- | ------------------| --------------------------|
-| Left          | [Magnet.LEFT][netext.geometry.magnet.Magnet.LEFT]     | Connect to the left side of the node |
-| Right          | [Magnet.RIGHT][netext.geometry.magnet.Magnet.RIGHT]     | Connect to the right side of the node |
-| Top          | [Magnet.TOP][netext.geometry.magnet.Magnet.TOP]     | Connect to the top side of the node |
-| Bottom          | [Magnet.BOTTOM][netext.geometry.magnet.Magnet.BOTTOM]     | Connect to the bottom side of the node |
-| Closest          | [Magnet.CLOSEST][netext.geometry.magnet.Magnet.CLOSEST]     | Connect to the closest magnet position. |
+| Magnet  | Value                                                   | Description                             |
+| ------- | ------------------------------------------------------- | --------------------------------------- |
+| Left    | [Magnet.LEFT][netext.geometry.magnet.Magnet.LEFT]       | Connect to the left side of the node    |
+| Right   | [Magnet.RIGHT][netext.geometry.magnet.Magnet.RIGHT]     | Connect to the right side of the node   |
+| Top     | [Magnet.TOP][netext.geometry.magnet.Magnet.TOP]         | Connect to the top side of the node     |
+| Bottom  | [Magnet.BOTTOM][netext.geometry.magnet.Magnet.BOTTOM]   | Connect to the bottom side of the node  |
+| Closest | [Magnet.CLOSEST][netext.geometry.magnet.Magnet.CLOSEST] | Connect to the closest magnet position. |
 
 ## Ports
 
@@ -200,7 +237,6 @@ Possible values are:
 | Heavy Box                 | [EdgeSegmentDrawingMode.BOX_HEAVY][netext.edge_rendering.modes.EdgeSegmentDrawingMode.BOX_HEAVY]               | Uses thicker box drawing characters to draw lines. Corners between edge segments are merged. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.EdgeRoutingMode.ORTHOGONAL].                      |
 | Double Box                | [EdgeSegmentDrawingMode.BOX_DOUBLE][netext.edge_rendering.modes.EdgeSegmentDrawingMode.BOX_DOUBLE]             | Uses double line box drawing characters to draw lines. Corners between edge segments are merged. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.EdgeRoutingMode.ORTHOGONAL].                  |
 | ASCII compatible          | [EdgeSegmentDrawingMode.ASCII][netext.edge_rendering.modes.EdgeSegmentDrawingMode.ASCII]                       | Uses ASCII characters to draw orthogonal lines. Corners between edge segments are merged with plus signs. Works only with [EdgeRoutingMode.ORTHOGONAL][netext.edge_routing.modes.EdgeRoutingMode.ORTHOGONAL].         |
-| Block                     | [EdgeSegmentDrawingMode.BLOCK][netext.edge_rendering.modes.EdgeSegmentDrawingMode.BLOCK]                       | Uses 2x3 block characters to draw the whole edge.                                                                                                                                                                     |
 
 ### Examples
 
@@ -242,11 +278,6 @@ g.add_edge("I", "J", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX
 g.add_node("K", **{"$x": 25, "$y": 13})
 g.add_node("L", **{"$x": 35, "$y": 22})
 g.add_edge("K", "L", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.ASCII,"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
-
-g.add_node("O", **{"$x": 65, "$y": 13})
-g.add_node("P", **{"$x": 75, "$y": 22})
-g.add_edge("O", "P", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BLOCK,"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
-
 
 output = ConsoleGraph(g, layout_engine=StaticLayout())
 ```

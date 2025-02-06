@@ -47,3 +47,17 @@ To set the shape of all nodes in the graph `g` to none. Alternatively you can se
 ```python
 g.edges["a"]["b"]["$edge-routing-mode"] = EdgeRoutingMode.straight
 ```
+
+## Styling via Properties
+
+You can also style the graph via properties. This way you can use code completion to see all available properties and their values
+and also benefit from type checking. The attribute based styling, however is easier to encode when storing the graph in a file.
+
+```python
+import networkx as nx
+from netext import EdgeProperties, NodeProperties, EdgeRoutingMode
+...
+nx.set_edge_attributes(g, EdgeProperties(routing_mode=EdgeRoutingMode.ORTHOGONAL), "$properties")
+```
+
+See the [API Documentation](../api/styling.md) for a full documentation of all possible properties.

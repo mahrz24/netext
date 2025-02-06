@@ -74,5 +74,4 @@
         "BOX_DOUBLE",
         "ASCII",
         "SINGLE_CHARACTER",
-        "BLOCK",
       ]

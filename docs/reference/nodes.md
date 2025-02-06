@@ -16,7 +16,7 @@ Type: Callable | None
 
 The `shape` attribute determines the surrounding decoration around the content of the node.
 
-Type: [Shape][netext.node_rasterizer.Shape] | None
+Type: str | None
 
 Possible values are:
 
