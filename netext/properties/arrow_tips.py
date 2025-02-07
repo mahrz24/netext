@@ -51,6 +51,6 @@ ARROW_TIPS = {
             ArrowDirections.RIGHT: ">",
             ArrowDirections.UP: "^",
             ArrowDirections.DOWN: "v",
-        }
+        },
     }
 }
