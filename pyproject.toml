@@ -1,6 +1,6 @@
 [project]
 name = "netext"
-version = "0.2.2dev0"
+version = "0.3.0"
 description = "A graph (network) rendering library for the terminal."
 authors = [{ name = "Malte Klemm", email = "me@malteklemm.de" }]
 license = { text = "MIT Licence" }
@@ -14,7 +14,7 @@ textual = ["textual>=1"]
 
 [project.urls]
 "Source code" = "https://github.com/mahrz24/netext"
-Documentation = "https://github.com/mahrz24/netext"
+Documentation = "https://mahrz24.github.io/netext/"
 
 [dependency-groups]
 testing = [

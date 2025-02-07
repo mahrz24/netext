@@ -469,6 +469,7 @@ jobs:
     needs: [test-builds-arch, test-builds-os, build-sdist]
     if: success() && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    environment: release
 
     steps:
       - uses: actions/checkout@v4
@@ -492,11 +493,10 @@ jobs:
 
       - run: twine check --strict dist/*
 
-      # - name: upload to pypi
-      #   run: twine upload dist/*
-      #   env:
-      #     TWINE_USERNAME: __token__
-      #     TWINE_PASSWORD: ${{ secrets.pypi_token }}
+      - name: upload to pypi
+        run: twine upload dist/*
+        env:
+          TWINE_USERNAME: __token__
 
 
   publish-docs:
