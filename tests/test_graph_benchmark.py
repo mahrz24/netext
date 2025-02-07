@@ -1,7 +1,6 @@
 from networkx import binomial_tree
 import networkx as nx
 import pytest
-from statistics import median
 from rich.console import Console
 
 from netext import ConsoleGraph
