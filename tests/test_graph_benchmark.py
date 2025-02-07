@@ -7,7 +7,8 @@ from netext import ConsoleGraph
 from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
 
-@pytest.fixture(scope='module')
+
+@pytest.fixture(scope="module")
 def graph() -> ConsoleGraph:
     graph = binomial_tree(5)
 
@@ -20,9 +21,11 @@ def graph() -> ConsoleGraph:
 
     return ConsoleGraph(graph)
 
-@pytest.fixture(scope='module')
+
+@pytest.fixture(scope="module")
 def console() -> Console:
     return Console()
+
 
 @pytest.mark.benchmark
 def test_graph_performance(graph: ConsoleGraph, console: Console, benchmark):

@@ -18,6 +18,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: set up python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
       - name: install rust nightly
         uses: dtolnay/rust-toolchain@nightly
 

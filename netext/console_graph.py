@@ -335,9 +335,9 @@ class ConsoleGraph:
         edge_buffer: EdgeBuffer | None = None
         label_nodes: list[StripBuffer] | None = None
 
-        assert self._zoom_factor is not None, (
-            "You tried to add an edge without a computed zoom factor. This should never happen."
-        )
+        assert (
+            self._zoom_factor is not None
+        ), "You tried to add an edge without a computed zoom factor. This should never happen."
 
         if not self._core_graph.contains_node(u):
             raise ValueError(f"Node {u} does not exist in graph")
