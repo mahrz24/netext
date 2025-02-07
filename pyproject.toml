@@ -1,13 +1,13 @@
 [project]
 name = "netext"
-version = "0.3.0"
+version = "0.3.1"
 description = "A graph (network) rendering library for the terminal."
 authors = [{ name = "Malte Klemm", email = "me@malteklemm.de" }]
 license = { text = "MIT Licence" }
 readme = "README.md"
 keywords = ["network", "graph", "terminal", "rich"]
 requires-python = ">=3.10"
-dependencies = ["rich>=13", "networkx~=3.0", "cachetools>=5.3.0"]
+dependencies = ["rich>=13", "networkx~=3.0", "cachetools>=5.3.0", "typing-extensions>=4.12.2"]
 
 [project.optional-dependencies]
 textual = ["textual>=1"]
