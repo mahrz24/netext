@@ -27,20 +27,17 @@ testing = [
     "pyright>=1.1.391",
     "pytest-asyncio>=0.21.1",
     "importlib-metadata>=8.5.0",
-    "netext",
 ]
 docs = [
     "mkdocs>=1.6.1",
     "mkdocstrings[python]>=0.20.0",
     "mkdocs-material>=9.0.5",
     "ruff>=0.9.1",
-    "netext",
 ]
 linting = [
     "pyright>=1.1.391",
     "ruff>=0.9.1",
     "maturin>=1,<2",
-    "netext",
 ]
 
 [build-system]
