@@ -26,6 +26,7 @@ testing = [
     "coverage[toml]>=6.4.2",
     "pyright>=1.1.391",
     "pytest-asyncio>=0.21.1",
+    "pytest-codspeed",
     "importlib-metadata>=8.5.0",
 ]
 docs = [
