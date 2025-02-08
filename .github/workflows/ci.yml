@@ -99,7 +99,7 @@ jobs:
 
       - run: uv pip freeze
 
-      - run: uv run pytest
+      - run: uv run pytest tests
 
       - uses: actions/upload-artifact@v4
         if: failure()

@@ -8,3 +8,9 @@ serve-docs: (sync-env "docs")
 lint *FILES: (sync-env "linting")
     uv run ruff format {{FILES}}
     uv run ruff check --fix {{FILES}}
+
+test: (sync-env "testing")
+    uv run pytest tests --benchmark-skip
+
+benchmark: (sync-env "testing")
+    uv run pytest tests  --benchmark-only
