@@ -7,10 +7,18 @@ license = { text = "MIT Licence" }
 readme = "README.md"
 keywords = ["network", "graph", "terminal", "rich"]
 requires-python = ">=3.10"
-dependencies = ["rich>=13", "networkx~=3.0", "cachetools>=5.3.0", "typing-extensions>=4.12.2"]
+dependencies = [
+    "rich>=13",
+    "networkx~=3.0",
+    "cachetools>=5.3.0",
+    "typing-extensions>=4.12.2",
+    "click>=8.1.8",
+    "rich-click>=1.8.5",
+]
 
 [project.optional-dependencies]
 textual = ["textual>=1"]
+dot = ["pydot>=3.0.4"]
 
 [project.urls]
 "Source code" = "https://github.com/mahrz24/netext"
@@ -29,20 +37,14 @@ testing = [
     "importlib-metadata>=8.5.0",
     "pytest-benchmark>=3.4.1",
 ]
-benchmark = [
-    "pytest-codspeed>=2",
-]
+benchmark = ["pytest-codspeed>=2"]
 docs = [
     "mkdocs>=1.6.1",
     "mkdocstrings[python]>=0.20.0",
     "mkdocs-material>=9.0.5",
     "ruff>=0.9.1",
 ]
-linting = [
-    "pyright>=1.1.391",
-    "ruff>=0.9.1",
-    "maturin>=1,<2",
-]
+linting = ["pyright>=1.1.391", "ruff>=0.9.1", "maturin>=1,<2"]
 
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
@@ -54,7 +56,7 @@ module-name = "netext._core"
 features = ["pyo3/extension-module"]
 
 [tool.pyright]
-executionEnvironments = [{ root = "netext"}]
+executionEnvironments = [{ root = "netext" }]
 typeCheckingMode = "standard"
 useLibraryCodeForTypes = true
 venvPath = "."
@@ -80,3 +82,6 @@ package = false
 
 [tool.uv.sources]
 netext = { workspace = true }
+
+[project.scripts]
+netext = "netext.cli:run"
