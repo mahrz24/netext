@@ -103,6 +103,7 @@ celerybeat.pid
 *.sage.py
 
 # Environments
+.codspeed
 .env
 .venv
 env/
