@@ -8,25 +8,18 @@ from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
 
 
-@pytest.fixture(scope="module")
-def graph() -> ConsoleGraph:
+@pytest.mark.benchmark
+def test_graph_performance_small_binomial_tree(benchmark):
     graph = binomial_tree(5)
-
     nx.set_edge_attributes(graph, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
     nx.set_edge_attributes(
         graph,
         EdgeSegmentDrawingMode.BOX,
         "$edge-segment-drawing-mode",
     )
+    console = Console()
 
-    return ConsoleGraph(graph)
-
-
-@pytest.fixture(scope="module")
-def console() -> Console:
-    return Console()
-
-
-@pytest.mark.benchmark
-def test_graph_performance(graph: ConsoleGraph, console: Console, benchmark):
-    benchmark(console.print, graph)
+    @benchmark
+    def _benchmark():
+        cg = ConsoleGraph(graph)
+        console.print(cg)
