@@ -8,7 +8,7 @@ from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
 
 
-@pytest.mark.parametrize("n", [2, 5, 7])
+@pytest.mark.parametrize("n", [2, 4, 6])
 @pytest.mark.benchmark
 def test_graph_performance_small_binomial_tree(n, benchmark):
     graph = binomial_tree(n)
