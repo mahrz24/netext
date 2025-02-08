@@ -29,7 +29,6 @@ fn _core(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<RoutingConfig>()?;
     m.add_class::<Neighborhood>()?;
     m.add_class::<EdgeRouter>()?;
-    m.add_class::<LibTracer>()?;
 
     Ok(())
 }
