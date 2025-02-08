@@ -3,15 +3,12 @@ use pyo3::prelude::*;
 mod geometry;
 mod graph;
 mod layout;
-mod lib_tracing;
 mod pyindexset;
 mod routing;
 
 use geometry::{DirectedPoint, Direction, Neighborhood, PlacedRectangularNode, Point, RectangularNode, Size};
 use routing::{RoutingConfig, EdgeRouter};
 use graph::CoreGraph;
-use lib_tracing::LibTracer;
-
 
 // A module to wrap the Python functions and structs
 #[pymodule]

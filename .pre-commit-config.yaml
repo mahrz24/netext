@@ -1,13 +1,20 @@
 repos:
-- repo: local
-  hooks:
-    - id: ruff lint
-      name: ruff lint
-      entry: ruff check
-      language: system
-      types: [python]
-    - id: ruff format
-      name: ruff format
-      entry: ruff format
-      language: system
-      types: [python]
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    # uv version.
+    rev: 0.5.29
+    hooks:
+      - id: uv-lock
+      - id: uv-export
+
+  - repo: local
+    hooks:
+      - id: ruff lint
+        name: ruff lint
+        entry: uv run ruff check
+        language: system
+        types: [python]
+      - id: ruff format
+        name: ruff format
+        entry: uv run ruff format
+        language: system
+        types: [python]
