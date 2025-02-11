@@ -18,6 +18,8 @@ class BoxShape(RectangularShapeMixin):
     def render_shape(
         self,
         console: Console,
+        width: int | None,
+        height: int | None,
         content_renderable: RenderableType,
         style: Style,
         padding: PaddingDimensions,
@@ -34,6 +36,8 @@ class BoxShape(RectangularShapeMixin):
             Panel(
                 content_renderable,
                 expand=False,
+                width=width,
+                height=height,
                 style=style,
                 padding=padding,
                 box=properties.box_type,

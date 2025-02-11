@@ -67,7 +67,7 @@ impl SugiyamaLayout {
             .collect();
 
         let ordered_layers = self.barycenter_ordering(&raw_graph, &layers);
-        let coordinates = self.brandes_koepf_coordinates(&ordered_layers, graph);
+        let coordinates: HashMap<usize, Point> = self.brandes_koepf_coordinates(&ordered_layers, graph);
 
         // In case of left right layout, we need to rotate the coordinates
         let final_coordinates: HashMap<usize, Point> =
@@ -123,6 +123,8 @@ impl SugiyamaLayout {
         let mut max_width = 0.0;
         let mut layer_widths = HashMap::new();
 
+        let mut y = 0.0;
+
         for (layer_index, layer) in layers.iter().enumerate() {
             let node_sizes: Vec<Option<&Size>> = layer
                 .into_iter()
@@ -135,7 +137,6 @@ impl SugiyamaLayout {
                 acc.max(height_in_direction(self.direction, size.unwrap_or(&Size::new(0, 0))))
             });
 
-            let y = layer_index as f32 * layer_height as f32;
             let mut x = 0.0;
 
             for (&node, size) in layer.into_iter().zip(node_sizes) {
@@ -148,6 +149,7 @@ impl SugiyamaLayout {
             }
 
             layer_widths.insert(layer_index, x);
+            y += layer_height as f32;
         }
 
         // Adjust nodes to center layers (TODO we should make sure to align the nodes to some kind of grid, not just center them)

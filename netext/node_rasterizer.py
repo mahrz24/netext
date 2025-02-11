@@ -147,7 +147,9 @@ def rasterize_node(
 
     strips = shape.render_shape(
         console,
-        content_renderable,
+        width=properties.width,
+        height=properties.height,
+        content_renderable=content_renderable,
         style=properties.style,
         padding=padding,
         properties=shape_props,

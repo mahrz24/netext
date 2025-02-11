@@ -15,9 +15,7 @@ petgraph = "0.6.4"
 priority-queue = "2.0.2"
 rand = "0.8.4"
 rstar = "0.12.0"
-tracing = "0.1.40"
-tracing-flame = "0.2.0"
-tracing-subscriber = "0.3.18"
+
 
 [dependencies.pyo3]
 version = "0.21.2"

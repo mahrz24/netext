@@ -32,6 +32,8 @@ class Shape(Protocol):
     def render_shape(
         self,
         console: Console,
+        width: int | None,
+        height: int | None,
         content_renderable: RenderableType,
         style: Style,
         padding: PaddingDimensions,
@@ -41,7 +43,7 @@ class Shape(Protocol):
         return NotImplemented
 
 
-class RectangularShapeMixin:
+class RectangularShapeMixin(Shape):
     def _renderable_type_to_strips(self, console: Console, node_renderable: RenderableType) -> list[Strip]:
         segment_lists = list(console.render_lines(node_renderable, pad=False))
         return [Strip(segments=cast(list[Segment | Spacer], segments)) for segments in segment_lists]
@@ -96,6 +98,8 @@ class JustContentShape(RectangularShapeMixin):
     def render_shape(
         self,
         console: Console,
+        width: int | None,
+        height: int | None,
         content_renderable: RenderableType,
         style: Style,
         padding: PaddingDimensions,

@@ -671,7 +671,7 @@ class ConsoleGraph:
             self._core_graph.update_node_size(
                 node,
                 core.Size(
-                    self.node_buffers_for_layout[node].layout_width + 10,
+                    self.node_buffers_for_layout[node].layout_width + 8,
                     self.node_buffers_for_layout[node].layout_height + 5,
                 ),
             )

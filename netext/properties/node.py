@@ -51,6 +51,10 @@ class Port:
 @dataclass
 class NodeProperties:
     shape: ShapeProperties = field(default_factory=Box)
+
+    width: int | None = None
+    height: int | None = None
+
     style: Style = Style()
     content_style: Style = Style()
     margin: int = 0
@@ -76,6 +80,10 @@ class NodeProperties:
     ) -> "NodeProperties":
         fallback = fallback or cls()
         shape: ShapeProperties = ShapeProperties.parse(data, suffix, fallback.shape)
+
+        width = data.get(f"$width{suffix}", fallback.width)
+        height = data.get(f"$height{suffix}", fallback.height)
+
         style: Style = data.get(f"$style{suffix}", fallback.style)
         content_style = data.get(f"$content-style{suffix}", fallback.content_style)
         margin: int = data.get(f"$margin{suffix}", fallback.margin)
@@ -89,6 +97,8 @@ class NodeProperties:
 
         result = cls(
             shape=shape,
+            width=width,
+            height=height,
             style=style,
             content_style=content_style,
             margin=margin,
