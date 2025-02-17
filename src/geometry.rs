@@ -252,10 +252,10 @@ impl BoundingBox for PlacedRectangularNode {
 
 impl PlacedNode for PlacedRectangularNode {
     fn contains_point(&self, point: &impl PointLike) -> bool {
-        point.x() >= self.top_left().x
-            && point.x() <= self.bottom_right().x
-            && point.y() >= self.top_left().y
-            && point.y() <= self.bottom_right().y
+        point.x() >= self.top_left().x - 2
+            && point.x() <= self.bottom_right().x + 2
+            && point.y() >= self.top_left().y - 2
+            && point.y() <= self.bottom_right().y + 2
     }
 }
 

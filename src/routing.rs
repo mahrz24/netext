@@ -7,6 +7,7 @@ use std::hash::Hash;
 
 use pyo3::prelude::*;
 
+use crate::geometry::PlacedNode;
 use crate::{
     geometry::{BoundingBox, DirectedPoint, Direction, Neighborhood, PlacedRectangularNode, Point},
     pyindexset::PyIndexSet,
@@ -32,7 +33,7 @@ impl RoutingConfig {
         diagonal_cost: i32,
         line_cost: i32,
         shape_cost: i32,
-        direction_change_margin: i32
+        direction_change_margin: i32,
     ) -> Self {
         RoutingConfig {
             neighborhood,
@@ -40,7 +41,7 @@ impl RoutingConfig {
             diagonal_cost,
             line_cost,
             shape_cost,
-            direction_change_margin
+            direction_change_margin,
         }
     }
 }
@@ -53,7 +54,7 @@ impl Default for RoutingConfig {
             diagonal_cost: 1,
             line_cost: 1,
             shape_cost: 1,
-            direction_change_margin: 1
+            direction_change_margin: 1,
         }
     }
 }
@@ -72,9 +73,9 @@ fn heuristic(a: &DirectedPoint, b: &DirectedPoint, config: RoutingConfig) -> i32
     };
 
     if a.direction == b.direction {
-        (lowest_distance + diagonal_cost)*12
+        (lowest_distance + diagonal_cost) * 12
     } else {
-        (lowest_distance + diagonal_cost + config.corner_cost)*12
+        (lowest_distance + diagonal_cost + config.corner_cost) * 12
     }
 }
 
@@ -133,10 +134,7 @@ fn get_neighbors(
     neighbors
 }
 
-fn reconstruct_path<T: Eq + Hash + Copy>(
-    came_from: &HashMap<T, T>,
-    current: T,
-) -> Vec<T> {
+fn reconstruct_path<T: Eq + Hash + Copy>(came_from: &HashMap<T, T>, current: T) -> Vec<T> {
     let mut total_path = vec![current];
     let mut current = current;
     while let Some(&parent) = came_from.get(&current) {
@@ -316,8 +314,6 @@ impl EdgeRouter {
         Ok(())
     }
 
-
-
     fn route_edges(
         &mut self,
         edges: Vec<(
@@ -331,8 +327,7 @@ impl EdgeRouter {
         let mut result = Vec::new();
 
         for (u, v, start, end, config) in edges {
-            let directed_points =
-                self.route_edge(start, end, config)?;
+            let directed_points = self.route_edge(start, end, config)?;
             let path = directed_points
                 .iter()
                 .map(|p| Point::new(p.x, p.y))
@@ -343,7 +338,7 @@ impl EdgeRouter {
         Ok(result)
     }
 
-    fn route_edge(
+    fn route_edge_astar(
         &self,
         start: DirectedPoint,
         end: DirectedPoint,
@@ -369,9 +364,11 @@ impl EdgeRouter {
 
             let current_distance = min(current_start_distance, current_end_distance);
 
-            for neighbor in
-                get_neighbors(&current, config.clone().neighborhood, current_distance > config.direction_change_margin)
-            {
+            for neighbor in get_neighbors(
+                &current,
+                config.clone().neighborhood,
+                current_distance > config.direction_change_margin,
+            ) {
                 let tentative_g_score = g_score.get(&current).unwrap_or(&(i32::MAX - 100))
                     + self.transition_cost(&current, &neighbor, &config);
 
@@ -391,5 +388,79 @@ impl EdgeRouter {
         Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
             "Goal not found.",
         ))
+    }
+
+    fn route_edge(
+        &self,
+        start: DirectedPoint,
+        end: DirectedPoint,
+        config: RoutingConfig,
+    ) -> PyResult<Vec<DirectedPoint>> {
+        println!("Routing edge from {:?} to {:?}", start, end);
+        if (start.x - end.x).abs() + (start.y - end.y).abs() > 10 {
+            let intermediate_x = (start.x + end.x) / 2;
+            let intermediate_y = (start.y + end.y) / 2;
+
+            let intermediate_direction = if (end.x - start.x).abs() > (end.y - start.y).abs() {
+                if end.y > start.y {
+                    Direction::Down
+                } else {
+                    Direction::Up
+                }
+            } else {
+                if end.x > start.x {
+                    Direction::Left
+                } else {
+                    Direction::Right
+                }
+            };
+
+            let intermediate_point_end = DirectedPoint::new(
+                intermediate_x,
+                intermediate_y,
+                intermediate_direction.opposite(),
+            );
+            let intermediate_point_start =
+                DirectedPoint::new(intermediate_x, intermediate_y, intermediate_direction);
+
+            let mut path = Vec::new();
+
+            if self.is_point_valid(&intermediate_point_start) {
+                println!("Intermediate point start is valid");
+                let mut config = config;
+                config.direction_change_margin = 0;
+                if let Ok(mut sub_path1) =
+                    self.route_edge(start, intermediate_point_end, config)
+                {
+                    if let Ok(mut sub_path2) =
+                        self.route_edge(intermediate_point_start, end, config)
+                    {
+                        path.append(&mut sub_path1);
+                        path.pop(); // Remove duplicate intermediate point
+                        path.append(&mut sub_path2);
+                        println!("Intermediate point end");
+                        return Ok(path);
+                    }
+                }
+
+            }
+        }
+        self.route_edge_astar(start, end, config)
+    }
+
+    fn is_point_valid(&self, point: &DirectedPoint) -> bool {
+        // Check if the point is within any placed node
+        for node in self.placed_nodes.values() {
+            if node.contains_point(point) {
+                return false;
+            }
+        }
+
+        // Check if the point is on any existing edge
+        if self.line_occlusion.get(&(point.x, point.y)).unwrap_or(&0) > &0 {
+            return false;
+        }
+
+        true
     }
 }
