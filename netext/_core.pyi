@@ -104,7 +104,10 @@ class LayoutDirection(Enum):
     LEFT_RIGHT = 1
 
 class LayoutEngine:
+    layout_direction: LayoutDirection
+
     def layout(self, graph: CoreGraph) -> Iterable[tuple[Hashable, Point]]: ...
+
 
 class SugiyamaLayout(LayoutEngine):
     def __init__(self, direction: LayoutDirection) -> None: ...

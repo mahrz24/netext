@@ -15,8 +15,8 @@ use graph::CoreGraph;
 fn _core(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<layout::sugiyama::SugiyamaLayout>()?;
     m.add_class::<layout::LayoutEngine>()?;
+    m.add_class::<layout::LayoutDirection>()?;
     m.add_class::<layout::static_::StaticLayout>()?;
-    m.add_class::<layout::sugiyama::LayoutDirection>()?;
     m.add_class::<layout::force_directed::ForceDirectedLayout>()?;
 
     m.add_class::<CoreGraph>()?;

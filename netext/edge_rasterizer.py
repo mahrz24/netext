@@ -33,6 +33,7 @@ def rasterize_edges(
     console: Console,
     edge_router: core.EdgeRouter,
     edge_route_requests: list[EdgeRoutingRequest],
+    layout_direction: core.LayoutDirection | None = None,
 ) -> tuple[
     dict[tuple[Hashable, Hashable], EdgeBuffer],
     dict[tuple[Hashable, Hashable], list[StripBuffer]],
@@ -47,7 +48,9 @@ def rasterize_edges(
         if request.lod != 1:
             request.properties = request.properties.lod_properties.get(request.lod, request.properties)
 
-        start, end = determine_edge_anchors(request.u_buffer, request.v_buffer, request.properties)
+        start, end = determine_edge_anchors(
+            request.u_buffer, request.v_buffer, request.properties, layout_direction=layout_direction
+        )
         edge_input = EdgeInput(
             start=start.point,
             end=end.point,
@@ -99,6 +102,7 @@ def rasterize_edge(
     properties: EdgeProperties,
     lod: int = 1,
     edge_index: int = 0,
+    layout_direction: core.LayoutDirection | None = None,
 ) -> tuple[EdgeBuffer, list[StripBuffer]] | None:
     if not properties.show:
         return None
@@ -109,7 +113,7 @@ def rasterize_edge(
     (
         start,
         end,
-    ) = determine_edge_anchors(u_buffer, v_buffer, properties)
+    ) = determine_edge_anchors(u_buffer, v_buffer, properties, layout_direction)
 
     edge_input = EdgeInput(
         start=start.point,
@@ -194,30 +198,29 @@ def determine_edge_anchors(
     u_buffer: NodeBuffer,
     v_buffer: NodeBuffer,
     properties: EdgeProperties,
+    layout_direction: core.LayoutDirection | None = None,
 ) -> tuple[DirectedPoint, DirectedPoint]:
-    if (port_name := properties.start_port) is not None and port_name in u_buffer.node_anchors.all_positions:
-        start = u_buffer.node_anchors.all_positions[port_name]
-        u_buffer.connect_port(port_name, v_buffer.node)
+    start = determine_edge_anchor(u_buffer, v_buffer, properties, layout_direction=layout_direction)
+    end = determine_edge_anchor(v_buffer, u_buffer, properties, layout_direction=layout_direction)
+    return start, end
+
+
+def determine_edge_anchor(
+    buffer: NodeBuffer,
+    other_buffer: NodeBuffer,
+    properties: EdgeProperties,
+    layout_direction: core.LayoutDirection | None = None,
+) -> DirectedPoint:
+    if (port_name := properties.start_port) is not None and port_name in buffer.node_anchors.all_positions:
+        anchor = buffer.node_anchors.all_positions[port_name]
+        buffer.connect_port(port_name, other_buffer.node)
     else:
-        if u_buffer.properties.slots and v_buffer.node in u_buffer.node_anchors.all_positions:
-            start = u_buffer.node_anchors.all_positions[v_buffer.node]
+        if buffer.properties.slots and other_buffer.node in buffer.node_anchors.all_positions:
+            anchor = buffer.node_anchors.all_positions[other_buffer.node]
         else:
-            if properties.start_magnet == Magnet.CLOSEST:
-                side = u_buffer.get_closest_side(v_buffer.center)
+            if properties.start_magnet == Magnet.AUTO:
+                side = buffer.determine_edge_side(other_buffer, layout_direction)
             else:
                 side = ShapeSide(properties.start_magnet.value)
-            start = u_buffer.get_side_position(side, offset=0, extrude=1)
-
-    if (port_name := properties.end_port) is not None and port_name in v_buffer.node_anchors.all_positions:
-        end = v_buffer.node_anchors.all_positions[port_name]
-        v_buffer.connect_port(port_name, u_buffer.node)
-    else:
-        if v_buffer.properties.slots and u_buffer.node in v_buffer.node_anchors.all_positions:
-            end = v_buffer.node_anchors.all_positions[u_buffer.node]
-        else:
-            if properties.end_magnet == Magnet.CLOSEST:
-                side = v_buffer.get_closest_side(start.point)
-            else:
-                side = ShapeSide(properties.end_magnet.value)
-            end = v_buffer.get_side_position(side, offset=0, extrude=1)
-    return start, end
+            anchor = buffer.get_side_position(side, offset=0, extrude=1)
+    return anchor

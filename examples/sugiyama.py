@@ -10,6 +10,7 @@ g = nx.binomial_tree(5)
 nx.set_edge_attributes(g, ArrowTip.ARROW, "$end-arrow-tip")
 nx.set_edge_attributes(g, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
 nx.set_edge_attributes(g, EdgeSegmentDrawingMode.BOX, "$edge-segment-drawing-mode")
+nx.set_node_attributes(g, 1, "$slots")
 
 layout = SugiyamaLayout(direction=LayoutDirection.LEFT_RIGHT)
 

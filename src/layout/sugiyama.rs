@@ -6,22 +6,13 @@ use petgraph::graphmap::DiGraphMap;
 use petgraph::unionfind::UnionFind;
 use petgraph::visit::IntoEdgeReferences;
 use petgraph::visit::{NodeIndexable, Topo};
-
 use pyo3::prelude::*;
 
 use crate::geometry::Size;
 use crate::{geometry::Point, graph::CoreGraph};
 
-use super::LayoutEngine;
+use super::{LayoutDirection, LayoutEngine};
 
-#[pyclass]
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
-pub enum LayoutDirection {
-    #[pyo3(name = "TOP_DOWN")]
-    TopDown = 0,
-    #[pyo3(name = "LEFT_RIGHT")]
-    LeftRight = 1,
-}
 
 #[pyclass(extends=LayoutEngine, subclass)]
 pub struct SugiyamaLayout {
@@ -38,6 +29,11 @@ impl SugiyamaLayout {
             },
             LayoutEngine {},
         )
+    }
+
+    #[getter]
+    fn get_layout_direction(&self) -> Option<LayoutDirection> {
+        Some(self.direction)
     }
 
     fn layout(&self, py: Python<'_>, graph: &CoreGraph) -> PyResult<Vec<(PyObject, Point)>> {
@@ -135,7 +131,7 @@ impl SugiyamaLayout {
                 acc.max(height_in_direction(self.direction, size.unwrap_or(&Size::new(0, 0))))
             });
 
-            let y = layer_index as f32 * layer_height as f32;
+            let y = layer_index as f32 * (layer_height as f32 + 5.0);
             let mut x = 0.0;
 
             for (&node, size) in layer.into_iter().zip(node_sizes) {

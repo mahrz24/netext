@@ -25,8 +25,8 @@ class EdgeProperties:
     start_port: str | None = None
     end_port: str | None = None
 
-    start_magnet: Magnet = Magnet.CLOSEST
-    end_magnet: Magnet = Magnet.CLOSEST
+    start_magnet: Magnet = Magnet.AUTO
+    end_magnet: Magnet = Magnet.AUTO
 
     lod_map: Callable[[float], int] = lambda _: 1  # noqa: E731
     lod_properties: dict[int, "EdgeProperties"] = field(default_factory=dict)

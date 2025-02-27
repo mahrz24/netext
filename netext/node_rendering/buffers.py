@@ -18,6 +18,8 @@ from netext.properties.shape import JustContent
 from netext.rendering.segment_buffer import Layer, Reference, Strip, StripBuffer, ZIndex
 from netext.shapes.shape import JustContentShape, Shape, ShapeBuffer
 
+import netext._core as core
+
 
 @dataclass(kw_only=True)
 class PortBuffer(ShapeBuffer):
@@ -57,8 +59,16 @@ class PortLabelBuffer(PortBuffer): ...
 
 
 @dataclass(kw_only=True)
+class RoutingHints:
+    density_in_layout_direction: float = 0.0
+    relative_offset_in_layout_direction: float = 0.0
+
+
+@dataclass(kw_only=True)
 class NodeBuffer(ShapeBuffer):
     node: Hashable
+
+    routing_hints: RoutingHints = field(default_factory=RoutingHints)
 
     properties: NodeProperties = field(default_factory=lambda: NodeProperties())
     margin: int = 0
@@ -130,6 +140,7 @@ class NodeBuffer(ShapeBuffer):
         self,
         out_neighbors: list[tuple[Self, EdgeProperties]] | None = None,
         in_neighbors: list[tuple[Self, EdgeProperties]] | None = None,
+        layout_direction: core.LayoutDirection | None = None,
     ) -> None:
         out_neighbors = out_neighbors or []
         in_neighbors = in_neighbors or []
@@ -137,22 +148,26 @@ class NodeBuffer(ShapeBuffer):
         if self.properties.slots:
             for v_buffer, props in out_neighbors:
                 if props.start_port is None:
-                    if props.start_magnet == Magnet.CLOSEST:
-                        edge_side = self.get_closest_side(v_buffer.center)
+                    if props.start_magnet == Magnet.AUTO:
+                        edge_side = self.determine_edge_side(v_buffer, layout_direction)
                     else:
                         edge_side = ShapeSide(props.start_magnet.value)
                     self.node_anchors.edge_sides[(self.node, v_buffer.node)] = edge_side
-                    self.node_anchors.edges_per_side[edge_side].append(v_buffer.node)
+                    sort_key = (
+                        -v_buffer.center.y if edge_side in [ShapeSide.LEFT, ShapeSide.RIGHT] else -v_buffer.center.x
+                    )
+                    self.node_anchors.edges_per_side[edge_side].append((sort_key, v_buffer.node))
             for u_buffer, props in in_neighbors:
-                if props.start_magnet == Magnet.CLOSEST:
-                    edge_side = self.get_closest_side(u_buffer.center)
+                if props.start_magnet == Magnet.AUTO:
+                    edge_side = self.determine_edge_side(u_buffer, layout_direction)
                 else:
                     edge_side = ShapeSide(props.start_magnet.value)
                 self.node_anchors.edge_sides[(u_buffer.node, self.node)] = edge_side
-                self.node_anchors.edges_per_side[edge_side].append(u_buffer.node)
+                sort_key = u_buffer.center.y if edge_side in [ShapeSide.LEFT, ShapeSide.RIGHT] else u_buffer.center.x
+                self.node_anchors.edges_per_side[edge_side].append((sort_key, u_buffer.node))
 
         for current_port_name, port in sorted(self.properties.ports.items(), key=lambda x: x[1].key):
-            if port.magnet == Magnet.CLOSEST or port.magnet is None:
+            if port.magnet == Magnet.AUTO or port.magnet is None:
                 port_side = ShapeSide.LEFT
                 for v_buffer, props in out_neighbors:
                     if props.start_port == current_port_name:
@@ -164,6 +179,34 @@ class NodeBuffer(ShapeBuffer):
                 port_side = ShapeSide(port.magnet.value)
             self.node_anchors.port_sides[current_port_name] = port_side
             self.node_anchors.ports_per_side[port_side].append(current_port_name)
+
+    def determine_edge_side(
+        self, other_buffer: "NodeBuffer", layout_direction: core.LayoutDirection | None
+    ) -> ShapeSide:
+        if layout_direction == core.LayoutDirection.TOP_DOWN:
+            # Prefer top or bottom, then left or right
+            # First check if the other buffer is above or below
+            if other_buffer.bottom_y < self.top_y:
+                side = ShapeSide.TOP
+            elif other_buffer.top_y > self.bottom_y:
+                side = ShapeSide.BOTTOM
+            elif other_buffer.left_x < self.right_x:
+                side = ShapeSide.LEFT
+            else:
+                side = ShapeSide.RIGHT
+        elif layout_direction == core.LayoutDirection.LEFT_RIGHT:
+            if other_buffer.right_x < self.left_x:
+                side = ShapeSide.LEFT
+            elif other_buffer.left_x > self.right_x:
+                side = ShapeSide.RIGHT
+            elif other_buffer.top_y < self.bottom_y:
+                side = ShapeSide.BOTTOM
+            else:
+                side = ShapeSide.TOP
+            side = self.get_closest_side(other_buffer.center)
+        else:
+            side = self.get_closest_side(other_buffer.center)
+        return side
 
     def determine_edge_positions(self) -> None:
         for current_port_name, _ in sorted(self.properties.ports.items(), key=lambda x: x[1].key):
@@ -182,7 +225,8 @@ class NodeBuffer(ShapeBuffer):
             edges_on_side = len(self.node_anchors.edges_per_side[side])
             ports_on_side = len(self.node_anchors.ports_per_side[side])
             edges_on_side += ports_on_side
-            for edge_index, edge in enumerate(self.node_anchors.edges_per_side[side]):
+
+            for edge_index, (sort_key, edge) in enumerate(sorted(self.node_anchors.edges_per_side[side])):
                 if edges_on_side == 1:
                     edge_offset = 0
                 else:
