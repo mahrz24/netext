@@ -1,6 +1,7 @@
 use std::ops::{Mul, Sub};
-
 use pyo3::{exceptions::PyIndexError, prelude::*, types::PyType, PyClass};
+use std::hash::Hash;
+
 
 pub trait PointLike {
     fn x(&self) -> i32;
@@ -362,11 +363,26 @@ impl Direction {
 }
 
 #[pyclass]
-#[derive(Clone, Eq, PartialEq, Hash, Copy, Debug)]
+#[derive(Clone, Copy, Eq, Debug)]
 pub struct DirectedPoint {
     pub x: i32,
     pub y: i32,
     pub direction: Direction,
+    pub debug: bool
+}
+
+impl PartialEq for DirectedPoint {
+    fn eq(&self, other: &Self) -> bool {
+        self.x == other.x && self.y == other.y && self.direction == other.direction
+    }
+}
+
+impl Hash for DirectedPoint {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.x.hash(state);
+        self.y.hash(state);
+        self.direction.hash(state);
+    }
 }
 
 impl PointLike for DirectedPoint {
@@ -383,7 +399,12 @@ impl PointLike for DirectedPoint {
 impl DirectedPoint {
     #[new]
     pub fn new(x: i32, y: i32, direction: Direction) -> Self {
-        DirectedPoint { x, y, direction }
+        DirectedPoint { x, y, direction, debug: false }
+    }
+
+    #[getter]
+    fn get_debug(&self) -> PyResult<bool> {
+        Ok(self.debug)
     }
 
     #[getter]

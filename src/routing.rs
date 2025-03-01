@@ -128,7 +128,20 @@ fn get_neighbors(
             Direction::DownLeft => neighbors.push(DirectedPoint::new(x, y, Direction::DownLeft)),
             Direction::Left => neighbors.push(DirectedPoint::new(x, y, Direction::Left)),
             Direction::UpLeft => neighbors.push(DirectedPoint::new(x, y, Direction::UpLeft)),
-            Direction::Center => neighbors.push(DirectedPoint::new(x, y, Direction::Center)),
+            Direction::Center => neighbors.extend_from_slice(
+                vec![
+                    DirectedPoint::new(x, y, Direction::Center),
+                    DirectedPoint::new(x, y, Direction::Up),
+                    DirectedPoint::new(x, y, Direction::Right),
+                    DirectedPoint::new(x, y, Direction::Down),
+                    DirectedPoint::new(x, y, Direction::Left),
+                    DirectedPoint::new(x, y, Direction::UpRight),
+                    DirectedPoint::new(x, y, Direction::DownRight),
+                    DirectedPoint::new(x, y, Direction::DownLeft),
+                    DirectedPoint::new(x, y, Direction::UpLeft),
+                ]
+                .as_slice(),
+            ),
         }
     }
     neighbors
@@ -327,7 +340,12 @@ impl EdgeRouter {
         let mut result = Vec::new();
 
         for (u, v, start, end, config) in edges {
+            println!("START Routing edge from {:?} to {:?}", start, end);
             let directed_points = self.route_edge(start, end, config)?;
+            println!(
+                "END Routing edge from {:?} to {:?}",
+                start, end,
+            );
             let path = directed_points
                 .iter()
                 .map(|p| Point::new(p.x, p.y))
@@ -355,7 +373,7 @@ impl EdgeRouter {
         f_score.insert(start, heuristic(&start, &end, config));
 
         while let Some((current, _)) = open_set.pop() {
-            if current == end {
+            if current == end || (end.direction == Direction::Center && current.x == end.x && current.y == end.y) {
                 return Ok(reconstruct_path(&came_from, current));
             }
 
@@ -397,31 +415,25 @@ impl EdgeRouter {
         config: RoutingConfig,
     ) -> PyResult<Vec<DirectedPoint>> {
         println!("Routing edge from {:?} to {:?}", start, end);
-        if (start.x - end.x).abs() + (start.y - end.y).abs() > 10 {
+        if (start.x - end.x).abs() + (start.y - end.y).abs() > 15
+            && ((start.x - end.x).abs() > 3 && (start.y - end.y).abs() > 3)
+        {
             let intermediate_x = (start.x + end.x) / 2;
             let intermediate_y = (start.y + end.y) / 2;
 
-            let intermediate_direction = if (end.x - start.x).abs() > (end.y - start.y).abs() {
-                if end.y > start.y {
-                    Direction::Down
-                } else {
-                    Direction::Up
-                }
-            } else {
-                if end.x > start.x {
-                    Direction::Left
-                } else {
-                    Direction::Right
-                }
-            };
+            let intermediate_direction = Direction::Center;
 
-            let intermediate_point_end = DirectedPoint::new(
+            let mut intermediate_point_end = DirectedPoint::new(
                 intermediate_x,
                 intermediate_y,
                 intermediate_direction.opposite(),
             );
-            let intermediate_point_start =
+
+            let mut intermediate_point_start =
                 DirectedPoint::new(intermediate_x, intermediate_y, intermediate_direction);
+
+            intermediate_point_start.debug = true;
+            intermediate_point_end.debug = true;
 
             let mut path = Vec::new();
 
@@ -429,22 +441,20 @@ impl EdgeRouter {
                 println!("Intermediate point start is valid");
                 let mut config = config;
                 config.direction_change_margin = 0;
-                if let Ok(mut sub_path1) =
-                    self.route_edge(start, intermediate_point_end, config)
-                {
+                if let Ok(mut sub_path1) = self.route_edge(start, intermediate_point_end, config) {
+                    //return Ok(sub_path1);
                     if let Ok(mut sub_path2) =
                         self.route_edge(intermediate_point_start, end, config)
                     {
                         path.append(&mut sub_path1);
-                        path.pop(); // Remove duplicate intermediate point
                         path.append(&mut sub_path2);
                         println!("Intermediate point end");
                         return Ok(path);
                     }
                 }
-
             }
         }
+        println!("No intermediate point found, routing directly");
         self.route_edge_astar(start, end, config)
     }
 

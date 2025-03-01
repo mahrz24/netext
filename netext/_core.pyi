@@ -27,6 +27,7 @@ class DirectedPoint:
     x: int
     y: int
     direction: Direction
+    debug: bool
     point: Point
 
     def __iter__(self) -> Iterator: ...
