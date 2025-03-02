@@ -119,7 +119,6 @@ def rasterize_point(
             return Segment(box_character_map[edge_segment_drawing_mode][6], style=style)
         elif Direction.UP_LEFT in directions or Direction.DOWN_RIGHT in directions:
             return Segment(box_character_map[edge_segment_drawing_mode][7], style=style)
-    print(directions)
     return Segment("*", style=style)
 
 
@@ -137,7 +136,6 @@ def rasterize_edge_path(
     offset = next(pattern)
     debug = False
 
-    print([(point.point.x, point.point.y, point.direction) for point in path.directed_points])
     for directed_point in path.directed_points:
         if directed_point.point == current_point:
             directions.append(directed_point.direction)

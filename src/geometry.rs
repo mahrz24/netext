@@ -1,11 +1,18 @@
-use std::ops::{Mul, Sub};
 use pyo3::{exceptions::PyIndexError, prelude::*, types::PyType, PyClass};
+use rstar::PointDistance;
 use std::hash::Hash;
-
+use std::ops::{Mul, Sub};
 
 pub trait PointLike {
     fn x(&self) -> i32;
     fn y(&self) -> i32;
+
+    fn as_point(&self) -> Point {
+        Point {
+            x: self.x(),
+            y: self.y(),
+        }
+    }
 }
 
 pub trait BoundingBox {
@@ -71,7 +78,10 @@ impl Sub for Point {
     }
 }
 
-impl<Scalar> Mul<Scalar> for Point where Scalar: std::convert::Into<f64> {
+impl<Scalar> Mul<Scalar> for Point
+where
+    Scalar: std::convert::Into<f64>,
+{
     type Output = Point;
 
     fn mul(self, other: Scalar) -> Point {
@@ -104,14 +114,14 @@ impl Point {
     fn max_point(cls: &Bound<'_, PyType>, points: Vec<Point>) -> PyResult<Point> {
         let max_x = points.iter().map(|p| p.x()).max().unwrap_or(0);
         let max_y = points.iter().map(|p| p.y()).max().unwrap_or(0);
-        Ok(Point{ x: max_x, y: max_y })
+        Ok(Point { x: max_x, y: max_y })
     }
 
     #[classmethod]
     fn min_point(cls: &Bound<'_, PyType>, points: Vec<Point>) -> PyResult<Point> {
         let min_x = points.iter().map(|p| p.x()).min().unwrap_or(0);
         let min_y = points.iter().map(|p| p.y()).min().unwrap_or(0);
-        Ok(Point{ x: min_x, y: min_y })
+        Ok(Point { x: min_x, y: min_y })
     }
 
     fn __eq__(&self, other: &Point) -> bool {
@@ -187,6 +197,34 @@ impl Point {
     }
 }
 
+impl rstar::Point for Point {
+    type Scalar = i32;
+    const DIMENSIONS: usize = 2;
+
+    fn generate(mut generator: impl FnMut(usize) -> Self::Scalar) -> Self {
+        Point {
+            x: generator(0),
+            y: generator(1),
+        }
+    }
+
+    fn nth(&self, index: usize) -> Self::Scalar {
+        match index {
+            0 => self.x,
+            1 => self.y,
+            _ => panic!("Index out of bounds"),
+        }
+    }
+
+    fn nth_mut(&mut self, index: usize) -> &mut Self::Scalar {
+        match index {
+            0 => &mut self.x,
+            1 => &mut self.y,
+            _ => panic!("Index out of bounds"),
+        }
+    }
+}
+
 impl PointLike for Point {
     fn x(&self) -> i32 {
         self.x
@@ -203,13 +241,11 @@ pub struct Rectangle {
     bottom_right: Point,
 }
 
-
 #[pyclass]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Copy)]
 pub struct RectangularNode {
     pub size: Size,
 }
-
 
 impl Layoutable for RectangularNode {
     fn size(&self) -> Size {
@@ -221,9 +257,7 @@ impl Layoutable for RectangularNode {
 impl RectangularNode {
     #[new]
     fn new(size: Size) -> Self {
-        RectangularNode {
-            size
-        }
+        RectangularNode { size }
     }
 }
 
@@ -250,6 +284,42 @@ impl BoundingBox for PlacedRectangularNode {
     }
 }
 
+impl PointDistance for PlacedRectangularNode {
+    fn distance_2(&self, point: &Point) -> i32 {
+        let x = point.x();
+        let y = point.y();
+        let x1 = self.top_left().x;
+        let y1 = self.top_left().y;
+        let x2 = self.bottom_right().x;
+        let y2 = self.bottom_right().y;
+
+        if x < x1 {
+            if y < y1 {
+                return (x1 - x).pow(2) + (y1 - y).pow(2);
+            } else if y > y2 {
+                return (x1 - x).pow(2) + (y2 - y).pow(2);
+            } else {
+                return (x1 - x).pow(2);
+            }
+        } else if x > x2 {
+            if y < y1 {
+                return (x2 - x).pow(2) + (y1 - y).pow(2);
+            } else if y > y2 {
+                return (x2 - x).pow(2) + (y2 - y).pow(2);
+            } else {
+                return (x - x2).pow(2);
+            }
+        } else {
+            if y < y1 {
+                return (y1 - y).pow(2);
+            } else if y > y2 {
+                return (x2 - x).pow(2) + (y2 - y).pow(2);
+            } else {
+                return (x - x2).pow(2);
+            }
+        }
+    }
+}
 
 impl PlacedNode for PlacedRectangularNode {
     fn contains_point(&self, point: &impl PointLike) -> bool {
@@ -264,9 +334,7 @@ impl PlacedNode for PlacedRectangularNode {
 impl PlacedRectangularNode {
     #[new]
     fn new(center: Point, node: RectangularNode) -> Self {
-        PlacedRectangularNode {
-            center, node
-        }
+        PlacedRectangularNode { center, node }
     }
 }
 
@@ -320,10 +388,9 @@ impl Direction {
 
     pub fn is_diagonal(&self) -> bool {
         match self {
-            Direction::UpRight
-            | Direction::UpLeft
-            | Direction::DownRight
-            | Direction::DownLeft => true,
+            Direction::UpRight | Direction::UpLeft | Direction::DownRight | Direction::DownLeft => {
+                true
+            }
             _ => false,
         }
     }
@@ -368,7 +435,7 @@ pub struct DirectedPoint {
     pub x: i32,
     pub y: i32,
     pub direction: Direction,
-    pub debug: bool
+    pub debug: bool,
 }
 
 impl PartialEq for DirectedPoint {
@@ -399,7 +466,12 @@ impl PointLike for DirectedPoint {
 impl DirectedPoint {
     #[new]
     pub fn new(x: i32, y: i32, direction: Direction) -> Self {
-        DirectedPoint { x, y, direction, debug: false }
+        DirectedPoint {
+            x,
+            y,
+            direction,
+            debug: false,
+        }
     }
 
     #[getter]
@@ -424,7 +496,10 @@ impl DirectedPoint {
 
     #[getter]
     fn get_point(&self) -> PyResult<Point> {
-        Ok(Point { x: self.x, y: self.y })
+        Ok(Point {
+            x: self.x,
+            y: self.y,
+        })
     }
 
     fn __len__(&self) -> PyResult<usize> {
@@ -438,7 +513,14 @@ impl DirectedPoint {
         };
 
         match idx {
-            0 => Ok(Py::new(py, Point { x: self.x, y: self.y })?.to_object(py)),
+            0 => Ok(Py::new(
+                py,
+                Point {
+                    x: self.x,
+                    y: self.y,
+                },
+            )?
+            .to_object(py)),
             1 => Ok(direction.to_object(py)),
             _ => Err(PyIndexError::new_err("index out of range")),
         }

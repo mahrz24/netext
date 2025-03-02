@@ -10,9 +10,9 @@ def _edge_routing_mode_to_routing_config(edge_routing_mode: EdgeRoutingMode) -> 
         case EdgeRoutingMode.ORTHOGONAL:
             return core.RoutingConfig(
                 neighborhood=core.Neighborhood.ORTHOGONAL,
-                corner_cost=300,
+                corner_cost=150,
                 diagonal_cost=1000,
-                line_cost=50,
+                line_cost=10,
                 shape_cost=150,
                 direction_change_margin=1,
             )
@@ -60,7 +60,6 @@ def route_edges(
         )
         for u, v, start, end, edge_routing_mode in edge_anchors
     ]
-    print("ROUTE EDGES")
     point_paths = edge_router.route_edges(core_anchors)
 
     return [

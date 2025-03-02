@@ -8,6 +8,7 @@ use std::hash::Hash;
 use pyo3::prelude::*;
 
 use crate::geometry::PlacedNode;
+use crate::geometry::PointLike;
 use crate::{
     geometry::{BoundingBox, DirectedPoint, Direction, Neighborhood, PlacedRectangularNode, Point},
     pyindexset::PyIndexSet,
@@ -169,14 +170,20 @@ pub struct EdgeRouter {
 }
 
 impl RTreeObject for PlacedRectangularNode {
-    type Envelope = rstar::AABB<[f32; 2]>;
+    type Envelope = rstar::AABB<Point>;
 
     fn envelope(&self) -> Self::Envelope {
         let top_left = self.top_left();
         let bottom_right = self.bottom_right();
         rstar::AABB::from_corners(
-            [top_left.x as f32, top_left.y as f32],
-            [bottom_right.x as f32, bottom_right.y as f32],
+            Point {
+                x: top_left.x,
+                y: top_left.y,
+            },
+            Point {
+                x: bottom_right.x,
+                y: bottom_right.y,
+            },
         )
     }
 }
@@ -209,12 +216,10 @@ impl EdgeRouter {
             }
         }
 
-        // Add corner cost if the direction turns (going from left to right is not a corner)
         if src.direction != dst.direction.opposite() {
             cost += config.corner_cost;
         }
 
-        // Add shape cost if the edge intersects a shape
         if config.shape_cost > 0 {
             if *self.shape_occlusion.get(&(dst.x, dst.y)).unwrap_or(&0) > 0 {
                 cost += config.shape_cost;
@@ -227,7 +232,31 @@ impl EdgeRouter {
             }
         }
 
+        // Add node proximity penalty.
+        // Uses a coefficient (here 100 is an example) and adds a penalty that decreases with d^2.
+        let node_penalty = self.nearest_node_penalty(dst, 100);
+        cost += node_penalty;
+
+        // Optionally, add an edge proximity penalty here using a similar method.
+
         cost
+    }
+
+    /// Returns a penalty cost based on the squared distance from `point` to the nearest node.
+    fn nearest_node_penalty(&self, point: &DirectedPoint, coefficient: i32) -> i32 {
+        // Query the placed_node_tree for the nearest node.
+        if let Some(nearest_node) = self.placed_node_tree.nearest_neighbor(&point.as_point()) {
+            // Compute center of the nearest node.
+            let center = nearest_node.center;
+            let dx = (point.x - center.x) as f32;
+            let dy = (point.y - center.y) as f32;
+            let distance_sq = dx * dx + dy * dy;
+            // Adding a small epsilon to avoid division by zero.
+            let penalty = coefficient as f32 / (distance_sq + 1.0);
+            penalty.round() as i32
+        } else {
+            0
+        }
     }
 }
 
@@ -340,12 +369,7 @@ impl EdgeRouter {
         let mut result = Vec::new();
 
         for (u, v, start, end, config) in edges {
-            println!("START Routing edge from {:?} to {:?}", start, end);
             let directed_points = self.route_edge(start, end, config)?;
-            println!(
-                "END Routing edge from {:?} to {:?}",
-                start, end,
-            );
             let path = directed_points
                 .iter()
                 .map(|p| Point::new(p.x, p.y))
@@ -373,7 +397,9 @@ impl EdgeRouter {
         f_score.insert(start, heuristic(&start, &end, config));
 
         while let Some((current, _)) = open_set.pop() {
-            if current == end || (end.direction == Direction::Center && current.x == end.x && current.y == end.y) {
+            if current == end
+                || (end.direction == Direction::Center && current.x == end.x && current.y == end.y)
+            {
                 return Ok(reconstruct_path(&came_from, current));
             }
 
@@ -414,8 +440,7 @@ impl EdgeRouter {
         end: DirectedPoint,
         config: RoutingConfig,
     ) -> PyResult<Vec<DirectedPoint>> {
-        println!("Routing edge from {:?} to {:?}", start, end);
-        if (start.x - end.x).abs() + (start.y - end.y).abs() > 15
+        if (start.x - end.x).abs() + (start.y - end.y).abs() > 25
             && ((start.x - end.x).abs() > 3 && (start.y - end.y).abs() > 3)
         {
             let intermediate_x = (start.x + end.x) / 2;
@@ -438,23 +463,19 @@ impl EdgeRouter {
             let mut path = Vec::new();
 
             if self.is_point_valid(&intermediate_point_start) {
-                println!("Intermediate point start is valid");
                 let mut config = config;
                 config.direction_change_margin = 0;
                 if let Ok(mut sub_path1) = self.route_edge(start, intermediate_point_end, config) {
-                    //return Ok(sub_path1);
                     if let Ok(mut sub_path2) =
                         self.route_edge(intermediate_point_start, end, config)
                     {
                         path.append(&mut sub_path1);
                         path.append(&mut sub_path2);
-                        println!("Intermediate point end");
                         return Ok(path);
                     }
                 }
             }
         }
-        println!("No intermediate point found, routing directly");
         self.route_edge_astar(start, end, config)
     }
 
