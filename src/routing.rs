@@ -1,4 +1,5 @@
 use priority_queue::PriorityQueue;
+use rstar::PointDistance;
 use rstar::RTreeObject;
 use std::cmp::min;
 use std::cmp::Reverse;
@@ -7,7 +8,6 @@ use std::hash::Hash;
 
 use pyo3::prelude::*;
 
-use crate::geometry::PlacedNode;
 use crate::geometry::PointLike;
 use crate::{
     geometry::{BoundingBox, DirectedPoint, Direction, Neighborhood, PlacedRectangularNode, Point},
@@ -163,6 +163,7 @@ fn reconstruct_path<T: Eq + Hash + Copy>(came_from: &HashMap<T, T>, current: T) 
 pub struct EdgeRouter {
     pub placed_nodes: HashMap<usize, PlacedRectangularNode>,
     pub placed_node_tree: rstar::RTree<PlacedRectangularNode>,
+    pub placed_edge_tree: rstar::RTree<PlacedEdge>, // new field for edge spatial index
     pub object_map: PyIndexSet,
     pub shape_occlusion: HashMap<(i32, i32), i32>,
     pub line_occlusion: HashMap<(i32, i32), i32>,
@@ -188,14 +189,34 @@ impl RTreeObject for PlacedRectangularNode {
     }
 }
 
-impl RTreeObject for DirectedPoint {
-    type Envelope = rstar::AABB<[f32; 2]>;
+// 1. Define a new struct for edges and implement RTreeObject.
+#[derive(Clone)]
+pub struct PlacedEdge {
+    pub start: Point,
+    pub end: Point,
+}
+
+impl rstar::RTreeObject for PlacedEdge {
+    type Envelope = rstar::AABB<Point>;
 
     fn envelope(&self) -> Self::Envelope {
-        rstar::AABB::from_corners(
-            [self.x as f32, self.y as f32],
-            [self.x as f32, self.y as f32],
-        )
+        let (min_x, max_x) = if self.start.x < self.end.x {
+            (self.start.x, self.end.x)
+        } else {
+            (self.end.x, self.start.x)
+        };
+        let (min_y, max_y) = if self.start.y < self.end.y {
+            (self.start.y, self.end.y)
+        } else {
+            (self.end.y, self.start.y)
+        };
+        rstar::AABB::from_corners(Point { x: min_x, y: min_y }, Point { x: max_x, y: max_y })
+    }
+}
+
+impl PointDistance for PlacedEdge {
+    fn distance_2(&self, point: &Point) -> i32 {
+        point_segment_distance_sq(point, &self.start, &self.end).round() as i32
     }
 }
 
@@ -237,7 +258,9 @@ impl EdgeRouter {
         let node_penalty = self.nearest_node_penalty(dst, 100);
         cost += node_penalty;
 
-        // Optionally, add an edge proximity penalty here using a similar method.
+        // Add edge proximity penalty.
+        let edge_penalty = self.nearest_edge_penalty(dst, 5);
+        cost += edge_penalty;
 
         cost
     }
@@ -258,6 +281,23 @@ impl EdgeRouter {
             0
         }
     }
+
+    // 6. Add a new function for calculating an edge proximity penalty.
+    fn nearest_edge_penalty(&self, point: &DirectedPoint, coefficient: i32) -> i32 {
+        // Query the placed_edge_tree for the nearest edge.
+        if let Some(nearest_edge) = self.placed_edge_tree.nearest_neighbor(&point.as_point()) {
+            // Compute the shortest squared distance from point to edge segment.
+            let distance_sq = point_segment_distance_sq(
+                &point.as_point(),
+                &nearest_edge.start,
+                &nearest_edge.end,
+            );
+            let penalty = coefficient as f32 / (distance_sq + 1.0);
+            penalty.round() as i32
+        } else {
+            0
+        }
+    }
 }
 
 #[pymethods]
@@ -267,6 +307,7 @@ impl EdgeRouter {
         EdgeRouter {
             placed_nodes: HashMap::default(),
             placed_node_tree: rstar::RTree::new(),
+            placed_edge_tree: rstar::RTree::new(), // initialize the new tree
             object_map: PyIndexSet::default(),
             shape_occlusion: HashMap::default(),
             line_occlusion: HashMap::default(),
@@ -311,7 +352,21 @@ impl EdgeRouter {
                 .or_insert(1);
         }
 
-        self.existing_edges.insert((start_index, end_index), line);
+        self.existing_edges
+            .insert((start_index, end_index), line.clone());
+
+        // Insert each segment between consecutive points into the spatial index.
+        let mut prev: Option<&Point> = None;
+        for point in &line {
+            if let Some(p) = prev {
+                let edge = PlacedEdge {
+                    start: *p,
+                    end: *point,
+                };
+                self.placed_edge_tree.insert(edge);
+            }
+            prev = Some(point);
+        }
 
         Ok(())
     }
@@ -482,7 +537,7 @@ impl EdgeRouter {
     fn is_point_valid(&self, point: &DirectedPoint) -> bool {
         // Check if the point is within any placed node
         for node in self.placed_nodes.values() {
-            if node.contains_point(point) {
+            if node.contains_point(&point.as_point()) {
                 return false;
             }
         }
@@ -494,4 +549,30 @@ impl EdgeRouter {
 
         true
     }
+}
+
+// 5. Create a helper to compute squared distance from a point to a segment.
+fn point_segment_distance_sq(point: &Point, start: &Point, end: &Point) -> f32 {
+    let px = point.x as f32;
+    let py = point.y as f32;
+    let x1 = start.x as f32;
+    let y1 = start.y as f32;
+    let x2 = end.x as f32;
+    let y2 = end.y as f32;
+    let dx = x2 - x1;
+    let dy = y2 - y1;
+    if dx == 0.0 && dy == 0.0 {
+        // start and end are the same point
+        let dx = px - x1;
+        let dy = py - y1;
+        return dx * dx + dy * dy;
+    }
+    // Calculate the projection factor t of point onto the edge vector
+    let t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy);
+    let t = t.clamp(0.0, 1.0);
+    let proj_x = x1 + t * dx;
+    let proj_y = y1 + t * dy;
+    let diff_x = px - proj_x;
+    let diff_y = py - proj_y;
+    diff_x * diff_x + diff_y * diff_y
 }

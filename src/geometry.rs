@@ -27,10 +27,6 @@ pub trait BoundingBox {
     }
 }
 
-pub trait PlacedNode: BoundingBox {
-    fn contains_point(&self, point: &impl PointLike) -> bool;
-}
-
 pub trait Layoutable: PyClass {
     fn size(&self) -> Size;
 }
@@ -321,14 +317,6 @@ impl PointDistance for PlacedRectangularNode {
     }
 }
 
-impl PlacedNode for PlacedRectangularNode {
-    fn contains_point(&self, point: &impl PointLike) -> bool {
-        point.x() >= self.top_left().x - 2
-            && point.x() <= self.bottom_right().x + 2
-            && point.y() >= self.top_left().y - 2
-            && point.y() <= self.bottom_right().y + 2
-    }
-}
 
 #[pymethods]
 impl PlacedRectangularNode {
