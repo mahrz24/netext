@@ -226,6 +226,8 @@ impl EdgeRouter {
         src: &DirectedPoint,
         dst: &DirectedPoint,
         config: &RoutingConfig,
+        global_start: &DirectedPoint,
+        global_end: &DirectedPoint,
     ) -> i32 {
         let mut cost: i32 = 0;
 
@@ -241,6 +243,7 @@ impl EdgeRouter {
             cost += config.corner_cost;
         }
 
+        // Continue with the old occlusion terms for shape and line.
         if config.shape_cost > 0 {
             if *self.shape_occlusion.get(&(dst.x, dst.y)).unwrap_or(&0) > 0 {
                 cost += config.shape_cost;
@@ -253,50 +256,17 @@ impl EdgeRouter {
             }
         }
 
-        // Add node proximity penalty.
-        // Uses a coefficient (here 100 is an example) and adds a penalty that decreases with d^2.
-        let node_penalty = self.nearest_node_penalty(dst, 100);
-        cost += node_penalty;
+        // Only add proximity penalties if dst is not equal to the global edge endpoints.
+        if dst.as_point() != global_start.as_point() && dst != global_end {
+            // Instead of RTree queries, use our occlusion map lookup.
+            let node_penalty = occlusion_penalty(&self.shape_occlusion, &dst.as_point(), 50, 3);
+            cost += node_penalty;
 
-        // Add edge proximity penalty.
-        let edge_penalty = self.nearest_edge_penalty(dst, 5);
-        cost += edge_penalty;
+            let edge_penalty = occlusion_penalty(&self.line_occlusion, &dst.as_point(), 100, 3);
+            cost += edge_penalty;
+        }
 
         cost
-    }
-
-    /// Returns a penalty cost based on the squared distance from `point` to the nearest node.
-    fn nearest_node_penalty(&self, point: &DirectedPoint, coefficient: i32) -> i32 {
-        // Query the placed_node_tree for the nearest node.
-        if let Some(nearest_node) = self.placed_node_tree.nearest_neighbor(&point.as_point()) {
-            // Compute center of the nearest node.
-            let center = nearest_node.center;
-            let dx = (point.x - center.x) as f32;
-            let dy = (point.y - center.y) as f32;
-            let distance_sq = dx * dx + dy * dy;
-            // Adding a small epsilon to avoid division by zero.
-            let penalty = coefficient as f32 / (distance_sq + 1.0);
-            penalty.round() as i32
-        } else {
-            0
-        }
-    }
-
-    // 6. Add a new function for calculating an edge proximity penalty.
-    fn nearest_edge_penalty(&self, point: &DirectedPoint, coefficient: i32) -> i32 {
-        // Query the placed_edge_tree for the nearest edge.
-        if let Some(nearest_edge) = self.placed_edge_tree.nearest_neighbor(&point.as_point()) {
-            // Compute the shortest squared distance from point to edge segment.
-            let distance_sq = point_segment_distance_sq(
-                &point.as_point(),
-                &nearest_edge.start,
-                &nearest_edge.end,
-            );
-            let penalty = coefficient as f32 / (distance_sq + 1.0);
-            penalty.round() as i32
-        } else {
-            0
-        }
     }
 }
 
@@ -439,6 +409,8 @@ impl EdgeRouter {
         &self,
         start: DirectedPoint,
         end: DirectedPoint,
+        global_start: DirectedPoint,
+        global_end: DirectedPoint,
         config: RoutingConfig,
     ) -> PyResult<Vec<DirectedPoint>> {
         let mut open_set = PriorityQueue::new();
@@ -460,7 +432,6 @@ impl EdgeRouter {
 
             let current_end_distance = (current.x - end.x).abs() + (current.y - end.y).abs();
             let current_start_distance = (current.x - start.x).abs() + (current.y - start.y).abs();
-
             let current_distance = min(current_start_distance, current_end_distance);
 
             for neighbor in get_neighbors(
@@ -469,7 +440,7 @@ impl EdgeRouter {
                 current_distance > config.direction_change_margin,
             ) {
                 let tentative_g_score = g_score.get(&current).unwrap_or(&(i32::MAX - 100))
-                    + self.transition_cost(&current, &neighbor, &config);
+                    + self.transition_cost(&current, &neighbor, &config, &global_start, &global_end);
 
                 if tentative_g_score < *g_score.get(&neighbor).unwrap_or(&(i32::MAX - 100)) {
                     came_from.insert(neighbor, current);
@@ -493,6 +464,8 @@ impl EdgeRouter {
         &self,
         start: DirectedPoint,
         end: DirectedPoint,
+        global_start: DirectedPoint,
+        global_end: DirectedPoint,
         config: RoutingConfig,
     ) -> PyResult<Vec<DirectedPoint>> {
         if (start.x - end.x).abs() + (start.y - end.y).abs() > 25
@@ -520,9 +493,9 @@ impl EdgeRouter {
             if self.is_point_valid(&intermediate_point_start) {
                 let mut config = config;
                 config.direction_change_margin = 0;
-                if let Ok(mut sub_path1) = self.route_edge(start, intermediate_point_end, config) {
+                if let Ok(mut sub_path1) = self.route_edge(start, intermediate_point_end,  global_start, global_end, config) {
                     if let Ok(mut sub_path2) =
-                        self.route_edge(intermediate_point_start, end, config)
+                        self.route_edge(intermediate_point_start, end, global_start, global_end, config)
                     {
                         path.append(&mut sub_path1);
                         path.append(&mut sub_path2);
@@ -531,7 +504,7 @@ impl EdgeRouter {
                 }
             }
         }
-        self.route_edge_astar(start, end, config)
+        self.route_edge_astar(start, end, global_start, global_end, config)
     }
 
     fn is_point_valid(&self, point: &DirectedPoint) -> bool {
@@ -575,4 +548,33 @@ fn point_segment_distance_sq(point: &Point, start: &Point, end: &Point) -> f32 {
     let diff_x = px - proj_x;
     let diff_y = py - proj_y;
     diff_x * diff_x + diff_y * diff_y
+}
+
+// Helper that, given an occlusion map (for nodes or edges), looks in a small window
+// around the given point and returns a penalty based on the smallest squared distance found.
+fn occlusion_penalty(
+    occlusion: &HashMap<(i32, i32), i32>,
+    point: &Point,
+    coefficient: i32,
+    window: i32,
+) -> i32 {
+    let mut best_d2 = None;
+    for dx in -window..=window {
+        for dy in -window..=window {
+            let cell = (point.x + dx, point.y + dy);
+            if occlusion.get(&cell).unwrap_or(&0) > &0 {
+                let d2 = (dx * dx + dy * dy) as f32;
+                best_d2 = match best_d2 {
+                    Some(current) if d2 < current => Some(d2),
+                    None => Some(d2),
+                    _ => best_d2,
+                };
+            }
+        }
+    }
+    if let Some(d2) = best_d2 {
+        (coefficient as f32 / (d2 + 1.0)).round() as i32
+    } else {
+        0
+    }
 }
