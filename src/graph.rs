@@ -1,6 +1,6 @@
 use petgraph::graph::NodeIndex;
 use petgraph::graphmap::DiGraphMap;
-use pyo3::prelude::*;
+use pyo3::{prelude::*, IntoPyObjectExt};
 use pyo3::types::PyAny;
 use std::collections::HashMap;
 
@@ -61,7 +61,7 @@ impl CoreGraph {
         if is_new {
             self.graph.add_node(index);
             if let Some(data) = data {
-                self.data_map.insert(index, data.into_py(py));
+                self.data_map.insert(index, data.into_py_any(py).unwrap());
             }
             if let Some(size) = size {
                 self.size_map.insert(index, size);
@@ -86,7 +86,7 @@ impl CoreGraph {
             self.graph.add_edge(index_a, index_b, ());
             if let Some(data) = data {
                 self.edge_data_map
-                    .insert((index_a, index_b), data.as_unbound().clone());
+                    .insert((index_a, index_b), data.into_py_any(_py).unwrap());
             }
         } else {
             return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -96,7 +96,7 @@ impl CoreGraph {
         Ok(())
     }
 
-    fn remove_node(&mut self, py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn remove_node(&mut self, obj: &Bound<'_, PyAny>) -> PyResult<()> {
         let index = self.object_map.get_full(obj)?;
 
         match index {
@@ -147,6 +147,7 @@ impl CoreGraph {
 
     fn node_data_or_default(
         &self,
+        py: Python<'_>,
         obj: &Bound<'_, PyAny>,
         default: &Bound<'_, PyAny>,
     ) -> PyResult<PyObject> {
@@ -155,7 +156,7 @@ impl CoreGraph {
             Some((index, _)) => {
                 let index = NodeIndex::new(index);
                 match self.data_map.get(&index) {
-                    Some(data) => Ok(data.clone()),
+                    Some(data) => Ok(data.clone_ref(py)),
                     None => Ok(default.clone().unbind()),
                 }
             }
@@ -209,6 +210,7 @@ impl CoreGraph {
 
     fn edge_data_or_default(
         &self,
+        py: Python<'_>,
         obj_a: &Bound<'_, PyAny>,
         obj_b: &Bound<'_, PyAny>,
         default: &Bound<'_, PyAny>,
@@ -220,7 +222,7 @@ impl CoreGraph {
             let index_a = NodeIndex::new(index_a);
             let index_b = NodeIndex::new(index_b);
             match self.edge_data_map.get(&(index_a, index_b)) {
-                Some(data) => Ok(data.clone()),
+                Some(data) => Ok(data.clone_ref(py)),
                 None => Ok(default.clone().unbind()),
             }
         } else {
@@ -238,7 +240,7 @@ impl CoreGraph {
         match index {
             Some((index, _)) => {
                 let index = NodeIndex::new(index);
-                self.data_map.insert(index, data.into_py(py));
+                self.data_map.insert(index, data.into_py_any(py).unwrap());
                 Ok(())
             }
             None => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
@@ -264,7 +266,7 @@ impl CoreGraph {
 
             if self.graph.contains_edge(index_a, index_b) {
                 self.edge_data_map
-                    .insert((index_a, index_b), data.into_py(py));
+                    .insert((index_a, index_b), data.into_py_any(py).unwrap());
             } else {
                 return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
                     "Edge does not exist.",

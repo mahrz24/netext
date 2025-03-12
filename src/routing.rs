@@ -5,6 +5,7 @@ use std::cmp::min;
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::sync::Arc;
 
 use pyo3::prelude::*;
 
@@ -22,7 +23,8 @@ pub struct RoutingConfig {
     diagonal_cost: i32,
     line_cost: i32,
     shape_cost: i32,
-    direction_change_margin: i32,
+    direction_change_margin_start: i32,
+    direction_change_margin_end: i32,
 }
 
 #[pymethods]
@@ -34,7 +36,8 @@ impl RoutingConfig {
         diagonal_cost: i32,
         line_cost: i32,
         shape_cost: i32,
-        direction_change_margin: i32,
+        direction_change_margin_start: i32,
+        direction_change_margin_end: i32,
     ) -> Self {
         RoutingConfig {
             neighborhood,
@@ -42,7 +45,8 @@ impl RoutingConfig {
             diagonal_cost,
             line_cost,
             shape_cost,
-            direction_change_margin,
+            direction_change_margin_start,
+            direction_change_margin_end,
         }
     }
 }
@@ -55,7 +59,8 @@ impl Default for RoutingConfig {
             diagonal_cost: 1,
             line_cost: 1,
             shape_cost: 1,
-            direction_change_margin: 1,
+            direction_change_margin_start: 1,
+            direction_change_margin_end: 1,
         }
     }
 }
@@ -118,6 +123,22 @@ fn get_neighbors(
         node.direction.other_directions(neighborhood)
     };
 
+    let mut center_targets = vec![
+                    DirectedPoint::new(x, y, Direction::Center),
+                    DirectedPoint::new(x, y, Direction::Up),
+                    DirectedPoint::new(x, y, Direction::Right),
+                    DirectedPoint::new(x, y, Direction::Down),
+                    DirectedPoint::new(x, y, Direction::Left),
+
+                ];
+
+    if neighborhood == Neighborhood::Moore {
+        center_targets.push(DirectedPoint::new(x, y, Direction::UpRight));
+        center_targets.push(DirectedPoint::new(x, y, Direction::DownRight));
+        center_targets.push(DirectedPoint::new(x, y, Direction::DownLeft));
+        center_targets.push(DirectedPoint::new(x, y, Direction::UpLeft));
+    }
+
     // Changing direction
     for d in allowed_directions {
         match d {
@@ -130,18 +151,7 @@ fn get_neighbors(
             Direction::Left => neighbors.push(DirectedPoint::new(x, y, Direction::Left)),
             Direction::UpLeft => neighbors.push(DirectedPoint::new(x, y, Direction::UpLeft)),
             Direction::Center => neighbors.extend_from_slice(
-                vec![
-                    DirectedPoint::new(x, y, Direction::Center),
-                    DirectedPoint::new(x, y, Direction::Up),
-                    DirectedPoint::new(x, y, Direction::Right),
-                    DirectedPoint::new(x, y, Direction::Down),
-                    DirectedPoint::new(x, y, Direction::Left),
-                    DirectedPoint::new(x, y, Direction::UpRight),
-                    DirectedPoint::new(x, y, Direction::DownRight),
-                    DirectedPoint::new(x, y, Direction::DownLeft),
-                    DirectedPoint::new(x, y, Direction::UpLeft),
-                ]
-                .as_slice(),
+                center_targets.as_slice()
             ),
         }
     }
@@ -257,14 +267,14 @@ impl EdgeRouter {
         }
 
         // Only add proximity penalties if dst is not equal to the global edge endpoints.
-        if dst.as_point() != global_start.as_point() && dst != global_end {
-            // Instead of RTree queries, use our occlusion map lookup.
-            let node_penalty = occlusion_penalty(&self.shape_occlusion, &dst.as_point(), 50, 3);
-            cost += node_penalty;
+        // if dst.as_point() != global_start.as_point() && dst != global_end {
+        //     // Instead of RTree queries, use our occlusion map lookup.
+        //     let node_penalty = occlusion_penalty(&self.shape_occlusion, &dst.as_point(), 50, 3);
+        //     cost += node_penalty;
 
-            let edge_penalty = occlusion_penalty(&self.line_occlusion, &dst.as_point(), 100, 3);
-            cost += edge_penalty;
-        }
+        //     let edge_penalty = occlusion_penalty(&self.line_occlusion, &dst.as_point(), 100, 3);
+        //     cost += edge_penalty;
+        // }
 
         cost
     }
@@ -394,7 +404,7 @@ impl EdgeRouter {
         let mut result = Vec::new();
 
         for (u, v, start, end, config) in edges {
-            let directed_points = self.route_edge(start, end, config)?;
+            let directed_points = self.route_edge(&u, &v, start, end, start, end, config)?;
             let path = directed_points
                 .iter()
                 .map(|p| Point::new(p.x, p.y))
@@ -432,12 +442,11 @@ impl EdgeRouter {
 
             let current_end_distance = (current.x - end.x).abs() + (current.y - end.y).abs();
             let current_start_distance = (current.x - start.x).abs() + (current.y - start.y).abs();
-            let current_distance = min(current_start_distance, current_end_distance);
 
             for neighbor in get_neighbors(
                 &current,
                 config.clone().neighborhood,
-                current_distance > config.direction_change_margin,
+                current_start_distance >= config.direction_change_margin_start && current_end_distance >= config.direction_change_margin_end,
             ) {
                 let tentative_g_score = g_score.get(&current).unwrap_or(&(i32::MAX - 100))
                     + self.transition_cost(&current, &neighbor, &config, &global_start, &global_end);
@@ -460,15 +469,17 @@ impl EdgeRouter {
         ))
     }
 
-    fn route_edge(
+    fn _route_edge(
         &self,
+        u: &Bound<'_, PyAny>,
+        v: &Bound<'_, PyAny>,
         start: DirectedPoint,
         end: DirectedPoint,
         global_start: DirectedPoint,
         global_end: DirectedPoint,
         config: RoutingConfig,
     ) -> PyResult<Vec<DirectedPoint>> {
-        if (start.x - end.x).abs() + (start.y - end.y).abs() > 25
+        if (start.x - end.x).abs() + (start.y - end.y).abs() > 10
             && ((start.x - end.x).abs() > 3 && (start.y - end.y).abs() > 3)
         {
             let intermediate_x = (start.x + end.x) / 2;
@@ -491,11 +502,13 @@ impl EdgeRouter {
             let mut path = Vec::new();
 
             if self.is_point_valid(&intermediate_point_start) {
-                let mut config = config;
-                config.direction_change_margin = 0;
-                if let Ok(mut sub_path1) = self.route_edge(start, intermediate_point_end,  global_start, global_end, config) {
+                let mut first_part_config = config.clone();
+                let mut second_part_config = config.clone();
+                first_part_config.direction_change_margin_start = 0;
+                second_part_config.direction_change_margin_end = 0;
+                if let Ok(mut sub_path1) = self._route_edge(u, v, start, intermediate_point_end,  global_start, global_end, first_part_config) {
                     if let Ok(mut sub_path2) =
-                        self.route_edge(intermediate_point_start, end, global_start, global_end, config)
+                        self._route_edge(u, v, intermediate_point_start, end, global_start, global_end, second_part_config)
                     {
                         path.append(&mut sub_path1);
                         path.append(&mut sub_path2);
@@ -505,6 +518,19 @@ impl EdgeRouter {
             }
         }
         self.route_edge_astar(start, end, global_start, global_end, config)
+    }
+
+    fn route_edge(
+        &self,
+        u: &Bound<'_, PyAny>,
+        v: &Bound<'_, PyAny>,
+        start: DirectedPoint,
+        end: DirectedPoint,
+        global_start: DirectedPoint,
+        global_end: DirectedPoint,
+        config: RoutingConfig,
+    ) -> PyResult<Vec<DirectedPoint>> {
+        self._route_edge(u, v, start, end, global_start, global_end, config)
     }
 
     fn is_point_valid(&self, point: &DirectedPoint) -> bool {

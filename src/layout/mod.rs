@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 
 use crate::{geometry::Point, graph::CoreGraph};
 
-#[pyclass]
+#[pyclass(eq, eq_int)]
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub enum LayoutDirection {
     #[pyo3(name = "TOP_DOWN")]

@@ -123,7 +123,14 @@ def rasterize_edge(
         edge_segment_drawing_mode=properties.segment_drawing_mode,
     )
 
-    edge_path = route_edge(start=start, end=end, edge_router=edge_router, edge_routing_mode=properties.routing_mode)
+    edge_path = route_edge(
+        u_buffer.node,
+        v_buffer.node,
+        start=start,
+        end=end,
+        edge_router=edge_router,
+        edge_routing_mode=properties.routing_mode,
+    )
 
     if not edge_path.directed_points or edge_path.start == edge_path.end:
         return None
@@ -131,6 +138,7 @@ def rasterize_edge(
     strips, label_buffers, boundary_1, boundary_2 = rasterize_path_and_label(
         console, u_buffer, v_buffer, properties, edge_input, edge_path
     )
+
 
     if boundary_1 == boundary_2:
         return None

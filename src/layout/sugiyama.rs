@@ -68,9 +68,6 @@ impl SugiyamaLayout {
         // In case of left right layout, we need to rotate the coordinates
         let final_coordinates: HashMap<usize, Point> =
             if self.direction == LayoutDirection::LeftRight {
-                let max_y = coordinates.values().map(|p| p.y).max().unwrap_or(0);
-                let max_x = coordinates.values().map(|p| p.x).max().unwrap_or(0);
-
                 coordinates
                     .into_iter()
                     .map(|(node, point)| {

@@ -1,3 +1,4 @@
+use pyo3::IntoPyObjectExt;
 use pyo3::{exceptions::PyIndexError, prelude::*, types::PyType, PyClass};
 use rstar::PointDistance;
 use std::hash::Hash;
@@ -18,13 +19,6 @@ pub trait PointLike {
 pub trait BoundingBox {
     fn top_left(&self) -> Point;
     fn bottom_right(&self) -> Point;
-
-    fn bounding_box(&self) -> Rectangle {
-        Rectangle {
-            top_left: self.top_left().clone(),
-            bottom_right: self.bottom_right().clone(),
-        }
-    }
 }
 
 pub trait Layoutable: PyClass {
@@ -107,14 +101,14 @@ impl Point {
     }
 
     #[classmethod]
-    fn max_point(cls: &Bound<'_, PyType>, points: Vec<Point>) -> PyResult<Point> {
+    fn max_point(_cls: &Bound<'_, PyType>, points: Vec<Point>) -> PyResult<Point> {
         let max_x = points.iter().map(|p| p.x()).max().unwrap_or(0);
         let max_y = points.iter().map(|p| p.y()).max().unwrap_or(0);
         Ok(Point { x: max_x, y: max_y })
     }
 
     #[classmethod]
-    fn min_point(cls: &Bound<'_, PyType>, points: Vec<Point>) -> PyResult<Point> {
+    fn min_point(_cls: &Bound<'_, PyType>, points: Vec<Point>) -> PyResult<Point> {
         let min_x = points.iter().map(|p| p.x()).min().unwrap_or(0);
         let min_y = points.iter().map(|p| p.y()).min().unwrap_or(0);
         Ok(Point { x: min_x, y: min_y })
@@ -184,10 +178,10 @@ impl Point {
         Ok(2) // The number of elements in the class
     }
 
-    fn __getitem__(&self, idx: usize, py: Python<'_>) -> PyResult<PyObject> {
+    fn __getitem__(&self, idx: usize) -> PyResult<i32> {
         match idx {
-            0 => Ok(self.x.to_object(py)),
-            1 => Ok(self.y.to_object(py)),
+            0 => Ok(self.x),
+            1 => Ok(self.y),
             _ => Err(PyIndexError::new_err("index out of range")),
         }
     }
@@ -231,11 +225,6 @@ impl PointLike for Point {
     }
 }
 
-#[derive(Debug)]
-pub struct Rectangle {
-    top_left: Point,
-    bottom_right: Point,
-}
 
 #[pyclass]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Copy)]
@@ -326,7 +315,7 @@ impl PlacedRectangularNode {
     }
 }
 
-#[pyclass]
+#[pyclass(eq, eq_int)]
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub enum Neighborhood {
     #[pyo3(name = "ORTHOGONAL")]
@@ -335,8 +324,8 @@ pub enum Neighborhood {
     Moore,
 }
 
-#[pyclass]
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
+#[pyclass(eq, eq_int)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug,)]
 pub enum Direction {
     #[pyo3(name = "CENTER")]
     Center = -1,
@@ -450,6 +439,7 @@ impl PointLike for DirectedPoint {
     }
 }
 
+
 #[pymethods]
 impl DirectedPoint {
     #[new]
@@ -501,15 +491,14 @@ impl DirectedPoint {
         };
 
         match idx {
-            0 => Ok(Py::new(
+            0 => Py::new(
                 py,
                 Point {
                     x: self.x,
                     y: self.y,
                 },
-            )?
-            .to_object(py)),
-            1 => Ok(direction.to_object(py)),
+            )?.into_py_any(py),
+            1 => direction.into_py_any(py),
             _ => Err(PyIndexError::new_err("index out of range")),
         }
     }

@@ -91,7 +91,7 @@ impl PyIndexSet {
                 Ok(())
 
             },
-            Err(absent) => Err(
+            Err(_) => Err(
                 PyErr::new::<exceptions::PyKeyError, _>("Object not found in index set"),
             ),
         }

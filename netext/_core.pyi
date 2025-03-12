@@ -63,6 +63,8 @@ class EdgeRouter:
     def remove_edge(self, u: Hashable, v: Hashable) -> None: ...
     def route_edge(
         self,
+        u: Hashable,
+        v: Hashable,
         start: DirectedPoint,
         end: DirectedPoint,
         config: RoutingConfig,
@@ -83,7 +85,8 @@ class RoutingConfig:
         diagonal_cost: int,
         line_cost: int,
         shape_cost: int,
-        direction_change_margin: int,
+        direction_change_margin_start: int,
+        direction_change_margin_end: int,
     ) -> None: ...
 
 class Direction(Enum):

@@ -10,30 +10,37 @@ def _edge_routing_mode_to_routing_config(edge_routing_mode: EdgeRoutingMode) -> 
         case EdgeRoutingMode.ORTHOGONAL:
             return core.RoutingConfig(
                 neighborhood=core.Neighborhood.ORTHOGONAL,
-                corner_cost=150,
-                diagonal_cost=1000,
-                line_cost=10,
-                shape_cost=150,
-                direction_change_margin=1,
+                corner_cost=50,
+                diagonal_cost=0,
+                line_cost=50,
+                shape_cost=50,
+                direction_change_margin_start=0,
+                direction_change_margin_end=0,
             )
         case _:
             return core.RoutingConfig(
                 neighborhood=core.Neighborhood.MOORE,
                 corner_cost=0,
                 diagonal_cost=0,
-                line_cost=50,
-                shape_cost=150,
-                direction_change_margin=1,
+                line_cost=10,
+                shape_cost=50,
+                direction_change_margin_start=2,
+                direction_change_margin_end=2,
+
             )
 
 
 def route_edge(
+    u: Hashable,
+    v: Hashable,
     start: DirectedPoint,
     end: DirectedPoint,
     edge_router: core.EdgeRouter,
     edge_routing_mode: EdgeRoutingMode,
 ) -> EdgePath:
     path = edge_router.route_edge(
+        u,
+        v,
         start,
         end,
         config=_edge_routing_mode_to_routing_config(edge_routing_mode),

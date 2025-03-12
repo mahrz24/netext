@@ -232,15 +232,26 @@ class NodeBuffer(ShapeBuffer):
                 else:
                     # TODO Duplication with port offset computation
                     # Also should be moved to the shape
+
+                    edges_to_distribute = ports_on_side + edges_on_side
+                    slot_fraction = float(ports_on_side + edge_index) / (edges_to_distribute-1)
+
                     if side == ShapeSide.TOP or side == ShapeSide.BOTTOM:
-                        edge_offset = math.ceil(
-                            (float(ports_on_side + edge_index) / (edges_on_side - 1)) * (self.width - 3)
-                        ) - math.floor((self.width - 2) / 2)
+                        available_width = self.width - 2
+                        remainder = available_width % edges_to_distribute
+                        remaining_width = available_width - remainder - 1
+                        edge_offset = math.floor(
+                            (slot_fraction * remaining_width)) - (remaining_width // 2)
+                        if side == ShapeSide.TOP:
+                            edge_offset -= 1
                     else:
-                        edge_offset = math.ceil(
-                            (float(ports_on_side + edge_index) / (ports_on_side + edges_on_side - 1))
-                            * (self.height - 3)
-                        ) - math.floor((self.height - 2) / 2)
+                        available_height = self.height - 2
+                        remainder = available_height % edges_to_distribute
+                        remaining_height = available_height - remainder - 1
+                        edge_offset = math.floor(
+                            (slot_fraction * remaining_height)) - (remaining_height // 2)
+                        if side == ShapeSide.LEFT:
+                            edge_offset -= 1
 
                 start = self.get_side_position(
                     side,
