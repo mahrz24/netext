@@ -20,5 +20,5 @@ tracing-flame = "0.2.0"
 tracing-subscriber = "0.3.18"
 
 [dependencies.pyo3]
-version = "0.21.2"
+version = "0.24.1"
 features = ["abi3-py310"]
