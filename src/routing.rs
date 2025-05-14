@@ -266,16 +266,6 @@ impl EdgeRouter {
             }
         }
 
-        // Only add proximity penalties if dst is not equal to the global edge endpoints.
-        // if dst.as_point() != global_start.as_point() && dst != global_end {
-        //     // Instead of RTree queries, use our occlusion map lookup.
-        //     let node_penalty = occlusion_penalty(&self.shape_occlusion, &dst.as_point(), 50, 3);
-        //     cost += node_penalty;
-
-        //     let edge_penalty = occlusion_penalty(&self.line_occlusion, &dst.as_point(), 100, 3);
-        //     cost += edge_penalty;
-        // }
-
         cost
     }
 }
@@ -482,39 +472,112 @@ impl EdgeRouter {
         if (start.x - end.x).abs() + (start.y - end.y).abs() > 10
             && ((start.x - end.x).abs() > 3 && (start.y - end.y).abs() > 3)
         {
-            let intermediate_x = (start.x + end.x) / 2;
-            let intermediate_y = (start.y + end.y) / 2;
+            // Create multiple intermediate point candidates
+            let candidates = vec![
+                // Midpoint
+                (start.x + end.x) / 2, (start.y + end.y) / 2,
+                // Corner points with proper offsets
+                start.x + match start.direction {
+                    Direction::Right | Direction::UpRight | Direction::DownRight => config.direction_change_margin_start,
+                    Direction::Left | Direction::UpLeft | Direction::DownLeft => -config.direction_change_margin_start,
+                    _ => 0,
+                },
+                end.y + match end.direction {
+                    Direction::Up | Direction::UpRight | Direction::UpLeft => -config.direction_change_margin_end,
+                    Direction::Down | Direction::DownRight | Direction::DownLeft => config.direction_change_margin_end,
+                    _ => 0,
+                },
+                // Second corner point with offsets
+                end.x + match end.direction {
+                    Direction::Right | Direction::UpRight | Direction::DownRight => config.direction_change_margin_end,
+                    Direction::Left | Direction::UpLeft | Direction::DownLeft => -config.direction_change_margin_end,
+                    _ => 0,
+                },
+                start.y + match start.direction {
+                    Direction::Up | Direction::UpRight | Direction::UpLeft => -config.direction_change_margin_start,
+                    Direction::Down | Direction::DownRight | Direction::DownLeft => config.direction_change_margin_start,
+                    _ => 0,
+                },
+            ];
 
             let intermediate_direction = Direction::Center;
+            let mut best_path = None;
+            let mut best_score = i32::MAX;
 
-            let mut intermediate_point_end = DirectedPoint::new(
-                intermediate_x,
-                intermediate_y,
-                intermediate_direction.opposite(),
-            );
+            // Try each pair of coordinates as an intermediate point
+            for i in (0..candidates.len()).step_by(2) {
+                if i + 1 >= candidates.len() {
+                    break;
+                }
 
-            let mut intermediate_point_start =
-                DirectedPoint::new(intermediate_x, intermediate_y, intermediate_direction);
+                let intermediate_x = candidates[i];
+                let intermediate_y = candidates[i + 1];
 
-            intermediate_point_start.debug = true;
-            intermediate_point_end.debug = true;
+                let mut intermediate_point_start = DirectedPoint::new(
+                    intermediate_x,
+                    intermediate_y,
+                    intermediate_direction,
+                );
 
-            let mut path = Vec::new();
+                let mut intermediate_point_end = DirectedPoint::new(
+                    intermediate_x,
+                    intermediate_y,
+                    intermediate_direction.opposite(),
+                );
 
-            if self.is_point_valid(&intermediate_point_start) {
+                intermediate_point_start.debug = true;
+                intermediate_point_end.debug = true;
+
+                // Skip invalid intermediate points
+                if !self.is_point_valid(&intermediate_point_start) {
+                    continue;
+                }
+
                 let mut first_part_config = config.clone();
                 let mut second_part_config = config.clone();
-                first_part_config.direction_change_margin_start = 0;
-                second_part_config.direction_change_margin_end = 0;
-                if let Ok(mut sub_path1) = self._route_edge(u, v, start, intermediate_point_end,  global_start, global_end, first_part_config) {
-                    if let Ok(mut sub_path2) =
-                        self._route_edge(u, v, intermediate_point_start, end, global_start, global_end, second_part_config)
-                    {
+                second_part_config.direction_change_margin_start = 0;
+                first_part_config.direction_change_margin_end = 0;
+
+                if let (Ok(mut sub_path1), Ok(mut sub_path2)) = (
+                    self._route_edge(u, v, start, intermediate_point_end, global_start, global_end, first_part_config),
+                    self._route_edge(u, v, intermediate_point_start, end, global_start, global_end, second_part_config)
+                ) {
+                    // Measure the quality of this path
+                    let mut full_path = sub_path1.clone();
+                    full_path.append(&mut sub_path2.clone());
+
+                    // Count direction changes (corners)
+                    let mut corners = 0;
+                    for i in 1..full_path.len() {
+                        if i > 0 && full_path[i-1].direction != full_path[i].direction {
+                            corners += 1;
+                        }
+                    }
+
+                    // If we found a path with only one corner, use it immediately
+                    if corners <= 1 {
+                        let mut path = Vec::new();
                         path.append(&mut sub_path1);
                         path.append(&mut sub_path2);
                         return Ok(path);
                     }
+
+                    // Score is combination of corners and path length
+                    let score = corners * 10 + full_path.len() as i32;
+
+                    if score < best_score {
+                        let mut path = Vec::new();
+                        path.append(&mut sub_path1);
+                        path.append(&mut sub_path2);
+                        best_path = Some(path);
+                        best_score = score;
+                    }
                 }
+            }
+
+            // Return the best path found (if any)
+            if let Some(path) = best_path {
+                return Ok(path);
             }
         }
         self.route_edge_astar(start, end, global_start, global_end, config)
@@ -574,33 +637,4 @@ fn point_segment_distance_sq(point: &Point, start: &Point, end: &Point) -> f32 {
     let diff_x = px - proj_x;
     let diff_y = py - proj_y;
     diff_x * diff_x + diff_y * diff_y
-}
-
-// Helper that, given an occlusion map (for nodes or edges), looks in a small window
-// around the given point and returns a penalty based on the smallest squared distance found.
-fn occlusion_penalty(
-    occlusion: &HashMap<(i32, i32), i32>,
-    point: &Point,
-    coefficient: i32,
-    window: i32,
-) -> i32 {
-    let mut best_d2 = None;
-    for dx in -window..=window {
-        for dy in -window..=window {
-            let cell = (point.x + dx, point.y + dy);
-            if occlusion.get(&cell).unwrap_or(&0) > &0 {
-                let d2 = (dx * dx + dy * dy) as f32;
-                best_d2 = match best_d2 {
-                    Some(current) if d2 < current => Some(d2),
-                    None => Some(d2),
-                    _ => best_d2,
-                };
-            }
-        }
-    }
-    if let Some(d2) = best_d2 {
-        (coefficient as f32 / (d2 + 1.0)).round() as i32
-    } else {
-        0
-    }
 }

@@ -14,4 +14,5 @@ nx.set_node_attributes(g, 1, "$slots")
 
 layout = SugiyamaLayout(direction=LayoutDirection.LEFT_RIGHT)
 
+print(g.edges)
 print(ConsoleGraph(g, layout_engine=layout))

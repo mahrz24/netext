@@ -14,8 +14,8 @@ def _edge_routing_mode_to_routing_config(edge_routing_mode: EdgeRoutingMode) -> 
                 diagonal_cost=0,
                 line_cost=50,
                 shape_cost=50,
-                direction_change_margin_start=0,
-                direction_change_margin_end=0,
+                direction_change_margin_start=3,
+                direction_change_margin_end=3,
             )
         case _:
             return core.RoutingConfig(
