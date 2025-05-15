@@ -27,6 +27,8 @@ pub struct RoutingConfig {
     direction_change_margin_end: i32,
 }
 
+
+
 #[pymethods]
 impl RoutingConfig {
     #[new]
@@ -64,6 +66,84 @@ impl Default for RoutingConfig {
         }
     }
 }
+
+#[pyclass]
+#[derive(Clone, PartialEq, Debug)]
+pub struct RoutingTrace {
+    pub cost_map: HashMap<(i32, i32), f64>, // Add cost map to store per-pixel costs
+}
+
+#[pymethods]
+impl RoutingTrace {
+    #[new]
+    fn new(cost_map: Option<HashMap<(i32, i32), f64>>) -> Self {
+        RoutingTrace {
+            cost_map: cost_map.unwrap_or_default(),
+        }
+    }
+
+    #[getter]
+    fn get_cost_map(&self) -> HashMap<(i32, i32), f64> {
+        self.cost_map.clone()
+    }
+
+    // Get cost for a specific position
+    fn get_cost_at(&self, x: i32, y: i32) -> Option<f64> {
+        self.cost_map.get(&(x, y)).copied()
+    }
+}
+
+
+#[pyclass]
+#[derive(Clone, PartialEq, Debug)]
+pub struct EdgeRoutingResult {
+    pub path: Vec<DirectedPoint>,
+    pub trace: Option<RoutingTrace>,
+}
+
+#[pymethods]
+impl EdgeRoutingResult {
+    #[new]
+    fn new(path: Vec<DirectedPoint>, trace: Option<RoutingTrace>) -> Self {
+        EdgeRoutingResult { path, trace }
+    }
+
+    #[getter]
+    fn get_path(&self) -> Vec<DirectedPoint> {
+        self.path.clone()
+    }
+
+    #[getter]
+    fn get_trace(&self) -> Option<RoutingTrace> {
+        self.trace.clone()
+    }
+}
+
+#[pyclass]
+#[derive(Clone, PartialEq, Debug)]
+pub struct EdgeRoutingsResult {
+    pub paths: Vec<Vec<DirectedPoint>>,
+    pub trace: Option<RoutingTrace>,
+}
+
+#[pymethods]
+impl EdgeRoutingsResult {
+    #[new]
+    fn new(paths: Vec<Vec<DirectedPoint>>, trace: Option<RoutingTrace>) -> Self {
+        EdgeRoutingsResult { paths, trace }
+    }
+
+    #[getter]
+    fn get_paths(&self) -> Vec<Vec<DirectedPoint>> {
+        self.paths.clone()
+    }
+
+    #[getter]
+    fn get_trace(&self) -> Option<RoutingTrace> {
+        self.trace.clone()
+    }
+}
+
 
 fn heuristic(a: &DirectedPoint, b: &DirectedPoint, config: RoutingConfig) -> i32 {
     let lowest_distance = if config.neighborhood == Neighborhood::Orthogonal {
@@ -390,19 +470,26 @@ impl EdgeRouter {
             DirectedPoint,
             RoutingConfig,
         )>,
-    ) -> PyResult<Vec<Vec<DirectedPoint>>> {
-        let mut result = Vec::new();
+    ) -> PyResult<EdgeRoutingsResult> {
+        let mut result_paths = Vec::new();
+        let mut all_cost_maps = HashMap::new();
 
         for (u, v, start, end, config) in edges {
-            let directed_points = self.route_edge(&u, &v, start, end, start, end, config)?;
-            let path = directed_points
-                .iter()
-                .map(|p| Point::new(p.x, p.y))
-                .collect();
+            let result = self.route_edge(&u, &v, start, end, start, end, config)?;
+
+            // Add this edge's cost map to the combined cost map
+            if let Some(trace) = &result.trace {
+                all_cost_maps.extend(trace.cost_map.clone());
+            }
+
+            let path = result.path.iter().map(|p| Point::new(p.x, p.y)).collect();
             let _ = self.add_edge(&u, &v, path);
-            result.push(directed_points);
+            result_paths.push(result.path);
         }
-        Ok(result)
+
+        // Create combined trace with all edge costs
+        let trace = RoutingTrace::new(Some(all_cost_maps));
+        Ok(EdgeRoutingsResult::new(result_paths, Some(trace)))
     }
 
     fn route_edge_astar(
@@ -412,7 +499,7 @@ impl EdgeRouter {
         global_start: DirectedPoint,
         global_end: DirectedPoint,
         config: RoutingConfig,
-    ) -> PyResult<Vec<DirectedPoint>> {
+    ) -> PyResult<EdgeRoutingResult> {
         let mut open_set = PriorityQueue::new();
         open_set.push(start, Reverse(0));
 
@@ -423,11 +510,25 @@ impl EdgeRouter {
         let mut f_score = HashMap::new();
         f_score.insert(start, heuristic(&start, &end, config));
 
+        // Create cost map for tracing
+        let mut cost_map = HashMap::new();
+
         while let Some((current, _)) = open_set.pop() {
             if current == end
                 || (end.direction == Direction::Center && current.x == end.x && current.y == end.y)
             {
-                return Ok(reconstruct_path(&came_from, current));
+                let path = reconstruct_path(&came_from, current);
+
+                // Store the cost for each point in the final path
+                let mut path_cost_map = HashMap::new();
+                for point in &path {
+                    if let Some(cost) = g_score.get(point) {
+                        path_cost_map.insert((point.x, point.y), *cost as f64);
+                    }
+                }
+
+                let trace = RoutingTrace::new(Some(path_cost_map));
+                return Ok(EdgeRoutingResult::new(path, Some(trace)));
             }
 
             let current_end_distance = (current.x - end.x).abs() + (current.y - end.y).abs();
@@ -449,6 +550,9 @@ impl EdgeRouter {
                         tentative_g_score + heuristic(&neighbor, &end, config),
                     );
 
+                    // Store cost in the cost map
+                    cost_map.insert((neighbor.x, neighbor.y), tentative_g_score as f64);
+
                     open_set.push(neighbor, Reverse(*f_score.get(&neighbor).unwrap()));
                 }
             }
@@ -468,7 +572,7 @@ impl EdgeRouter {
         global_start: DirectedPoint,
         global_end: DirectedPoint,
         config: RoutingConfig,
-    ) -> PyResult<Vec<DirectedPoint>> {
+    ) -> PyResult<EdgeRoutingResult> {
         if (start.x - end.x).abs() + (start.y - end.y).abs() > 10
             && ((start.x - end.x).abs() > 3 && (start.y - end.y).abs() > 3)
         {
@@ -538,10 +642,14 @@ impl EdgeRouter {
                 second_part_config.direction_change_margin_start = 0;
                 first_part_config.direction_change_margin_end = 0;
 
-                if let (Ok(mut sub_path1), Ok(mut sub_path2)) = (
+                if let (Ok(sub_result1), Ok(sub_result2)) = (
                     self._route_edge(u, v, start, intermediate_point_end, global_start, global_end, first_part_config),
                     self._route_edge(u, v, intermediate_point_start, end, global_start, global_end, second_part_config)
                 ) {
+                    // Clone paths for evaluation
+                    let mut sub_path1 = sub_result1.path.clone();
+                    let mut sub_path2 = sub_result2.path.clone();
+
                     // Measure the quality of this path
                     let mut full_path = sub_path1.clone();
                     full_path.append(&mut sub_path2.clone());
@@ -559,7 +667,18 @@ impl EdgeRouter {
                         let mut path = Vec::new();
                         path.append(&mut sub_path1);
                         path.append(&mut sub_path2);
-                        return Ok(path);
+
+                        // Merge the cost maps from both sub-results
+                        let mut combined_cost_map = HashMap::new();
+                        if let Some(trace1) = &sub_result1.trace {
+                            combined_cost_map.extend(trace1.cost_map.clone());
+                        }
+                        if let Some(trace2) = &sub_result2.trace {
+                            combined_cost_map.extend(trace2.cost_map.clone());
+                        }
+
+                        let trace = RoutingTrace::new(Some(combined_cost_map));
+                        return Ok(EdgeRoutingResult::new(path, Some(trace)));
                     }
 
                     // Score is combination of corners and path length
@@ -569,15 +688,26 @@ impl EdgeRouter {
                         let mut path = Vec::new();
                         path.append(&mut sub_path1);
                         path.append(&mut sub_path2);
-                        best_path = Some(path);
+
+                        // Store the best trace so far
+                        let mut combined_cost_map = HashMap::new();
+                        if let Some(trace1) = &sub_result1.trace {
+                            combined_cost_map.extend(trace1.cost_map.clone());
+                        }
+                        if let Some(trace2) = &sub_result2.trace {
+                            combined_cost_map.extend(trace2.cost_map.clone());
+                        }
+
+                        best_path = Some((path, combined_cost_map));
                         best_score = score;
                     }
                 }
             }
 
             // Return the best path found (if any)
-            if let Some(path) = best_path {
-                return Ok(path);
+            if let Some((path, cost_map)) = best_path {
+                let trace = RoutingTrace::new(Some(cost_map));
+                return Ok(EdgeRoutingResult::new(path, Some(trace)));
             }
         }
         self.route_edge_astar(start, end, global_start, global_end, config)
@@ -592,7 +722,7 @@ impl EdgeRouter {
         global_start: DirectedPoint,
         global_end: DirectedPoint,
         config: RoutingConfig,
-    ) -> PyResult<Vec<DirectedPoint>> {
+    ) -> PyResult<EdgeRoutingResult> {
         self._route_edge(u, v, start, end, global_start, global_end, config)
     }
 

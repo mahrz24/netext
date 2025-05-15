@@ -38,13 +38,16 @@ def route_edge(
     edge_router: core.EdgeRouter,
     edge_routing_mode: EdgeRoutingMode,
 ) -> EdgePath:
-    path = edge_router.route_edge(
+    result = edge_router.route_edge(
         u,
         v,
         start,
         end,
+        start,
+        end,
         config=_edge_routing_mode_to_routing_config(edge_routing_mode),
     )
+    path = result.path
 
     return EdgePath(
         start=start.point,
@@ -67,7 +70,8 @@ def route_edges(
         )
         for u, v, start, end, edge_routing_mode in edge_anchors
     ]
-    point_paths = edge_router.route_edges(core_anchors)
+    result = edge_router.route_edges(core_anchors)
+    point_paths = result.paths
 
     return [
         EdgePath(

@@ -1,6 +1,6 @@
 from collections.abc import Hashable
 from enum import Enum
-from typing import Any, Iterable, Iterator
+from typing import Any, Iterable, Iterator, Optional
 
 class CoreGraph:
     @classmethod
@@ -57,6 +57,21 @@ class RectangularNode:
 class PlacedRectangularNode:
     def __init__(self, center: Point, node: RectangularNode) -> None: ...
 
+class RoutingTrace:
+    def __init__(self, cost_buffers: list[list[list[float]]]) -> None: ...
+
+class EdgeRoutingResult:
+    path: list[DirectedPoint]
+    trace: Optional[RoutingTrace]
+
+    def __init__(self, path: list[DirectedPoint], trace: Optional[RoutingTrace]) -> None: ...
+
+class EdgeRoutingsResult:
+    paths: list[list[DirectedPoint]]
+    trace: Optional[RoutingTrace]
+
+    def __init__(self, paths: list[list[DirectedPoint]], trace: Optional[RoutingTrace]) -> None: ...
+
 class EdgeRouter:
     def add_node(self, node: Hashable, placed_node: PlacedRectangularNode) -> None: ...
     def remove_node(self, node: Hashable) -> None: ...
@@ -67,11 +82,13 @@ class EdgeRouter:
         v: Hashable,
         start: DirectedPoint,
         end: DirectedPoint,
+        global_start: DirectedPoint,
+        global_end: DirectedPoint,
         config: RoutingConfig,
-    ) -> list[DirectedPoint]: ...
+    ) -> EdgeRoutingResult: ...
     def route_edges(
         self, edge_anchors: list[tuple[Hashable, Hashable, DirectedPoint, DirectedPoint, RoutingConfig]]
-    ) -> list[list[DirectedPoint]]: ...
+    ) -> EdgeRoutingsResult: ...
 
 class Neighborhood(Enum):
     ORTHOGONAL = 0
