@@ -58,7 +58,10 @@ class PlacedRectangularNode:
     def __init__(self, center: Point, node: RectangularNode) -> None: ...
 
 class RoutingTrace:
-    def __init__(self, cost_buffers: list[list[list[float]]]) -> None: ...
+    def __init__(
+        self,
+    ) -> None: ...
+
 
 class EdgeRoutingResult:
     path: list[DirectedPoint]
@@ -98,13 +101,11 @@ class RoutingConfig:
     def __init__(
         self,
         neighborhood: Neighborhood,
-        corner_cost: int,
-        diagonal_cost: int,
-        line_cost: int,
-        shape_cost: int,
-        direction_change_margin_start: int,
-        direction_change_margin_end: int,
+        generate_trace: Optional[bool] = False,
     ) -> None: ...
+
+    def get_generate_trace(self) -> bool: ...
+    def set_generate_trace(self, value: bool) -> None: ...
 
 class Direction(Enum):
     CENTER = -1
