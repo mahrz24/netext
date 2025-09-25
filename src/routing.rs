@@ -206,6 +206,33 @@ impl EdgeRouter {
             RoutingConfig,
         )>,
     ) -> PyResult<EdgeRoutingsResult> {
+        let MAX_ITERATIONS = 10;
+        // First we generate a grid from all start and end point projections and midpoints.
+        // The midpoints are to create lanes between nodes.
+
+        // Then we remove all points that are inside any placed node and all edges that intersect
+        // any placed node or are directly adjacent to a placed node.
+
+        // We also need to maintain usage on the original grid, initialized with usage from
+        // existing edges.
+
+        // Now we route all nets once, storing their paths and updating usage.
+
+        // Now we iterate up to some maximum number of iterations
+
+        for _ in 0..MAX_ITERATIONS {
+            // 1) Compute present costs from current usage
+
+            // 2) Order nets by difficulty (span, channel width, past failures, etc.)
+
+            // 3) For each net in order, find the cheapest path using A* or Dijkstra
+
+            // Skip locked nets (no overflow)
+
+            // Rip-up old path
+        }
+
+
         let mut result_paths = Vec::new();
         Ok(EdgeRoutingsResult::new(result_paths, None))
     }
