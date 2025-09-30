@@ -1,6 +1,6 @@
-pub mod sugiyama;
-pub mod static_;
 pub mod force_directed;
+pub mod static_;
+pub mod sugiyama;
 use pyo3::prelude::*;
 
 use crate::{geometry::Point, graph::CoreGraph};
@@ -14,10 +14,8 @@ pub enum LayoutDirection {
     LeftRight = 1,
 }
 
-
 #[pyclass(subclass)]
-pub struct LayoutEngine {
-}
+pub struct LayoutEngine {}
 
 #[pymethods]
 impl LayoutEngine {

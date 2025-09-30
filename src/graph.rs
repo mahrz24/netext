@@ -1,10 +1,10 @@
 use petgraph::graph::NodeIndex;
 use petgraph::graphmap::DiGraphMap;
-use pyo3::{prelude::*, IntoPyObjectExt};
 use pyo3::types::PyAny;
+use pyo3::{prelude::*, IntoPyObjectExt};
 use std::collections::HashMap;
 
-use crate::geometry::{Size};
+use crate::geometry::Size;
 use crate::pyindexset::PyIndexSet;
 
 #[pyclass]

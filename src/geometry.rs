@@ -225,7 +225,6 @@ impl PointLike for Point {
     }
 }
 
-
 #[pyclass]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Copy)]
 pub struct RectangularNode {
@@ -306,7 +305,6 @@ impl PointDistance for PlacedRectangularNode {
     }
 }
 
-
 #[pymethods]
 impl PlacedRectangularNode {
     #[new]
@@ -325,7 +323,7 @@ pub enum Neighborhood {
 }
 
 #[pyclass(eq, eq_int)]
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug,)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub enum Direction {
     #[pyo3(name = "CENTER")]
     Center = -1,
@@ -439,7 +437,6 @@ impl PointLike for DirectedPoint {
     }
 }
 
-
 #[pymethods]
 impl DirectedPoint {
     #[new]
@@ -497,7 +494,8 @@ impl DirectedPoint {
                     x: self.x,
                     y: self.y,
                 },
-            )?.into_py_any(py),
+            )?
+            .into_py_any(py),
             1 => direction.into_py_any(py),
             _ => Err(PyIndexError::new_err("index out of range")),
         }

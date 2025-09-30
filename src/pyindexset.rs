@@ -89,11 +89,10 @@ impl PyIndexSet {
                 entry.remove();
                 self.objects[index] = SlotOrRemoved::Removed;
                 Ok(())
-
-            },
-            Err(_) => Err(
-                PyErr::new::<exceptions::PyKeyError, _>("Object not found in index set"),
-            ),
+            }
+            Err(_) => Err(PyErr::new::<exceptions::PyKeyError, _>(
+                "Object not found in index set",
+            )),
         }
     }
 
@@ -126,7 +125,10 @@ impl PyIndexSet {
             hashbrown::hash_table::Entry::Occupied(entry) => Ok((*entry.get(), false)),
             hashbrown::hash_table::Entry::Vacant(entry) => {
                 let index = self.objects.len();
-                self.objects.push(SlotOrRemoved::Taken(Slot { hash, obj: obj.clone().unbind() }));
+                self.objects.push(SlotOrRemoved::Taken(Slot {
+                    hash,
+                    obj: obj.clone().unbind(),
+                }));
                 entry.insert(index);
 
                 Ok((index, true))

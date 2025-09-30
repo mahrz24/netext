@@ -28,7 +28,11 @@ impl StaticLayout {
                         let dict_result = bound_data.downcast::<PyDict>();
                         let dict = match dict_result {
                             Ok(value) => value,
-                            Err(_) => return Err(PyErr::new::<exceptions::PyTypeError, _>("Data must be a dictionary"))
+                            Err(_) => {
+                                return Err(PyErr::new::<exceptions::PyTypeError, _>(
+                                    "Data must be a dictionary",
+                                ))
+                            }
                         };
                         let x = dict.get_item("$x");
                         let y = dict.get_item("$y");
@@ -37,7 +41,7 @@ impl StaticLayout {
                             Ok(Some(value)) => match value.extract::<i32>() {
                                 Ok(value) => value,
                                 Err(_) => 0,
-                            }
+                            },
                             _ => 0,
                         };
 
@@ -45,7 +49,7 @@ impl StaticLayout {
                             Ok(Some(value)) => match value.extract::<i32>() {
                                 Ok(value) => value,
                                 Err(_) => 0,
-                            }
+                            },
                             _ => 0,
                         };
 

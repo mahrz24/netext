@@ -6,9 +6,11 @@ mod layout;
 mod pyindexset;
 mod routing;
 
-use geometry::{DirectedPoint, Direction, Neighborhood, PlacedRectangularNode, Point, RectangularNode, Size};
-use routing::{RoutingConfig, EdgeRouter};
+use geometry::{
+    DirectedPoint, Direction, Neighborhood, PlacedRectangularNode, Point, RectangularNode, Size,
+};
 use graph::CoreGraph;
+use routing::{EdgeRouter, RoutingConfig};
 
 // A module to wrap the Python functions and structs
 #[pymodule]
