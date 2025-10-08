@@ -65,27 +65,6 @@ def route_edges(
     ]
     result = edge_router.route_edges(core_anchors)
 
-
-    if result.trace is not None:
-        console = Console()
-        for (ecm, path) in zip(result.trace.edge_cost_maps, result.paths):
-            undirected_points = [dp.point for dp in path]
-            print(f"Edge cost map for edge {ecm[0]} -> {ecm[1]}:")
-            min_x = min(x for x, _ in result.trace.edge_cost_maps[ecm].keys())
-            max_x = max(x for x, _ in result.trace.edge_cost_maps[ecm].keys())
-            min_y = min(y for _, y in result.trace.edge_cost_maps[ecm].keys())
-            max_y = max(y for _, y in result.trace.edge_cost_maps[ecm].keys())
-            max_cost = max(result.trace.edge_cost_maps[ecm].values(), default=0)
-            for y in range(min_y, max_y + 1):
-                for x in range(min_x, max_x + 1):
-                    cost = result.trace.edge_cost_maps[ecm].get((x, y), 0)
-                    char = " "
-                    if Point(x,y) in undirected_points:
-                        char = "x"
-                    console.print(
-                        Text(char, style=Style(bgcolor=Color.from_rgb(cost / max_cost * 255, 150, 150))), end=""
-                    )
-                console.print("")
     point_paths = result.paths
 
     return [
