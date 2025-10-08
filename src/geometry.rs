@@ -322,6 +322,12 @@ pub enum Neighborhood {
     Moore,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Orientation {
+    Horizontal,
+    Vertical,
+}
+
 #[pyclass(eq, eq_int)]
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
 pub enum Direction {

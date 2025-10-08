@@ -1,4 +1,5 @@
 use hashbrown::hash_map::Keys;
+use petgraph::algo::k_shortest_path;
 use priority_queue::PriorityQueue;
 use rstar::PointDistance;
 use rstar::RTreeObject;
@@ -7,12 +8,14 @@ use std::cmp::min;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
+use std::f64::INFINITY;
 use std::hash::Hash;
 use std::result;
 use std::sync::Arc;
 
 use pyo3::prelude::*;
 
+use crate::geometry::Orientation;
 use crate::geometry::PointLike;
 use crate::{
     geometry::{BoundingBox, DirectedPoint, Direction, Neighborhood, PlacedRectangularNode, Point},
@@ -360,22 +363,20 @@ impl EdgeRouter {
             let tl = node.top_left();
             let br = node.bottom_right();
 
-            println!("Removing grid points and segments inside node {:?} spanning from {:?} to {:?}", node, tl, br);
+            println!(
+                "Removing grid points and segments inside node {:?} spanning from {:?} to {:?}",
+                node, tl, br
+            );
 
-            let min_grid_x = x_lines
-                .binary_search(&tl.x)
-                .unwrap_or_else(|x| x);
-            let max_grid_x = x_lines
-                .binary_search(&br.x)
-                .unwrap_or_else(|x| x);
-            let min_grid_y = y_lines
-                .binary_search(&tl.y)
-                .unwrap_or_else(|y| y);
-            let max_grid_y = y_lines
-                .binary_search(&br.y)
-                .unwrap_or_else(|y| y);
+            let min_grid_x = x_lines.binary_search(&tl.x).unwrap_or_else(|x| x);
+            let max_grid_x = x_lines.binary_search(&br.x).unwrap_or_else(|x| x);
+            let min_grid_y = y_lines.binary_search(&tl.y).unwrap_or_else(|y| y);
+            let max_grid_y = y_lines.binary_search(&br.y).unwrap_or_else(|y| y);
 
-            println!("Node grid coords from ({}, {}) to ({}, {})", min_grid_x, min_grid_y, max_grid_x, max_grid_y);
+            println!(
+                "Node grid coords from ({}, {}) to ({}, {})",
+                min_grid_x, min_grid_y, max_grid_x, max_grid_y
+            );
 
             if min_grid_x == max_grid_x || min_grid_y == max_grid_y {
                 // Node is too small to cover any grid points or segments
@@ -384,7 +385,9 @@ impl EdgeRouter {
 
             for grid_y in min_grid_y..=max_grid_y {
                 for grid_x in min_grid_x..=max_grid_x {
-                    if let Some(grid_index) = grid_coords_to_grid_index(grid_width, grid_height, grid_x, grid_y) {
+                    if let Some(grid_index) =
+                        grid_coords_to_grid_index(grid_width, grid_height, grid_x, grid_y)
+                    {
                         grid_point_mask[grid_index] = false;
                     }
                 }
@@ -431,8 +434,8 @@ impl EdgeRouter {
         let mut raw_capacity = vec![1; raw_num_edges as usize];
 
         // Create prefix sums along the x and y axes for fast capacity queries later.
-        let mut raw_capacity_prefix_x = vec![0; raw_num_edges as usize];
-        let mut raw_capacity_prefix_y = vec![0; raw_num_edges as usize];
+        let mut raw_capacity_prefix_x = vec![0; ((raw_width - 1) * raw_height) as usize];
+        let mut raw_capacity_prefix_y = vec![0; (raw_width * (raw_height - 1)) as usize];
 
         compute_raw_grid_edge_prefix_sums(
             raw_width,
@@ -443,8 +446,8 @@ impl EdgeRouter {
             &mut raw_capacity_prefix_y,
         );
 
-        let mut raw_usage_prefix_x = vec![0; raw_num_edges as usize];
-        let mut raw_usage_prefix_y = vec![0; raw_num_edges as usize];
+        let mut raw_usage_prefix_x = vec![0; ((raw_width - 1) * raw_height) as usize];
+        let mut raw_usage_prefix_y = vec![0; (raw_width * (raw_height - 1)) as usize];
 
         compute_raw_grid_edge_prefix_sums(
             raw_width,
@@ -455,14 +458,200 @@ impl EdgeRouter {
             &mut raw_usage_prefix_y,
         );
 
-        // With the prefix sums, we can also compute usage and capacity
+        debug_print_raw_edge_buffer(raw_width, raw_height, &raw_capacity);
+
+        // With the prefix sums, we can also compute usage and capacity on the grid edges.
+        // for the initial routing, the usage is zero everywhere and the cose is just the length of the edge.
+        // hence we can pass a simplified cost function to the A*
+
+        let mut initial_result_paths: Vec<Vec<DirectedPoint>> = Vec::new();
 
         // Now we route all edges once, storing their paths and updating usage.
-        for (u, v, _, _, _) in edges {
-            // Route edge from u to v
-            // 1) Get start and end grid points
-            // 2) Find shortest path using A* or Dijkstra
-            // 3) Update usage along path
+        for (u, v, start, end, _) in edges {
+            let start_raw_index =
+                point_to_raw_index(min_x, min_y, raw_width, raw_height, &start.as_point());
+            let end_raw_index =
+                point_to_raw_index(min_x, min_y, raw_width, raw_height, &end.as_point());
+
+            if start_raw_index.is_none() || end_raw_index.is_none() {
+                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "Start or end point is out of bounds",
+                ));
+            }
+            let start_raw_index = start_raw_index.unwrap();
+            let end_raw_index = end_raw_index.unwrap();
+
+            let start_orientation: Orientation = match start.direction {
+                Direction::Up | Direction::Down => Orientation::Vertical,
+                Direction::Left | Direction::Right => Orientation::Horizontal,
+                Direction::UpLeft | Direction::DownRight | Direction::Center => Orientation::Vertical,
+                Direction::UpRight | Direction::DownLeft => Orientation::Horizontal,
+
+            };
+            let end_orientation: Orientation = match end.direction {
+                Direction::Up | Direction::Down => Orientation::Vertical,
+                Direction::Left | Direction::Right => Orientation::Horizontal,
+  Direction::UpLeft | Direction::DownRight | Direction::Center => Orientation::Vertical,
+                Direction::UpRight | Direction::DownLeft => Orientation::Horizontal,
+            };
+
+            let start_grid_index: usize = point_to_grid_index(
+                &x_lines,
+                &y_lines,
+                grid_width,
+                grid_height,
+                &start.as_point(),
+            )
+            .ok_or_else(|| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                    "Start point is not on a grid point",
+                )
+            })?;
+            let end_grid_index: usize =
+                point_to_grid_index(&x_lines, &y_lines, grid_width, grid_height, &end.as_point())
+                    .ok_or_else(|| {
+                    PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "End point is not on a grid point",
+                    )
+                })?;
+            println!("Routing edge from {:?} to {:?} with start grid coords {:?} and end grid coords {:?}", u, v, start_grid_index, end_grid_index);
+
+            let grid_path = route_visibility_astar(
+                grid_width,
+                grid_height,
+                &grid_point_mask,
+                &visibility_segment_mask,
+                start_grid_index,
+                end_grid_index,
+                start_orientation,
+                end_orientation,
+                |idx, orientation| {
+                    // Neighbors function
+                    let (x, y) = grid_index_to_grid_coords(grid_width, grid_height, idx);
+                    let mut neighbors = Vec::new();
+                    // We can always only move in the direction of our orientation
+                    match orientation {
+                        Orientation::Horizontal => {
+                            // Move left
+                            if x > 0 {
+                                if let Some(neighbor_index) =
+                                    grid_coords_to_grid_index(grid_width, grid_height, x - 1, y)
+                                {
+                                    let segment_index = gridcoords_to_segment_index(
+                                        grid_width,
+                                        grid_height,
+                                        (x - 1, y),
+                                        (x, y),
+                                    );
+                                    if visibility_segment_mask[segment_index] {
+                                        neighbors.push((neighbor_index, Orientation::Horizontal));
+                                    }
+                                }
+                            }
+                            // Move right
+                            if x + 1 < grid_width {
+                                if let Some(neighbor_index) =
+                                    grid_coords_to_grid_index(grid_width, grid_height, x + 1, y)
+                                {
+                                    let segment_index = gridcoords_to_segment_index(
+                                        grid_width,
+                                        grid_height,
+                                        (x, y),
+                                        (x + 1, y),
+                                    );
+                                    if visibility_segment_mask[segment_index] {
+                                        neighbors.push((neighbor_index, Orientation::Horizontal));
+                                    }
+                                }
+                            }
+                        }
+                        Orientation::Vertical => {
+                            // Move up
+                            if y > 0 {
+                                if let Some(neighbor_index) =
+                                    grid_coords_to_grid_index(grid_width, grid_height, x, y - 1)
+                                {
+                                    let segment_index = gridcoords_to_segment_index(
+                                        grid_width,
+                                        grid_height,
+                                        (x, y - 1),
+                                        (x, y),
+                                    );
+                                    if visibility_segment_mask[segment_index] {
+                                        neighbors.push((neighbor_index, Orientation::Vertical));
+                                    }
+                                }
+                            }
+                            // Move down
+                            if y + 1 < grid_height {
+                                if let Some(neighbor_index) =
+                                    grid_coords_to_grid_index(grid_width, grid_height, x, y + 1)
+                                {
+                                    let segment_index = gridcoords_to_segment_index(
+                                        grid_width,
+                                        grid_height,
+                                        (x, y),
+                                        (x, y + 1),
+                                    );
+                                    if visibility_segment_mask[segment_index] {
+                                        neighbors.push((neighbor_index, Orientation::Vertical));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    neighbors
+                },
+                |from_idx, to_idx, from_orientation, to_orientation| {
+                    // Cost function
+                    let (from_grid_x, from_grid_y) =
+                        grid_index_to_grid_coords(grid_width, grid_height, from_idx);
+                    let (to_grid_x, to_grid_y) =
+                        grid_index_to_grid_coords(grid_width, grid_height, to_idx);
+
+                    let from_actual_x = x_lines[from_grid_x];
+                    let from_actual_y = y_lines[from_grid_y];
+                    let to_actual_x = x_lines[to_grid_x];
+                    let to_actual_y = y_lines[to_grid_y];
+
+                    let distance =
+                        (from_actual_x - to_actual_x).abs() + (from_actual_y - to_actual_y).abs();
+                    let orientation_cost = if from_orientation != to_orientation {
+                        10
+                    } else {
+                        0
+                    };
+                    distance + orientation_cost
+                },
+            )?;
+            // Convert grid path to actual points with directions
+            let mut result_path = Vec::new();
+            for (grid_index, orientation) in grid_path {
+                let (grid_x, grid_y) =
+                    grid_index_to_grid_coords(grid_width, grid_height, grid_index);
+                let point = grid_coords_to_point(&x_lines, &y_lines, grid_width, grid_height, grid_x, grid_y);
+                let direction = match orientation {
+                    Orientation::Horizontal => {
+                        if result_path.last().map_or(false, |p: &DirectedPoint| p.x < point.x) {
+                            Direction::Right
+                        } else if result_path.last().map_or(false, |p: &DirectedPoint| p.x > point.x) {
+                            Direction::Left
+                        } else {
+                            Direction::Center
+                        }
+                    }
+                    Orientation::Vertical => {
+                        if result_path.last().map_or(false, |p: &DirectedPoint| p.y < point.y) {
+                            Direction::Up
+                        } else if result_path.last().map_or(false, |p: &DirectedPoint| p.y > point.y) {
+                            Direction::Down
+                        } else {
+                            Direction::Center
+                        }
+                    }
+                };
+                result_path.push(DirectedPoint { x: point.x, y: point.y, direction, debug: false });
+            }
         }
 
         // Now we iterate up to some maximum number of iterations
@@ -487,7 +676,7 @@ impl EdgeRouter {
             // 4) If no nets overflowed, we're done
         }
 
-        let mut result_paths = Vec::new();
+
         Ok(EdgeRoutingsResult::new(result_paths, None))
     }
 
@@ -504,6 +693,140 @@ impl EdgeRouter {
         let mut result_path = Vec::new();
         Ok(EdgeRoutingResult::new(result_path, None))
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+struct GridState {
+    index: usize,
+    orientation: Orientation,
+}
+
+fn route_visibility_astar<NeighborFn, CostFn>(
+    grid_width: usize,
+    grid_height: usize,
+    grid_point_mask: &[bool],
+    _visibility_segment_mask: &[bool],
+    start_grid_index: usize,
+    end_grid_index: usize,
+    start_orientation: Orientation,
+    end_orientation: Orientation,
+    mut neighbors_fn: NeighborFn,
+    mut cost_fn: CostFn,
+) -> PyResult<Vec<(usize, Orientation)>>
+where
+    NeighborFn: FnMut(usize, Orientation) -> Vec<(usize, Orientation)>,
+    CostFn: FnMut(usize, usize, Orientation, Orientation) -> i32,
+{
+    if start_grid_index >= grid_point_mask.len() || end_grid_index >= grid_point_mask.len() {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "Start or end grid index out of bounds",
+        ));
+    }
+
+    if !grid_point_mask[start_grid_index] || !grid_point_mask[end_grid_index] {
+        return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+            "Start or end grid point is blocked",
+        ));
+    }
+
+    let start_state = GridState {
+        index: start_grid_index,
+        orientation: start_orientation,
+    };
+    let goal_state = GridState {
+        index: end_grid_index,
+        orientation: end_orientation,
+    };
+
+    if start_state == goal_state {
+        return Ok(vec![(start_state.index, start_state.orientation)]);
+    }
+
+    let goal_coords = grid_index_to_grid_coords(grid_width, grid_height, goal_state.index);
+
+    let heuristic = |state: GridState| -> i32 {
+        let (sx, sy) = grid_index_to_grid_coords(grid_width, grid_height, state.index);
+        (sx as i32 - goal_coords.0 as i32).abs() + (sy as i32 - goal_coords.1 as i32).abs()
+    };
+
+    let mut open_set: BinaryHeap<(Reverse<i32>, u64, GridState)> = BinaryHeap::new();
+    let mut came_from: HashMap<GridState, GridState> = HashMap::new();
+    let mut g_score: HashMap<GridState, i32> = HashMap::new();
+
+    const MAX_SCORE: i32 = i32::MAX / 4;
+    let mut insert_counter: u64 = 0;
+
+    g_score.insert(start_state, 0);
+    let start_f = heuristic(start_state);
+    open_set.push((Reverse(start_f), insert_counter, start_state));
+    insert_counter += 1;
+
+    while let Some((Reverse(_f_score), _order, current_state)) = open_set.pop() {
+        if current_state == goal_state {
+            let mut path = Vec::new();
+            let mut cursor = current_state;
+            path.push((cursor.index, cursor.orientation));
+            while let Some(prev) = came_from.get(&cursor).copied() {
+                cursor = prev;
+                path.push((cursor.index, cursor.orientation));
+            }
+            path.reverse();
+            return Ok(path);
+        }
+
+        let current_g = *g_score.get(&current_state).unwrap_or(&MAX_SCORE);
+
+        for (neighbor_index, neighbor_orientation) in
+            neighbors_fn(current_state.index, current_state.orientation)
+        {
+            if neighbor_index >= grid_point_mask.len() {
+                continue;
+            }
+
+            if !grid_point_mask[neighbor_index] {
+                continue;
+            }
+
+            let neighbor_state = GridState {
+                index: neighbor_index,
+                orientation: neighbor_orientation,
+            };
+
+            let step_cost = cost_fn(
+                current_state.index,
+                neighbor_state.index,
+                current_state.orientation,
+                neighbor_state.orientation,
+            );
+
+            if step_cost >= MAX_SCORE {
+                continue;
+            }
+
+            let tentative_g = match current_g.checked_add(step_cost) {
+                Some(sum) => sum,
+                None => continue,
+            };
+
+            if tentative_g >= *g_score.get(&neighbor_state).unwrap_or(&MAX_SCORE) {
+                continue;
+            }
+
+            came_from.insert(neighbor_state, current_state);
+            g_score.insert(neighbor_state, tentative_g);
+            let heuristic_cost = heuristic(neighbor_state);
+            let f_score = match tentative_g.checked_add(heuristic_cost) {
+                Some(value) => value,
+                None => continue,
+            };
+            open_set.push((Reverse(f_score), insert_counter, neighbor_state));
+            insert_counter += 1;
+        }
+    }
+
+    Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+        "Goal not found.",
+    ))
 }
 
 fn grid_coords_to_point(
@@ -531,12 +854,7 @@ fn point_to_grid_index(
 ) -> Option<usize> {
     let grid_x = x_lines.binary_search(&point.x).ok()?;
     let grid_y = y_lines.binary_search(&point.y).ok()?;
-    grid_coords_to_grid_index(
-        grid_width,
-        grid_height,
-        grid_x,
-        grid_y,
-    )
+    grid_coords_to_grid_index(grid_width, grid_height, grid_x, grid_y)
 }
 
 fn grid_coords_to_grid_index(
@@ -655,8 +973,8 @@ fn compute_raw_grid_edge_prefix_sums(
     prefix_y: &mut Vec<i32>,
 ) {
     assert!(values.len() == raw_number_edges as usize);
-    assert!(prefix_x.len() == raw_number_edges as usize);
-    assert!(prefix_y.len() == raw_number_edges as usize);
+    assert!(prefix_x.len() == ((raw_width - 1) * raw_height) as usize);
+    assert!(prefix_y.len() == (raw_width * (raw_height - 1)) as usize);
 
     // Fill horizontal prefix sums
     for y in 0..raw_height {
@@ -665,6 +983,17 @@ fn compute_raw_grid_edge_prefix_sums(
             let edge_index = (y * (raw_width - 1) + x) as usize;
             sum += values[edge_index];
             prefix_x[edge_index] = sum;
+        }
+    }
+
+    // Fill vertical prefix sums
+    let offset = ((raw_width - 1) * raw_height) as usize;
+    for x in 0..raw_width {
+        let mut sum = 0;
+        for y in 0..(raw_height - 1) {
+            let edge_index = ((raw_width - 1) * raw_height + x * (raw_height - 1) + y) as usize;
+            sum += values[edge_index];
+            prefix_y[edge_index - offset] = sum;
         }
     }
 }
@@ -706,6 +1035,36 @@ fn debug_print_grid_buffer<T: std::fmt::Display>(
             }
         }
         println!();
+    }
+    println!();
+}
+
+fn debug_print_raw_edge_buffer<T: std::fmt::Display>(
+    raw_width: i32,
+    raw_height: i32,
+    buffer: &Vec<T>,
+) {
+    // Print horizontal edges
+    for y in 0..raw_height {
+        // Print horizontal edge row
+        print!("  .");
+        for x in 0..(raw_width - 1) {
+            let edge_index = (y * (raw_width - 1) + x) as usize;
+            print!("{:3}  .", buffer[edge_index]);
+        }
+        println!();
+
+        // Print vertical edge row
+        if y < raw_height - 1 {
+            for x in 0..raw_width {
+                let edge_index = ((raw_width - 1) * raw_height + x * (raw_height - 1) + y) as usize;
+                print!("{:3} ", buffer[edge_index]);
+                if x < raw_width - 1 {
+                    print!("  ");
+                }
+            }
+            println!();
+        }
     }
     println!();
 }
