@@ -80,7 +80,7 @@ def render_arrow_tip_buffers(
                 edge,
                 end_arrow_tip,
                 end_arrow_tip_position,
-                end_arrow_tip_dir.opposite(),
+                end_arrow_tip_dir,
                 edge_segment_drawing_mode,
                 style=style,
             )

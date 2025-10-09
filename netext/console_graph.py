@@ -152,7 +152,7 @@ class ConsoleGraph:
 
         for node, data in graph.nodes(data=True):
             if not self._core_graph.contains_node(node):
-                self._core_graph.add_node(node, data)
+                self._core_graph.add_node(node, data, core.Size(0, 0))
             else:
                 self._core_graph.update_node_data(node, data)
         for u, v, data in graph.edges(data=True):
@@ -268,7 +268,6 @@ class ConsoleGraph:
             data = dict()
 
         properties = NodeProperties.from_data_dict(data)
-        self._core_graph.add_node(node, dict(data, **{"$properties": properties}))
 
         # Add to node buffers for layout
         node_buffer = rasterize_node(self.console, node, cast(dict[str, Any], data))
@@ -286,6 +285,10 @@ class ConsoleGraph:
             node_anchors=node_buffer.node_anchors,
         )
         node_buffer.determine_edge_positions()
+
+        self._core_graph.add_node(
+            node, dict(data, **{"$properties": properties}), core.Size(node_buffer.width, node_buffer.height)
+        )
 
         self.node_buffers[node] = node_buffer
 

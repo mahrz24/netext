@@ -267,7 +267,10 @@ impl EdgeRouter {
         let mut x_lines = Vec::new();
         let mut y_lines = Vec::new();
 
+        println!("x_coords: {:?}", x_coords);
+
         let mut last_x = None;
+
         while let Some(x) = x_coords.pop() {
             if let Some(last_x) = last_x {
                 if last_x < x - 5 {
@@ -277,7 +280,7 @@ impl EdgeRouter {
                     x_lines.push((last_x + x) / 2);
                 }
                 if last_x < x - 5 {
-                    x_lines.push(last_x + 2);
+                    x_lines.push(x - 2);
                 }
             }
             x_lines.push(x);
@@ -318,7 +321,7 @@ impl EdgeRouter {
         });
 
         // We add some padding to the bounding box or use the min/max coordinates of the edges also padded.
-        let padding = 10;
+        let padding = 3;
         let min_x = min(min_nodes_x - padding, x_lines[0] - padding);
         let max_x = max(max_nodes_x + padding, x_lines[x_lines.len() - 1] + padding);
         let min_y = min(min_nodes_y - padding, y_lines[0] - padding);
@@ -356,6 +359,25 @@ impl EdgeRouter {
         // any placed node or are directly adjacent to a placed node.
 
         // We use a mask to remove these points and edges.
+
+        let mut start_end_indices: HashSet<usize> = HashSet::new();
+        for (_, _, start, end, _) in &edges {
+            if let Some(start_index) = point_to_grid_index(
+                &x_lines,
+                &y_lines,
+                grid_width,
+                grid_height,
+                &start.as_point(),
+            ) {
+                start_end_indices.insert(start_index);
+            }
+            if let Some(end_index) =
+                point_to_grid_index(&x_lines, &y_lines, grid_width, grid_height, &end.as_point())
+            {
+                start_end_indices.insert(end_index);
+            }
+        }
+
         let mut grid_point_mask = vec![true; grid_width * grid_height];
         let mut visibility_segment_mask = vec![true; grid_num_edges];
 
@@ -378,55 +400,46 @@ impl EdgeRouter {
                 min_grid_x, min_grid_y, max_grid_x, max_grid_y
             );
 
-            if min_grid_x == max_grid_x || min_grid_y == max_grid_y {
-                // Node is too small to cover any grid points or segments
-                continue;
-            }
-
-            for grid_y in min_grid_y..=max_grid_y {
-                for grid_x in min_grid_x..=max_grid_x {
-                    if let Some(grid_index) =
-                        grid_coords_to_grid_index(grid_width, grid_height, grid_x, grid_y)
-                    {
-                        grid_point_mask[grid_index] = false;
+            if !(min_grid_x == max_grid_x || min_grid_y == max_grid_y) {
+                for grid_y in min_grid_y..=max_grid_y {
+                    for grid_x in min_grid_x..=max_grid_x {
+                        if let Some(grid_index) =
+                            grid_coords_to_grid_index(grid_width, grid_height, grid_x, grid_y)
+                        {
+                            if start_end_indices.contains(&grid_index) {
+                                // We do not block start or end points
+                                continue;
+                            }
+                            grid_point_mask[grid_index] = false;
+                        }
                     }
                 }
             }
 
-            for grid_y in min_grid_y..=max_grid_y {
-                for grid_x in min_grid_x..(max_grid_x) {
-                    let segment_index = gridcoords_to_segment_index(
-                        grid_width,
-                        grid_height,
-                        (grid_x, grid_y),
-                        (grid_x + 1, grid_y),
-                    );
-                    visibility_segment_mask[segment_index] = false;
-                }
-            }
+            let tl_x_extruded = tl.x - 1;
+            let tl_y_extruded = tl.y - 1;
+            let br_x_extruded = br.x + 1;
+            let br_y_extruded = br.y + 1;
 
-            for grid_y in min_grid_y..(max_grid_y) {
-                for grid_x in min_grid_x..=max_grid_x {
+            // Check if the extruded coordinates are exactly on grid lines
+            let min_extruded_grid_x = x_lines.binary_search(&tl_x_extruded);
+            let max_extruded_grid_x = x_lines.binary_search(&br_x_extruded);
+            let min_extruded_grid_y = y_lines.binary_search(&tl_y_extruded);
+            let max_extruded_grid_y = y_lines.binary_search(&br_y_extruded);
+
+            if let Ok(grid_x) = min_extruded_grid_x {
+                // Remove the segments along the y grid coordinates with this grid_x.
+                for grid_y in min_grid_y..max_grid_y {
                     let segment_index = gridcoords_to_segment_index(
                         grid_width,
                         grid_height,
                         (grid_x, grid_y),
-                        (grid_x, grid_y + 1),
+                        (grid_x, grid_y + 1)
                     );
                     visibility_segment_mask[segment_index] = false;
                 }
             }
         }
-
-        debug_print_grid_buffer(
-            raw_width,
-            raw_height,
-            grid_width,
-            grid_height,
-            &x_lines,
-            &y_lines,
-            &grid_point_mask,
-        );
 
         // We also need to maintain usage and capacity on the raw grid, initialized with usage from
         // existing edges. We could also use capacity to change how edges are routed here.
@@ -458,7 +471,18 @@ impl EdgeRouter {
             &mut raw_usage_prefix_y,
         );
 
-        debug_print_raw_edge_buffer(raw_width, raw_height, &raw_capacity);
+        let start_end_points: Vec<(usize, usize)> = start_end_indices
+            .iter()
+            .map(|idx| grid_index_to_grid_coords(grid_width, grid_height, *idx)).collect();
+
+        debug_print_buffer(grid_width as i32, grid_height as i32, &grid_point_mask, &start_end_points);
+
+        debug_print_edge_buffer(
+            grid_width as i32,
+            grid_height as i32,
+            &visibility_segment_mask,
+            &start_end_points
+        );
 
         // With the prefix sums, we can also compute usage and capacity on the grid edges.
         // for the initial routing, the usage is zero everywhere and the cose is just the length of the edge.
@@ -484,14 +508,17 @@ impl EdgeRouter {
             let start_orientation: Orientation = match start.direction {
                 Direction::Up | Direction::Down => Orientation::Vertical,
                 Direction::Left | Direction::Right => Orientation::Horizontal,
-                Direction::UpLeft | Direction::DownRight | Direction::Center => Orientation::Vertical,
+                Direction::UpLeft | Direction::DownRight | Direction::Center => {
+                    Orientation::Vertical
+                }
                 Direction::UpRight | Direction::DownLeft => Orientation::Horizontal,
-
             };
             let end_orientation: Orientation = match end.direction {
                 Direction::Up | Direction::Down => Orientation::Vertical,
                 Direction::Left | Direction::Right => Orientation::Horizontal,
-  Direction::UpLeft | Direction::DownRight | Direction::Center => Orientation::Vertical,
+                Direction::UpLeft | Direction::DownRight | Direction::Center => {
+                    Orientation::Vertical
+                }
                 Direction::UpRight | Direction::DownLeft => Orientation::Horizontal,
             };
 
@@ -600,6 +627,14 @@ impl EdgeRouter {
                             }
                         }
                     }
+                    // It is also possible to stay and switch the direction
+
+                    let new_orientation = match orientation {
+                        Orientation::Horizontal => Orientation::Vertical,
+                        Orientation::Vertical => Orientation::Horizontal,
+                    };
+                    neighbors.push((idx, new_orientation));
+
                     neighbors
                 },
                 |from_idx, to_idx, from_orientation, to_orientation| {
@@ -625,33 +660,109 @@ impl EdgeRouter {
                 },
             )?;
             // Convert grid path to actual points with directions
+            // First convert the grid path to actual grid points.
+
+            // For debugging print the path only if a grid index appears twice in the path but not
+            // as direct consecutive duplicates (which indicate direction switches).
+            println!("Grid path from {} to {}: {:?}", u, v, grid_path);
+
+            let mut grid_points: Vec<Point> = grid_path
+                .iter()
+                .map(|(grid_index, _)| {
+                    let (grid_x, grid_y) =
+                        grid_index_to_grid_coords(grid_width, grid_height, *grid_index);
+                    grid_coords_to_point(
+                        &x_lines,
+                        &y_lines,
+                        grid_width,
+                        grid_height,
+                        grid_x,
+                        grid_y,
+                    )
+                })
+                .collect();
+            println!("Grid points: {:?}", grid_points);
+            // Build the full path by inserting intermediate directed points on the raw grid.
             let mut result_path = Vec::new();
-            for (grid_index, orientation) in grid_path {
-                let (grid_x, grid_y) =
-                    grid_index_to_grid_coords(grid_width, grid_height, grid_index);
-                let point = grid_coords_to_point(&x_lines, &y_lines, grid_width, grid_height, grid_x, grid_y);
-                let direction = match orientation {
-                    Orientation::Horizontal => {
-                        if result_path.last().map_or(false, |p: &DirectedPoint| p.x < point.x) {
-                            Direction::Right
-                        } else if result_path.last().map_or(false, |p: &DirectedPoint| p.x > point.x) {
-                            Direction::Left
-                        } else {
-                            Direction::Center
-                        }
+
+            //println!("Grid path: {:?}", grid_points);
+
+            for window in grid_points.windows(2) {
+                let window_start = window[0];
+                let window_end = window[1];
+
+                let mut direction = Direction::Center;
+
+                // Skip duplicate points, which indicate direction switches, we basically
+                // reconstruct the path with directions here anyway.
+                if window_start == window_end {
+                    continue;
+                }
+
+                // Determine if the movement is vertical or horizontal.
+                if window_start.x == window_end.x {
+                    // Vertical segment.
+                    direction = if window_end.y < window_start.y {
+                        Direction::Up
+                    } else {
+                        Direction::Down
+                    };
+                    // Fill intermediate points between start and end (including the start).
+                    let direction_offset = if direction == Direction::Up { -1 } else { 1 };
+
+                    result_path.push(DirectedPoint {
+                        x: window_start.x,
+                        y: window_start.y,
+                        direction,
+                        debug: false,
+                    });
+
+                    for y in 1..=(window_end.y - window_start.y).abs() {
+                        result_path.push(DirectedPoint {
+                            x: window_start.x,
+                            y: window_start.y + y * direction_offset,
+                            direction: direction.opposite(),
+                            debug: false,
+                        });
                     }
-                    Orientation::Vertical => {
-                        if result_path.last().map_or(false, |p: &DirectedPoint| p.y < point.y) {
-                            Direction::Up
-                        } else if result_path.last().map_or(false, |p: &DirectedPoint| p.y > point.y) {
-                            Direction::Down
-                        } else {
-                            Direction::Center
-                        }
+                } else if window_start.y == window_end.y {
+                    // Horizontal segment.
+                    direction = if window_end.x > window_start.x {
+                        Direction::Right
+                    } else {
+                        Direction::Left
+                    };
+
+                    // Fill intermediate points between start and end (including the start).
+                    result_path.push(DirectedPoint {
+                        x: window_start.x,
+                        y: window_start.y,
+                        direction,
+                        debug: false,
+                    });
+
+                    let direction_offset = if direction == Direction::Left { -1 } else { 1 };
+                    for x in 1..=(window_end.x - window_start.x).abs() {
+                        result_path.push(DirectedPoint {
+                            x: window_start.x + x * direction_offset,
+                            y: window_start.y,
+                            direction: direction.opposite(),
+                            debug: false,
+                        });
                     }
-                };
-                result_path.push(DirectedPoint { x: point.x, y: point.y, direction, debug: false });
+                } else {
+                    // In case of diagonal movement (should not occur in our grid routing), just push the end.
+                }
             }
+            // Add the grid endpoint.
+            result_path.push(DirectedPoint {
+                x: end.x,
+                y: end.y,
+                direction: end.direction.opposite(),
+                debug: false,
+            });
+            //println!("Routed path: {:?}", result_path);
+            initial_result_paths.push(result_path.clone());
         }
 
         // Now we iterate up to some maximum number of iterations
@@ -676,8 +787,7 @@ impl EdgeRouter {
             // 4) If no nets overflowed, we're done
         }
 
-
-        Ok(EdgeRoutingsResult::new(result_paths, None))
+        Ok(EdgeRoutingsResult::new(initial_result_paths, None))
     }
 
     fn route_edge(
@@ -717,6 +827,10 @@ where
     NeighborFn: FnMut(usize, Orientation) -> Vec<(usize, Orientation)>,
     CostFn: FnMut(usize, usize, Orientation, Orientation) -> i32,
 {
+    println!(
+        "Routing from grid index {} to {} in grid of size {} x {}",
+        start_grid_index, end_grid_index, grid_width, grid_height
+    );
     if start_grid_index >= grid_point_mask.len() || end_grid_index >= grid_point_mask.len() {
         return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
             "Start or end grid index out of bounds",
@@ -843,6 +957,47 @@ fn grid_coords_to_point(
         x: x_lines[grid_x],
         y: y_lines[grid_y],
     }
+}
+
+fn grid_segment_coords(
+    x_lines: &Vec<i32>,
+    y_lines: &Vec<i32>,
+    grid_width: usize,
+    grid_height: usize,
+    start_grid_x: usize,
+    start_grid_y: usize,
+    end_grid_x: usize,
+    end_grid_y: usize,
+) -> (Point, Point) {
+    assert!(start_grid_x < grid_width);
+    assert!(end_grid_x < grid_width);
+    assert!(start_grid_y < grid_height);
+    assert!(end_grid_y < grid_height);
+
+    // Segments connect adjacent grid coordinates; guard to catch accidental misuse.
+    assert!(
+        (start_grid_x == end_grid_x && start_grid_y.abs_diff(end_grid_y) == 1)
+            || (start_grid_y == end_grid_y && start_grid_x.abs_diff(end_grid_x) == 1)
+    );
+
+    let start = grid_coords_to_point(
+        x_lines,
+        y_lines,
+        grid_width,
+        grid_height,
+        start_grid_x,
+        start_grid_y,
+    );
+    let end = grid_coords_to_point(
+        x_lines,
+        y_lines,
+        grid_width,
+        grid_height,
+        end_grid_x,
+        end_grid_y,
+    );
+
+    (start, end)
 }
 
 fn point_to_grid_index(
@@ -998,25 +1153,32 @@ fn compute_raw_grid_edge_prefix_sums(
     }
 }
 
-fn debug_print_raw_buffer<T: std::fmt::Display>(width: i32, height: i32, buffer: &Vec<T>) {
+fn debug_print_buffer(width: i32, height: i32, buffer: &Vec<bool>, marked: &Vec<(usize, usize)>) {
     for y in 0..height {
         for x in 0..width {
             let index = (y * width + x) as usize;
-            print!(" {}  ", buffer[index]);
+
+            if marked.contains(&(x as usize, y as usize)) {
+                print!("{}", if buffer[index] { 'X' } else { '_' });
+            } else {
+                print!("{}", if buffer[index] { '*' } else { ' ' });
+            }
+
+            print!("-")
         }
         println!();
     }
     println!();
 }
 
-fn debug_print_grid_buffer<T: std::fmt::Display>(
+fn debug_print_grid_buffer(
     raw_width: i32,
     raw_height: i32,
     grid_width: usize,
     grid_height: usize,
     x_lines: &Vec<i32>,
     y_lines: &Vec<i32>,
-    buffer: &Vec<T>,
+    buffer: &Vec<bool>,
 ) {
     for raw_y in 0..raw_height {
         print!("Y{:3} ", y_lines[0] + raw_y);
@@ -1029,9 +1191,9 @@ fn debug_print_grid_buffer<T: std::fmt::Display>(
             if let Some(grid_index) =
                 point_to_grid_index(x_lines, y_lines, grid_width, grid_height, &point)
             {
-                print!("{:5}", buffer[grid_index]);
+                print!("{}", if buffer[grid_index] { 'X' } else { '/' });
             } else {
-                print!("  .  ");
+                print!(" ");
             }
         }
         println!();
@@ -1039,28 +1201,33 @@ fn debug_print_grid_buffer<T: std::fmt::Display>(
     println!();
 }
 
-fn debug_print_raw_edge_buffer<T: std::fmt::Display>(
-    raw_width: i32,
-    raw_height: i32,
-    buffer: &Vec<T>,
-) {
+fn debug_print_edge_buffer(width: i32, height: i32, buffer: &Vec<bool>, marked: &Vec<(usize, usize)>) {
     // Print horizontal edges
-    for y in 0..raw_height {
+    for y in 0..height {
         // Print horizontal edge row
-        print!("  .");
-        for x in 0..(raw_width - 1) {
-            let edge_index = (y * (raw_width - 1) + x) as usize;
-            print!("{:3}  .", buffer[edge_index]);
+        if marked.contains(&(0, y as usize)) {
+            print!("X")
+        } else {
+            print!("*");
+        }
+        for x in 0..(width - 1) {
+            let edge_index = (y * (width - 1) + x) as usize;
+            print!("{:1}", if buffer[edge_index] { '-' } else { ' ' });
+            if marked.contains(&(x as usize, y as usize)) {
+                print!("X")
+            } else {
+                print!("*")
+            }
         }
         println!();
 
         // Print vertical edge row
-        if y < raw_height - 1 {
-            for x in 0..raw_width {
-                let edge_index = ((raw_width - 1) * raw_height + x * (raw_height - 1) + y) as usize;
-                print!("{:3} ", buffer[edge_index]);
-                if x < raw_width - 1 {
-                    print!("  ");
+        if y < height - 1 {
+            for x in 0..width {
+                let edge_index = ((width - 1) * height + x * (height - 1) + y) as usize;
+                print!("{:1}", if buffer[edge_index] { '|' } else { ' ' });
+                if x < width - 1 {
+                    print!(" ");
                 }
             }
             println!();
