@@ -429,12 +429,51 @@ impl EdgeRouter {
 
             if let Ok(grid_x) = min_extruded_grid_x {
                 // Remove the segments along the y grid coordinates with this grid_x.
-                for grid_y in min_grid_y..max_grid_y {
+                for grid_y in max(0, min_grid_y - 1)..=min(grid_height - 2, max_grid_y) {
                     let segment_index = gridcoords_to_segment_index(
                         grid_width,
                         grid_height,
                         (grid_x, grid_y),
-                        (grid_x, grid_y + 1)
+                        (grid_x, grid_y + 1),
+                    );
+                    visibility_segment_mask[segment_index] = false;
+                }
+            }
+
+            if let Ok(grid_x) = max_extruded_grid_x {
+                // Remove the segments along the y grid coordinates with this grid_x.
+                for grid_y in max(0, min_grid_y - 1)..=min(grid_height - 2, max_grid_y) {
+                    let segment_index = gridcoords_to_segment_index(
+                        grid_width,
+                        grid_height,
+                        (grid_x, grid_y),
+                        (grid_x, grid_y + 1),
+                    );
+                    visibility_segment_mask[segment_index] = false;
+                }
+            }
+
+            if let Ok(grid_y) = min_extruded_grid_y {
+                // Remove the segments along the x grid coordinates with this grid_y.
+                for grid_x in max(0, min_grid_x - 1)..=min(grid_width - 2, max_grid_x) {
+                    let segment_index = gridcoords_to_segment_index(
+                        grid_width,
+                        grid_height,
+                        (grid_x, grid_y),
+                        (grid_x + 1, grid_y),
+                    );
+                    visibility_segment_mask[segment_index] = false;
+                }
+            }
+
+            if let Ok(grid_y) = max_extruded_grid_y {
+                // Remove the segments along the x grid coordinates with this grid_y.
+                for grid_x in max(0, min_grid_x - 1)..=min(grid_width - 2, max_grid_x) {
+                    let segment_index = gridcoords_to_segment_index(
+                        grid_width,
+                        grid_height,
+                        (grid_x, grid_y),
+                        (grid_x + 1, grid_y),
                     );
                     visibility_segment_mask[segment_index] = false;
                 }
@@ -473,15 +512,21 @@ impl EdgeRouter {
 
         let start_end_points: Vec<(usize, usize)> = start_end_indices
             .iter()
-            .map(|idx| grid_index_to_grid_coords(grid_width, grid_height, *idx)).collect();
+            .map(|idx| grid_index_to_grid_coords(grid_width, grid_height, *idx))
+            .collect();
 
-        debug_print_buffer(grid_width as i32, grid_height as i32, &grid_point_mask, &start_end_points);
+        debug_print_buffer(
+            grid_width as i32,
+            grid_height as i32,
+            &grid_point_mask,
+            &start_end_points,
+        );
 
         debug_print_edge_buffer(
             grid_width as i32,
             grid_height as i32,
             &visibility_segment_mask,
-            &start_end_points
+            &start_end_points,
         );
 
         // With the prefix sums, we can also compute usage and capacity on the grid edges.
@@ -1201,7 +1246,12 @@ fn debug_print_grid_buffer(
     println!();
 }
 
-fn debug_print_edge_buffer(width: i32, height: i32, buffer: &Vec<bool>, marked: &Vec<(usize, usize)>) {
+fn debug_print_edge_buffer(
+    width: i32,
+    height: i32,
+    buffer: &Vec<bool>,
+    marked: &Vec<(usize, usize)>,
+) {
     // Print horizontal edges
     for y in 0..height {
         // Print horizontal edge row
