@@ -144,6 +144,250 @@ impl EdgeRoutingsResult {
     }
 }
 
+#[derive(Clone, Hash)]
+pub struct RawTermArea {
+    pub top_left: Point,
+    pub bottom_right: Point,
+}
+
+#[derive(Clone, Hash, Default)]
+pub struct VisGrid {
+    pub width: usize,
+    pub height: usize,
+    pub size: usize,
+    pub num_segments: usize,
+    pub x_lines: Vec<i32>,
+    pub y_lines: Vec<i32>,
+}
+
+#[repr(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
+pub struct RawTermPoint(pub u32);
+
+#[repr(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
+pub struct RawTermSegment(pub u32);
+
+#[repr(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
+pub struct VisGridPoint(pub u32);
+
+#[repr(transparent)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
+pub struct VisGridSegment(pub u32);
+
+impl VisGrid {
+    pub fn new(width: usize, height: usize, x_lines: Vec<i32>, y_lines: Vec<i32>) -> Self {
+        VisGrid {
+            width,
+            height,
+            size: width * height,
+            num_segments: (width - 1) * height + (height - 1) * width,
+            x_lines,
+            y_lines,
+        }
+    }
+
+    pub fn from_edges_and_nodes(edges: &Vec<(Point, Point)>, nodes: &Vec<PlacedRectangularNode>) -> Self {
+        // First we generate a grid from all start and end point projections and midpoints.
+
+        // Instead of pushing into BinaryHeap repeatedly,
+        // accumulate unique x and y coordinates in HashSets.
+        let mut x_set = HashSet::new();
+        let mut y_set = HashSet::new();
+
+        for (start, end) in edges {
+            x_set.insert(start.x);
+            x_set.insert(end.x);
+            y_set.insert(start.y);
+            y_set.insert(end.y);
+        }
+
+        // Replace the original binary heaps with ones built from unique values.
+        let mut x_coords: Vec<i32> = x_set.into_iter().collect();
+        let mut y_coords: Vec<i32> = y_set.into_iter().collect();
+
+        // Sort the coordinates
+        // TODO we could do this more rust idiomatically
+        x_coords.sort_unstable();
+        y_coords.sort_unstable();
+        x_coords.reverse();
+        y_coords.reverse();
+
+        // For each pair of consecutive coordinates, we add their midpoint.
+        let mut x_lines = Vec::new();
+        let mut y_lines = Vec::new();
+
+        let mut last_x = None;
+
+        while let Some(x) = x_coords.pop() {
+            if let Some(last_x) = last_x {
+                if last_x < x - 5 {
+                    x_lines.push(last_x + 2);
+                }
+                if last_x < x - 1 {
+                    x_lines.push((last_x + x) / 2);
+                }
+                if last_x < x - 5 {
+                    x_lines.push(x - 2);
+                }
+            }
+            x_lines.push(x);
+            last_x = Some(x);
+        }
+        let mut last_y = None;
+        while let Some(y) = y_coords.pop() {
+            if let Some(last_y) = last_y {
+                if last_y < y - 5 {
+                    y_lines.push(last_y + 2);
+                }
+                if last_y < y - 1 {
+                    y_lines.push((last_y + y) / 2);
+                }
+                if last_y < y - 5 {
+                    y_lines.push(y - 2);
+                }
+            }
+            y_lines.push(y);
+            last_y = Some(y);
+        }
+
+        // Get the bounding box of all nodes
+        let mut min_nodes_x = i32::MAX;
+        let mut max_nodes_x = i32::MIN;
+        let mut min_nodes_y = i32::MAX;
+        let mut max_nodes_y = i32::MIN;
+
+        nodes.iter().for_each(|node| {
+            let tl = node.top_left();
+            let br = node.bottom_right();
+            min_nodes_x = min(min_nodes_x, tl.x);
+            max_nodes_x = max(max_nodes_x, br.x);
+            min_nodes_y = min(min_nodes_y, tl.y);
+            max_nodes_y = max(max_nodes_y, br.y);
+        });
+
+        // We add some padding to the bounding box or use the min/max coordinates of the edges also padded.
+        let padding = 3;
+        let min_x = min(min_nodes_x - padding, x_lines[0] - padding);
+        let max_x = max(max_nodes_x + padding, x_lines[x_lines.len() - 1] + padding);
+        let min_y = min(min_nodes_y - padding, y_lines[0] - padding);
+        let max_y = max(max_nodes_y + padding, y_lines[y_lines.len() - 1] + padding);
+
+        // We add these to the grid keeping it sorted and unique.
+        if !x_lines.contains(&min_x) {
+            x_lines.insert(0, min_x);
+        }
+        if !x_lines.contains(&max_x) {
+            x_lines.push(max_x);
+        }
+        if !y_lines.contains(&min_y) {
+            y_lines.insert(0, min_y);
+        }
+        if !y_lines.contains(&max_y) {
+            y_lines.push(max_y);
+        }
+
+        VisGrid::new(x_lines.len(), y_lines.len(), x_lines, y_lines)
+    }
+
+    fn raw_term_area(&self) -> RawTermArea {
+        RawTermArea {
+            top_left: Point {
+                x: self.x_lines[0],
+                y: self.y_lines[0],
+            },
+            bottom_right: Point {
+                x: self.x_lines[self.width - 1],
+                y: self.y_lines[self.height - 1],
+            },
+        }
+    }
+
+    fn min_x(&self) -> i32 {
+        self.x_lines[0]
+    }
+
+    fn min_y(&self) -> i32 {
+        self.y_lines[0]
+    }
+
+    fn max_x(&self) -> i32 {
+        self.x_lines[self.width - 1]
+    }
+
+    fn max_y(&self) -> i32 {
+        self.y_lines[self.height - 1]
+    }
+
+    fn is_valid_point(&self, point: VisGridPoint) -> bool {
+        point.0 < self.size as u32
+    }
+
+    fn is_valid_segment(&self, segment: VisGridSegment) -> bool {
+        segment.0 < self.num_segments as u32
+    }
+
+    fn point_to_raw_term_point(
+        &self,
+        point: VisGridPoint,
+    ) -> Option<RawTermPoint> {
+        if !self.is_valid_point(point) {
+            return None;
+        }
+        let min_x = self.x_lines[0] as i32;
+        let min_y = self.y_lines[0] as i32;
+        let grid_x = (point.0 % self.width as u32) as usize;
+        let grid_y = (point.0 / self.width as u32) as usize;
+        let x = self.x_lines[grid_x] as i32;
+        let y = self.y_lines[grid_y] as i32;
+        Some(RawTermPoint(((x - min_x) + (y - min_y) * (self.x_lines[self.width - 1] as i32)) as u32))
+    }
+
+    fn point_to_grid_coordinates(
+        &self,
+        point: VisGridPoint,
+    ) -> Option<(usize, usize)> {
+        if !self.is_valid_point(point) {
+            return None;
+        }
+        let grid_x = (point.0 % self.width as u32) as usize;
+        let grid_y = (point.0 / self.width as u32) as usize;
+        Some((grid_x, grid_y))
+    }
+
+    fn raw_term_point_to_grid_point(&self, point: RawTermPoint) -> Option<VisGridPoint> {
+        let min_x = self.min_x();
+        let min_y = self.min_y();
+        let max_x = self.max_x();
+
+        let raw_x = (point.0 % (max_x - min_x + 1) as u32) as i32 + min_x;
+        let raw_y = (point.0 / (max_x - min_x + 1) as u32) as i32 + min_y;
+
+        // Find the closest grid line for x and y
+        let grid_x = match self.x_lines.binary_search(&(raw_x as i32)) {
+            Ok(idx) => idx,
+            Err(idx) => {
+                if idx == 0 || idx >= self.width {
+                    return None;
+                }
+                idx - 1
+            }
+        };
+        let grid_y = match self.y_lines.binary_search(&(raw_y as i32)) {
+            Ok(idx) => idx,
+            Err(idx) => {
+                if idx == 0 || idx >= self.height {
+                    return None;
+                }
+                idx - 1
+            }
+        };
+
+        Some(VisGridPoint((grid_y * self.width + grid_x) as u32))
+    }
+}
+
 #[pyclass]
 pub struct EdgeRouter {
     pub placed_nodes: HashMap<usize, PlacedRectangularNode>,
@@ -238,110 +482,19 @@ impl EdgeRouter {
 
         let MAX_ITERATIONS = 10;
         // First we generate a grid from all start and end point projections and midpoints.
-        let mut x_coords = Vec::new();
-        let mut y_coords = Vec::new();
-        // Instead of pushing into BinaryHeap repeatedly,
-        // accumulate unique x and y coordinates in HashSets.
-        let mut x_set = HashSet::new();
-        let mut y_set = HashSet::new();
+        let vis_grid = VisGrid::from_edges_and_nodes(
+            &edges
+                .iter()
+                .map(|(u, v, _, _, _)| (u.as_point(), v.as_point()))
+                .collect(),
+            &self.placed_nodes.values().cloned().collect(),
+        );
 
-        for (_, _, start, end, _) in &edges {
-            x_set.insert(start.x);
-            x_set.insert(end.x);
-            y_set.insert(start.y);
-            y_set.insert(end.y);
-        }
+        let raw_width = vis_grid.max_x() - vis_grid.min_x() + 1;
+        let raw_height = vis_grid.max_y() - vis_grid.min_y() + 1;
 
-        // Replace the original binary heaps with ones built from unique values.
-        x_coords = x_set.into_iter().collect();
-        y_coords = y_set.into_iter().collect();
-
-        // Sort the coordinates
-        // TODO we could do this more rust idiomatically
-        x_coords.sort_unstable();
-        y_coords.sort_unstable();
-        x_coords.reverse();
-        y_coords.reverse();
-
-        // For each pair of consecutive coordinates, we add their midpoint.
-        let mut x_lines = Vec::new();
-        let mut y_lines = Vec::new();
-
-        println!("x_coords: {:?}", x_coords);
-
-        let mut last_x = None;
-
-        while let Some(x) = x_coords.pop() {
-            if let Some(last_x) = last_x {
-                if last_x < x - 5 {
-                    x_lines.push(last_x + 2);
-                }
-                if last_x < x - 1 {
-                    x_lines.push((last_x + x) / 2);
-                }
-                if last_x < x - 5 {
-                    x_lines.push(x - 2);
-                }
-            }
-            x_lines.push(x);
-            last_x = Some(x);
-        }
-        let mut last_y = None;
-        while let Some(y) = y_coords.pop() {
-            if let Some(last_y) = last_y {
-                if last_y < y - 5 {
-                    y_lines.push(last_y + 2);
-                }
-                if last_y < y - 1 {
-                    y_lines.push((last_y + y) / 2);
-                }
-                if last_y < y - 5 {
-                    y_lines.push(y - 2);
-                }
-            }
-            y_lines.push(y);
-            last_y = Some(y);
-        }
-
-        print!("Initial y  lines: {:?}\n", y_lines);
-
-        // Get the bounding box of all nodes
-        let mut min_nodes_x = i32::MAX;
-        let mut max_nodes_x = i32::MIN;
-        let mut min_nodes_y = i32::MAX;
-        let mut max_nodes_y = i32::MIN;
-
-        self.placed_nodes.values().for_each(|node| {
-            let tl = node.top_left();
-            let br = node.bottom_right();
-            min_nodes_x = min(min_nodes_x, tl.x);
-            max_nodes_x = max(max_nodes_x, br.x);
-            min_nodes_y = min(min_nodes_y, tl.y);
-            max_nodes_y = max(max_nodes_y, br.y);
-        });
-
-        // We add some padding to the bounding box or use the min/max coordinates of the edges also padded.
-        let padding = 3;
-        let min_x = min(min_nodes_x - padding, x_lines[0] - padding);
-        let max_x = max(max_nodes_x + padding, x_lines[x_lines.len() - 1] + padding);
-        let min_y = min(min_nodes_y - padding, y_lines[0] - padding);
-        let max_y = max(max_nodes_y + padding, y_lines[y_lines.len() - 1] + padding);
-
-        // We add these to the grid keeping it sorted and unique.
-        x_lines.insert(0, min_x);
-        x_lines.push(max_x);
-        y_lines.insert(0, min_y);
-        y_lines.push(max_y);
-
-        // Debug print x_lines and y_lines
-        println!("x_lines: {:?}", x_lines);
-        println!("y_lines: {:?}", y_lines);
-
-        let raw_width = max_x - min_x + 1;
-        let raw_height = max_y - min_y + 1;
-
-        let grid_width = x_lines.len();
-        let grid_height = y_lines.len();
+        let grid_width = vis_grid.x_lines.len();
+        let grid_height = vis_grid.y_lines.len();
 
         println!("Raw grid size: {} x {}", raw_width, raw_height);
         println!("Grid size: {} x {}", grid_width, grid_height);
