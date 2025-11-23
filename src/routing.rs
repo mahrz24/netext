@@ -873,10 +873,10 @@ impl EdgeRouter {
                         "End point is not on a grid point",
                     )
                 })?;
-            println!("Routing edge from {:?} to {:?} with start grid coords {:?} and end grid coords {:?}", u, v, start_grid_point, end_grid_index);
+            println!("Routing edge from {:?} to {:?} with start grid coords {:?} and end grid coords {:?}", u, v, start_grid_point, end_grid_point);
 
             let grid_path = route_visibility_astar(
-                masked_grid,
+                &masked_grid,
                 start_grid_point,
                 end_grid_point,
                 start_orientation,
@@ -1050,17 +1050,15 @@ struct GridState {
     orientation: Orientation,
 }
 
-fn route_visibility_astar<NeighborFn, CostFn>(
-    masked_grid: MaskedGrid,
+fn route_visibility_astar<CostFn>(
+    masked_grid: &MaskedGrid,
     start_grid_point: GridPoint,
     end_grid_point: GridPoint,
     start_orientation: Orientation,
     end_orientation: Orientation,
-    mut neighbors_fn: NeighborFn,
     mut cost_fn: CostFn,
 ) -> PyResult<Vec<(GridPoint, Orientation)>>
 where
-    NeighborFn: FnMut(GridPoint, Orientation) -> Vec<(GridPoint, Orientation)>,
     CostFn: FnMut(GridPoint, GridPoint, Orientation, Orientation) -> i32,
 {
     println!(
@@ -1140,7 +1138,7 @@ where
         let current_g = *g_score.get(&current_state).unwrap_or(&MAX_SCORE);
 
         for (neighbor_index, neighbor_orientation) in
-            neighbors_fn(current_state.index, current_state.orientation)
+            masked_grid.neighbors(current_state.index, current_state.orientation)
         {
             if !masked_grid.point_mask[neighbor_index] {
                 continue;
