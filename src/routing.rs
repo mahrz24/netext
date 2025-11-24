@@ -1,3 +1,4 @@
+use hashbrown::raw;
 use rstar::RTreeObject;
 use std::cmp::max;
 use std::cmp::min;
@@ -7,6 +8,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 use std::ops::Index;
 use std::ops::IndexMut;
+use std::result;
 
 use pyo3::prelude::*;
 
@@ -175,37 +177,54 @@ impl RawArea {
         ))
     }
 
-    pub fn edge_prefix_sums(
+    pub fn raw_point_to_prefix_y_index(&self, raw_point: RawPoint) -> usize {
+        let x = (raw_point.0 % ((self.width()) as u32)) as i32;
+        let y = (raw_point.0 / ((self.width()) as u32)) as i32;
+        (x * (self.height()) + y) as usize
+    }
+
+    pub fn raw_point_to_prefix_x_index(&self, raw_point: RawPoint) -> usize {
+        let x = (raw_point.0 % ((self.width()) as u32)) as i32;
+        let y = (raw_point.0 / (self.width() as u32)) as i32;
+        (y * (self.width()) + x) as usize
+    }
+
+    pub fn edge_prefix_sums<T>(
         &self,
-        edge_buffer: &Vec<i32>,
-        prefix_x: &mut Vec<i32>,
-        prefix_y: &mut Vec<i32>,
-    ) {
+        edge_buffer: &Vec<T>,
+        prefix_x: &mut Vec<T>,
+        prefix_y: &mut Vec<T>,
+    ) where
+        T: Copy + Default + std::ops::AddAssign,
+    {
         let width = self.width() as usize;
         let height = self.height() as usize;
         let num_edges = self.num_segments();
 
-        assert!(prefix_x.len() == ((width - 1) * height) as usize);
-        assert!(prefix_y.len() == (width * (height - 1)) as usize);
+        assert!(prefix_x.len() == (width * height) as usize);
+        assert!(prefix_y.len() == (width * height) as usize);
 
         // Fill horizontal prefix sums
         for y in 0..height {
-            let mut sum = 0;
+            let mut sum: T = T::default();
+            prefix_x[y * width] = sum;
             for x in 0..(width - 1) {
                 let edge_index = (y * (width - 1) + x) as usize;
+                let prefix_index = y * width + x + 1;
                 sum += edge_buffer[edge_index];
-                prefix_x[edge_index] = sum;
+                prefix_x[prefix_index] = sum;
             }
         }
 
         // Fill vertical prefix sums
-        let offset = ((width - 1) * height) as usize;
         for x in 0..width {
-            let mut sum = 0;
+            let mut sum: T = T::default();
+            prefix_y[x * height] = sum;
             for y in 0..(height - 1) {
-                let edge_index = ((width - 1) * height + x * (height - 1) + y) as usize;
+                let edge_index = (x * (height - 1) + y) as usize;
+                let prefix_index = x * height + y + 1;
                 sum += edge_buffer[edge_index];
-                prefix_y[edge_index - offset] = sum;
+                prefix_y[prefix_index] = sum;
             }
         }
     }
@@ -226,7 +245,7 @@ pub struct Grid {
 }
 
 #[repr(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
 pub struct RawPoint(pub u32);
 
 #[repr(transparent)]
@@ -398,6 +417,36 @@ impl Grid {
         segment.0 < self.num_segments as u32
     }
 
+    fn grid_coords_to_segment_index(
+        &self,
+        grid_a: (usize, usize),
+        grid_b: (usize, usize),
+    ) -> usize {
+        assert!(grid_a.0 < self.width);
+        assert!(grid_a.1 < self.height);
+        assert!(grid_b.0 < self.width);
+        assert!(grid_b.1 < self.height);
+        if grid_a.0 == grid_b.0 {
+            // Vertical segment
+            // If y differs by more than one, this is not a grid segment
+            assert!(grid_a.1 + 1 == grid_b.1 || grid_b.1 + 1 == grid_a.1);
+            let min_y = min(grid_a.1, grid_b.1);
+            let x = grid_a.0;
+            assert!(min_y < self.height - 1);
+            (self.width - 1) * self.height + x * (self.height - 1) + min_y
+        } else if grid_a.1 == grid_b.1 {
+            // Horizontal segment
+            let y = grid_a.1;
+            // If x differs by more than one, this is not a grid segment
+            assert!(grid_a.0 + 1 == grid_b.0 || grid_b.0 + 1 == grid_a.0);
+            let min_x = min(grid_a.0, grid_b.0);
+            assert!(min_x < self.width - 1);
+            y * (self.width - 1) + min_x
+        } else {
+            panic!("Grid coordinates are not adjacent");
+        }
+    }
+
     fn grid_point_to_raw_point(&self, point: GridPoint) -> Option<RawPoint> {
         if !self.is_valid_point(point) {
             return None;
@@ -444,6 +493,14 @@ impl Grid {
         let grid_x = self.x_lines.binary_search(&point.x).ok()?;
         let grid_y = self.y_lines.binary_search(&point.y).ok()?;
         self.grid_coords_to_grid_point(grid_x, grid_y)
+    }
+
+    fn grid_point_to_point(&self, point: GridPoint) -> Option<Point> {
+        let (grid_x, grid_y) = self.grid_point_to_grid_coords(point)?;
+        Some(Point {
+            x: self.x_lines[grid_x],
+            y: self.y_lines[grid_y],
+        })
     }
 
     fn raw_point_to_closest_grid_point(&self, point: RawPoint) -> Option<GridPoint> {
@@ -531,12 +588,8 @@ impl<'a> MaskedGrid<'a> {
             if let Ok(grid_x) = min_extruded_grid_x {
                 // Remove the segments along the y grid coordinates with this grid_x.
                 for grid_y in max(0, min_grid_y - 1)..=min(grid.height - 2, max_grid_y) {
-                    let segment_index = gridcoords_to_segment_index(
-                        grid.width,
-                        grid.height,
-                        (grid_x, grid_y),
-                        (grid_x, grid_y + 1),
-                    );
+                    let segment_index =
+                        grid.grid_coords_to_segment_index((grid_x, grid_y), (grid_x, grid_y + 1));
                     visibility_segment_mask[segment_index] = false;
                 }
             }
@@ -544,12 +597,8 @@ impl<'a> MaskedGrid<'a> {
             if let Ok(grid_x) = max_extruded_grid_x {
                 // Remove the segments along the y grid coordinates with this grid_x.
                 for grid_y in max(0, min_grid_y - 1)..=min(grid.height - 2, max_grid_y) {
-                    let segment_index = gridcoords_to_segment_index(
-                        grid.width,
-                        grid.height,
-                        (grid_x, grid_y),
-                        (grid_x, grid_y + 1),
-                    );
+                    let segment_index =
+                        grid.grid_coords_to_segment_index((grid_x, grid_y), (grid_x, grid_y + 1));
                     visibility_segment_mask[segment_index] = false;
                 }
             }
@@ -557,12 +606,8 @@ impl<'a> MaskedGrid<'a> {
             if let Ok(grid_y) = min_extruded_grid_y {
                 // Remove the segments along the x grid coordinates with this grid_y.
                 for grid_x in max(0, min_grid_x - 1)..=min(grid.width - 2, max_grid_x) {
-                    let segment_index = gridcoords_to_segment_index(
-                        grid.width,
-                        grid.height,
-                        (grid_x, grid_y),
-                        (grid_x + 1, grid_y),
-                    );
+                    let segment_index =
+                        grid.grid_coords_to_segment_index((grid_x, grid_y), (grid_x + 1, grid_y));
                     visibility_segment_mask[segment_index] = false;
                 }
             }
@@ -570,12 +615,8 @@ impl<'a> MaskedGrid<'a> {
             if let Ok(grid_y) = max_extruded_grid_y {
                 // Remove the segments along the x grid coordinates with this grid_y.
                 for grid_x in max(0, min_grid_x - 1)..=min(grid.width - 2, max_grid_x) {
-                    let segment_index = gridcoords_to_segment_index(
-                        grid.width,
-                        grid.height,
-                        (grid_x, grid_y),
-                        (grid_x + 1, grid_y),
-                    );
+                    let segment_index =
+                        grid.grid_coords_to_segment_index((grid_x, grid_y), (grid_x + 1, grid_y));
                     visibility_segment_mask[segment_index] = false;
                 }
             }
@@ -610,12 +651,8 @@ impl<'a> MaskedGrid<'a> {
                 // Move left
                 if x > 0 {
                     if let Some(neighbor_index) = self.grid.grid_coords_to_grid_point(x - 1, y) {
-                        let segment_index = gridcoords_to_segment_index(
-                            self.grid.width,
-                            self.grid.height,
-                            (x - 1, y),
-                            (x, y),
-                        );
+                        let segment_index =
+                            self.grid.grid_coords_to_segment_index((x - 1, y), (x, y));
                         if self.segment_mask[segment_index] {
                             neighbors.push((neighbor_index, Orientation::Horizontal));
                         }
@@ -624,12 +661,8 @@ impl<'a> MaskedGrid<'a> {
                 // Move right
                 if x + 1 < self.grid.width {
                     if let Some(neighbor_index) = self.grid.grid_coords_to_grid_point(x + 1, y) {
-                        let segment_index = gridcoords_to_segment_index(
-                            self.grid.width,
-                            self.grid.height,
-                            (x, y),
-                            (x + 1, y),
-                        );
+                        let segment_index =
+                            self.grid.grid_coords_to_segment_index((x, y), (x + 1, y));
                         if self.segment_mask[segment_index] {
                             neighbors.push((neighbor_index, Orientation::Horizontal));
                         }
@@ -640,12 +673,8 @@ impl<'a> MaskedGrid<'a> {
                 // Move up
                 if y > 0 {
                     if let Some(neighbor_index) = self.grid.grid_coords_to_grid_point(x, y - 1) {
-                        let segment_index = gridcoords_to_segment_index(
-                            self.grid.width,
-                            self.grid.height,
-                            (x, y - 1),
-                            (x, y),
-                        );
+                        let segment_index =
+                            self.grid.grid_coords_to_segment_index((x, y - 1), (x, y));
                         if self.segment_mask[segment_index] {
                             neighbors.push((neighbor_index, Orientation::Vertical));
                         }
@@ -654,12 +683,8 @@ impl<'a> MaskedGrid<'a> {
                 // Move down
                 if y + 1 < self.grid.height {
                     if let Some(neighbor_index) = self.grid.grid_coords_to_grid_point(x, y + 1) {
-                        let segment_index = gridcoords_to_segment_index(
-                            self.grid.width,
-                            self.grid.height,
-                            (x, y),
-                            (x, y + 1),
-                        );
+                        let segment_index =
+                            self.grid.grid_coords_to_segment_index((x, y), (x, y + 1));
                         if self.segment_mask[segment_index] {
                             neighbors.push((neighbor_index, Orientation::Vertical));
                         }
@@ -782,7 +807,8 @@ impl EdgeRouter {
             );
         }
 
-        let MAX_ITERATIONS = 10;
+        let max_iterations = 10;
+
         // First we generate a grid from all start and end point projections and midpoints.
         let grid = Grid::from_edges_and_nodes(
             &edges
@@ -793,7 +819,7 @@ impl EdgeRouter {
         );
 
         let raw_area = grid.raw_area();
-        let raw_num_edges = raw_area.num_segments();
+        let raw_num_segments = raw_area.num_segments();
 
         // Then we remove all grid points that are inside any placed node and all edges that intersect
         // any placed node or are directly adjacent to a placed node.
@@ -820,14 +846,16 @@ impl EdgeRouter {
 
         // We also need to maintain usage and capacity on the raw grid, initialized with usage from
         // existing edges. We could also use capacity to change how edges are routed here.
-        let mut raw_usage = vec![0; raw_num_edges as usize];
-        let mut raw_capacity = vec![1; raw_num_edges as usize];
+        let mut raw_usage = vec![0; raw_num_segments as usize];
+        let mut raw_capacity = vec![1; raw_num_segments as usize];
+        let mut raw_cost = vec![0.0; raw_num_segments as usize];
+        let mut raw_history_cost = vec![0.0; raw_num_segments as usize];
 
         // Create prefix sums along the x and y axes for fast capacity queries later.
         let mut raw_capacity_prefix_x =
-            vec![0; ((raw_area.width() - 1) * raw_area.height()) as usize];
+            vec![0; ((raw_area.width()) * raw_area.height()) as usize];
         let mut raw_capacity_prefix_y =
-            vec![0; (raw_area.width() * (raw_area.height() - 1)) as usize];
+            vec![0; (raw_area.width() * (raw_area.height())) as usize];
 
         raw_area.edge_prefix_sums(
             &raw_capacity,
@@ -835,183 +863,215 @@ impl EdgeRouter {
             &mut raw_capacity_prefix_y,
         );
 
-        let mut raw_usage_prefix_x = vec![0; ((raw_area.width() - 1) * raw_area.height()) as usize];
-        let mut raw_usage_prefix_y = vec![0; (raw_area.width() * (raw_area.height() - 1)) as usize];
+        let mut raw_usage_prefix_x = vec![0; ((raw_area.width()) * raw_area.height()) as usize];
+        let mut raw_usage_prefix_y = vec![0; (raw_area.width() * (raw_area.height())) as usize];
 
-        raw_area.edge_prefix_sums(&raw_usage, &mut raw_usage_prefix_x, &mut raw_usage_prefix_y);
+        let mut raw_cost_prefix_x =
+            vec![0.0; ((raw_area.width()) * raw_area.height()) as usize];
+        let mut raw_cost_prefix_y =
+            vec![0.0; (raw_area.width() * (raw_area.height())) as usize];
+
+        let mut raw_history_cost_prefix_x =
+            vec![0.0; ((raw_area.width()) * raw_area.height()) as usize];
+        let mut raw_history_cost_prefix_y =
+            vec![0.0; (raw_area.width() * (raw_area.height())) as usize];
+
         // With the prefix sums, we can also compute usage and capacity on the grid edges.
         // for the initial routing, the usage is zero everywhere and the cose is just the length of the edge.
         // hence we can pass a simplified cost function to the A*
 
-        let mut initial_result_paths: Vec<Vec<DirectedPoint>> = Vec::new();
-
-        // Now we route all edges once, storing their paths and updating usage.
-        for (u, v, start, end, _) in edges {
-            let start_raw_point = raw_area.point_to_raw_point(&start.as_point());
-            let end_raw_point = raw_area.point_to_raw_point(&end.as_point());
-
-            if start_raw_point.is_none() || end_raw_point.is_none() {
-                return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                    "Start or end point is out of bounds",
-                ));
-            }
-            let start_raw_point = start_raw_point.unwrap();
-            let end_raw_point = end_raw_point.unwrap();
-
-            let start_orientation: Orientation = start.direction.to_orientation();
-            let end_orientation: Orientation = end.direction.to_orientation();
-
-            let start_grid_point: GridPoint =
-                grid.point_to_grid_point(&start.as_point()).ok_or_else(|| {
-                    PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "Start point is not on a grid point",
-                    )
-                })?;
-            let end_grid_point: GridPoint =
-                grid.point_to_grid_point(&end.as_point()).ok_or_else(|| {
-                    PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "End point is not on a grid point",
-                    )
-                })?;
-            println!("Routing edge from {:?} to {:?} with start grid coords {:?} and end grid coords {:?}", u, v, start_grid_point, end_grid_point);
-
-            let grid_path = route_visibility_astar(
-                &masked_grid,
-                start_grid_point,
-                end_grid_point,
-                start_orientation,
-                end_orientation,
-                |from_idx, to_idx, from_orientation, to_orientation| {
-                    // Cost function
-                    let (from_grid_x, from_grid_y) =
-                        grid.grid_point_to_grid_coords(from_idx).unwrap();
-                    let (to_grid_x, to_grid_y) = grid.grid_point_to_grid_coords(to_idx).unwrap();
-
-                    let from_actual_x = grid.x_lines[from_grid_x];
-                    let from_actual_y = grid.y_lines[from_grid_y];
-                    let to_actual_x = grid.x_lines[to_grid_x];
-                    let to_actual_y = grid.y_lines[to_grid_y];
-
-                    let distance =
-                        (from_actual_x - to_actual_x).abs() + (from_actual_y - to_actual_y).abs();
-                    let orientation_cost = if from_orientation != to_orientation {
-                        10
-                    } else {
-                        0
-                    };
-                    distance + orientation_cost
-                },
-            )?;
-            // Convert grid path to actual points with directions
-            // First convert the grid path to actual grid points.
-
-            // For debugging print the path only if a grid index appears twice in the path but not
-            // as direct consecutive duplicates (which indicate direction switches).
-            println!("Grid path from {} to {}: {:?}", u, v, grid_path);
-
-            let mut grid_points: Vec<Point> = grid_path
-                .iter()
-                .map(|(grid_index, _)| {
-                    let (grid_x, grid_y) = grid.grid_point_to_raw_coords(*grid_index).unwrap();
-                    Point {
-                        x: grid_x,
-                        y: grid_y,
-                    }
-                })
-                .collect();
-            println!("Grid points: {:?}", grid_points);
-
-            // Build the full path by inserting intermediate directed points on the raw grid.
-            let mut result_path = Vec::new();
-
-            //println!("Grid path: {:?}", grid_points);
-
-            for window in grid_points.windows(2) {
-                let window_start = window[0];
-                let window_end = window[1];
-
-                let mut direction = Direction::Center;
-
-                // Skip duplicate points, which indicate direction switches, we basically
-                // reconstruct the path with directions here anyway.
-                if window_start == window_end {
-                    continue;
-                }
-
-                // Determine if the movement is vertical or horizontal.
-                if window_start.x == window_end.x {
-                    // Vertical segment.
-                    direction = if window_end.y < window_start.y {
-                        Direction::Up
-                    } else {
-                        Direction::Down
-                    };
-                    // Fill intermediate points between start and end (including the start).
-                    let direction_offset = if direction == Direction::Up { -1 } else { 1 };
-
-                    result_path.push(DirectedPoint {
-                        x: window_start.x,
-                        y: window_start.y,
-                        direction,
-                        debug: false,
-                    });
-
-                    for y in 1..=(window_end.y - window_start.y).abs() {
-                        result_path.push(DirectedPoint {
-                            x: window_start.x,
-                            y: window_start.y + y * direction_offset,
-                            direction: direction.opposite(),
-                            debug: false,
-                        });
-                    }
-                } else if window_start.y == window_end.y {
-                    // Horizontal segment.
-                    direction = if window_end.x > window_start.x {
-                        Direction::Right
-                    } else {
-                        Direction::Left
-                    };
-
-                    // Fill intermediate points between start and end (including the start).
-                    result_path.push(DirectedPoint {
-                        x: window_start.x,
-                        y: window_start.y,
-                        direction,
-                        debug: false,
-                    });
-
-                    let direction_offset = if direction == Direction::Left { -1 } else { 1 };
-                    for x in 1..=(window_end.x - window_start.x).abs() {
-                        result_path.push(DirectedPoint {
-                            x: window_start.x + x * direction_offset,
-                            y: window_start.y,
-                            direction: direction.opposite(),
-                            debug: false,
-                        });
-                    }
-                } else {
-                    // In case of diagonal movement (should not occur in our grid routing), just push the end.
-                }
-            }
-            // Add the grid endpoint.
-            result_path.push(DirectedPoint {
-                x: end.x,
-                y: end.y,
-                direction: end.direction.opposite(),
-                debug: false,
-            });
-            //println!("Routed path: {:?}", result_path);
-            initial_result_paths.push(result_path.clone());
-        }
+        let mut result_paths: HashMap<(RawPoint, RawPoint), Vec<DirectedPoint>> = HashMap::new();
 
         // Now we iterate up to some maximum number of iterations
+        let lambda = 2.0;
+        let base_cost = 1.0;
 
-        for _ in 0..MAX_ITERATIONS {
+        for _ in 0..max_iterations {
             // 1) Compute present costs from current usage
+            for i in 0..raw_num_segments as usize {
+                // Cost is base + lambda * max(0, usage - capacity)
+                let usage = raw_usage[i];
+                let capacity = raw_capacity[i];
+                let overflow = if usage > capacity {
+                    usage - capacity
+                } else {
+                    0
+                };
+                raw_cost[i] = 1.0 + lambda * (overflow as f64);
+            }
+
+            // Update prefix sums as the per edge costs have now all changed.
+            raw_area.edge_prefix_sums(&raw_usage, &mut raw_usage_prefix_x, &mut raw_usage_prefix_y);
+            raw_area.edge_prefix_sums(&raw_cost, &mut raw_cost_prefix_x, &mut raw_cost_prefix_y);
+            raw_area.edge_prefix_sums(
+                &raw_history_cost,
+                &mut raw_history_cost_prefix_x,
+                &mut raw_history_cost_prefix_y,
+            );
 
             // 2) Order nets by difficulty (span, channel width, past failures, etc.)
+            // We want to route all edges, starting with the most difficult ones.
+            // Difficulty is the span (Manhattan distance) between start and end point
+            // plus the obstacle density in the bounding box of start and end point
+            let mut sorted_edges = edges.clone();
+            sorted_edges.sort_by_key(|(_, _, start, end, _)| {
+                // TODO We could cache this value per edge to avoid recomputing it every iteration.
+                // TODO We could also use a spatial index to quickly find obstacles in the bounding box.
+                let span = (start.as_point().x - end.as_point().x).abs()
+                    + (start.as_point().y - end.as_point().y).abs();
+                let min_x = min(start.as_point().x, end.as_point().x);
+                let max_x = max(start.as_point().x, end.as_point().x);
+                let min_y = min(start.as_point().y, end.as_point().y);
+                let max_y = max(start.as_point().y, end.as_point().y);
+                let mut obstacle_area = 0;
+                let mut total_area = (max_x - min_x) * (max_y - min_y);
+                for node in &placed_nodes_vector {
+                    let node_tl = node.top_left();
+                    let node_br = node.bottom_right();
+                    if node_tl.x <= max_x
+                        && node_br.x >= min_x
+                        && node_tl.y <= max_y
+                        && node_br.y >= min_y
+                    {
+                        obstacle_area += (min(node_br.x, max_x) - max(node_tl.x, min_x)).max(0)
+                            * (min(node_br.y, max_y) - max(node_tl.y, min_y)).max(0);
+                    }
+                }
+                -(span + (200.0 * obstacle_area as f32 / (total_area as f32)).round() as i32)
+            });
 
             // 3) For each net in order, find the cheapest path using A* or Dijkstra
+
+            // Now we route all edges once, storing their paths and updating usage.
+            for (u, v, start, end, _) in sorted_edges {
+                let start_raw_point = raw_area.point_to_raw_point(&start.as_point());
+                let end_raw_point = raw_area.point_to_raw_point(&end.as_point());
+
+                if start_raw_point.is_none() || end_raw_point.is_none() {
+                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                        "Start or end point is out of bounds",
+                    ));
+                }
+                let start_raw_point = start_raw_point.unwrap();
+                let end_raw_point = end_raw_point.unwrap();
+
+                let start_orientation: Orientation = start.direction.to_orientation();
+                let end_orientation: Orientation = end.direction.to_orientation();
+
+                let start_grid_point: GridPoint =
+                    grid.point_to_grid_point(&start.as_point()).ok_or_else(|| {
+                        PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                            "Start point is not on a grid point",
+                        )
+                    })?;
+                let end_grid_point: GridPoint =
+                    grid.point_to_grid_point(&end.as_point()).ok_or_else(|| {
+                        PyErr::new::<pyo3::exceptions::PyValueError, _>(
+                            "End point is not on a grid point",
+                        )
+                    })?;
+
+                let grid_path = route_visibility_astar(
+                    &masked_grid,
+                    start_grid_point,
+                    end_grid_point,
+                    start_orientation,
+                    end_orientation,
+                    |from_idx, to_idx, from_orientation, to_orientation| {
+                        // Cost function
+                        let from_point =
+                            grid.grid_point_to_point(from_idx).unwrap();
+                        let to_point =
+                            grid.grid_point_to_point(to_idx).unwrap();
+
+                        let turn_cost = if from_orientation != to_orientation {
+                            1
+                        } else {
+                            0
+                        };
+
+                        // The current cost can be computed using the prefix sums on the raw grid.
+                        let current_cost = if from_point == to_point {
+                            0
+                        } else {
+                            if from_point.x == to_point.x {
+                                // Vertical move
+                                let to_upper = to_point.y > from_point.y;
+
+                                let upper_raw_point = if to_upper {
+                                    grid.grid_point_to_raw_point(to_idx).unwrap()
+                                } else {
+                                    grid.grid_point_to_raw_point(from_idx).unwrap()
+                                };
+                                let lower_raw_point = if to_upper {
+                                    grid.grid_point_to_raw_point(from_idx).unwrap()
+                                } else {
+                                    grid.grid_point_to_raw_point(to_idx).unwrap()
+                                };
+
+                                let prefix_index_lower =
+                                    raw_area.raw_point_to_prefix_y_index(lower_raw_point);
+                                let prefix_index_upper =
+                                    raw_area.raw_point_to_prefix_y_index(upper_raw_point);
+                                raw_cost_prefix_y[prefix_index_upper] as i32
+                                    - raw_cost_prefix_y[prefix_index_lower] as i32
+                            } else {
+                                // Horizontal move
+                                let to_left = to_point.x < from_point.x;
+
+                                let left_raw_point = if to_left {
+                                    grid.grid_point_to_raw_point(to_idx).unwrap()
+                                } else {
+                                    grid.grid_point_to_raw_point(from_idx).unwrap()
+                                };
+                                let right_raw_point = if to_left {
+                                    grid.grid_point_to_raw_point(from_idx).unwrap()
+                                } else {
+                                    grid.grid_point_to_raw_point(to_idx).unwrap()
+                                };
+
+                                let prefix_index_left =
+                                    raw_area.raw_point_to_prefix_x_index(left_raw_point);
+                                let prefix_index_right =
+                                    raw_area.raw_point_to_prefix_x_index(right_raw_point);
+
+                                println!("Right cost {} at {:?}", raw_cost_prefix_x[prefix_index_right], right_raw_point);
+                                println!("Left cost {} at {:?}", raw_cost_prefix_x[prefix_index_left], left_raw_point);
+
+                                raw_cost_prefix_x[prefix_index_right] as i32
+                                    - raw_cost_prefix_x[prefix_index_left] as i32
+                            }
+                        };
+                        println!(
+                            "Cost from {:?} to {:?}: turn_cost = {}, current_cost = {}",
+                            from_point,
+                            to_point,
+                            turn_cost,
+                            current_cost
+                        );
+                        turn_cost + current_cost
+                    },
+                )?;
+                // Convert grid path to actual points with directions
+
+                // First convert the grid path to actual grid points (only corner points).
+                let grid_points: Vec<Point> = grid_path
+                    .iter()
+                    .map(|(grid_index, _)| {
+                        let (grid_x, grid_y) = grid.grid_point_to_raw_coords(*grid_index).unwrap();
+                        Point {
+                            x: grid_x,
+                            y: grid_y,
+                        }
+                    })
+                    .collect();
+                println!("Grid points: {:?}", grid_points);
+
+                let result_path: Vec<DirectedPoint> =
+                    grid_point_path_to_directed_point_path(&grid_points, &end);
+                //println!("Routed path: {:?}", result_path);
+                result_paths.insert((start_raw_point, end_raw_point), result_path);
+            }
 
             // a) Skip locked nets (no overflow)
 
@@ -1026,7 +1086,10 @@ impl EdgeRouter {
             // 4) If no nets overflowed, we're done
         }
 
-        Ok(EdgeRoutingsResult::new(initial_result_paths, None))
+        Ok(EdgeRoutingsResult::new(
+            result_paths.values().cloned().collect(),
+            None,
+        ))
     }
 
     fn route_edge(
@@ -1039,7 +1102,7 @@ impl EdgeRouter {
         global_end: DirectedPoint,
         config: RoutingConfig,
     ) -> PyResult<EdgeRoutingResult> {
-        let mut result_path = Vec::new();
+        let result_path = Vec::new();
         Ok(EdgeRoutingResult::new(result_path, None))
     }
 }
@@ -1186,71 +1249,84 @@ where
     ))
 }
 
-fn gridcoords_to_segment_index(
-    grid_width: usize,
-    grid_height: usize,
-    grid_a: (usize, usize),
-    grid_b: (usize, usize),
-) -> usize {
-    assert!(grid_a.0 < grid_width);
-    assert!(grid_a.1 < grid_height);
-    assert!(grid_b.0 < grid_width);
-    assert!(grid_b.1 < grid_height);
-    if grid_a.0 == grid_b.0 {
-        // Vertical segment
-        // If y differs by more than one, this is not a grid segment
-        assert!(grid_a.1 + 1 == grid_b.1 || grid_b.1 + 1 == grid_a.1);
-        let min_y = min(grid_a.1, grid_b.1);
-        let x = grid_a.0;
-        assert!(min_y < grid_height - 1);
-        (grid_width - 1) * grid_height + x * (grid_height - 1) + min_y
-    } else if grid_a.1 == grid_b.1 {
-        // Horizontal segment
-        let y = grid_a.1;
-        // If x differs by more than one, this is not a grid segment
-        assert!(grid_a.0 + 1 == grid_b.0 || grid_b.0 + 1 == grid_a.0);
-        let min_x = min(grid_a.0, grid_b.0);
-        assert!(min_x < grid_width - 1);
-        y * (grid_width - 1) + min_x
-    } else {
-        panic!("Grid coordinates are not adjacent");
-    }
-}
+fn grid_point_path_to_directed_point_path(
+    grid_points: &Vec<Point>,
+    end: &DirectedPoint,
+) -> Vec<DirectedPoint> {
+    // Build the full path by inserting intermediate directed points on the raw grid.
+    let mut result_path = Vec::new();
 
-fn segment_index_to_gridcoords(
-    grid_width: usize,
-    grid_height: usize,
-    segment_index: usize,
-) -> ((usize, usize), (usize, usize)) {
-    assert!(segment_index < (grid_width - 1) * grid_height + (grid_height - 1) * grid_width);
-    if segment_index < (grid_width - 1) * grid_height {
-        // Horizontal segment
-        let grid_y = segment_index / (grid_width - 1);
-        let grid_x = segment_index % (grid_width - 1);
-        ((grid_x, grid_y), (grid_x + 1, grid_y))
-    } else {
-        // Vertical segment
-        let vertical_index = segment_index - (grid_width - 1) * grid_height;
-        let grid_x = vertical_index / (grid_height - 1);
-        let grid_y = vertical_index % (grid_height - 1);
-        ((grid_x, grid_y), (grid_x, grid_y + 1))
-    }
-}
+    for window in grid_points.windows(2) {
+        let window_start = window[0];
+        let window_end = window[1];
 
-fn debug_print_buffer(width: i32, height: i32, buffer: &Vec<bool>, marked: &Vec<(usize, usize)>) {
-    for y in 0..height {
-        for x in 0..width {
-            let index = (y * width + x) as usize;
-
-            if marked.contains(&(x as usize, y as usize)) {
-                print!("{}", if buffer[index] { 'X' } else { '_' });
-            } else {
-                print!("{}", if buffer[index] { '*' } else { ' ' });
-            }
-
-            print!("-")
+        // Skip duplicate points, which indicate direction switches, we basically
+        // reconstruct the path with directions here anyway.
+        if window_start == window_end {
+            continue;
         }
-        println!();
+
+        // Determine if the movement is vertical or horizontal.
+        if window_start.x == window_end.x {
+            // Vertical segment.
+            let direction = if window_end.y < window_start.y {
+                Direction::Up
+            } else {
+                Direction::Down
+            };
+            // Fill intermediate points between start and end (including the start).
+            let direction_offset = if direction == Direction::Up { -1 } else { 1 };
+
+            result_path.push(DirectedPoint {
+                x: window_start.x,
+                y: window_start.y,
+                direction,
+                debug: false,
+            });
+
+            for y in 1..=(window_end.y - window_start.y).abs() {
+                result_path.push(DirectedPoint {
+                    x: window_start.x,
+                    y: window_start.y + y * direction_offset,
+                    direction: direction.opposite(),
+                    debug: false,
+                });
+            }
+        } else if window_start.y == window_end.y {
+            // Horizontal segment.
+            let direction = if window_end.x > window_start.x {
+                Direction::Right
+            } else {
+                Direction::Left
+            };
+
+            // Fill intermediate points between start and end (including the start).
+            result_path.push(DirectedPoint {
+                x: window_start.x,
+                y: window_start.y,
+                direction,
+                debug: false,
+            });
+
+            let direction_offset = if direction == Direction::Left { -1 } else { 1 };
+            for x in 1..=(window_end.x - window_start.x).abs() {
+                result_path.push(DirectedPoint {
+                    x: window_start.x + x * direction_offset,
+                    y: window_start.y,
+                    direction: direction.opposite(),
+                    debug: false,
+                });
+            }
+        } else {
+            // In case of diagonal movement (should not occur in our grid routing), just push the end.
+        }
     }
-    println!();
+    // Add the grid endpoint.
+    result_path.push(DirectedPoint {
+        x: end.x,
+        y: end.y,
+        direction: end.direction.opposite(),
+        debug: false,
+    });
+    result_path
 }
