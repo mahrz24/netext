@@ -177,18 +177,43 @@ impl RawArea {
         ))
     }
 
-    pub fn raw_point_to_prefix_y_index(&self, raw_point: RawPoint) -> usize {
-        let x = (raw_point.0 % ((self.width()) as u32)) as i32;
-        let y = (raw_point.0 / ((self.width()) as u32)) as i32;
-        (x * (self.height()) + y) as usize
-    }
+    pub fn directed_point_to_segment_index(&self, directed_point: &Point) -> Option<usize> {
+        let raw_point = self.point_to_raw_point(directed_point)?;
+        let grid_x = (raw_point.0 % (self.width() as u32)) as i32;
+        let grid_y = (raw_point.0 / (self.width() as u32)) as i32;
 
-    pub fn raw_point_to_prefix_x_index(&self, raw_point: RawPoint) -> usize {
-        let x = (raw_point.0 % ((self.width()) as u32)) as i32;
-        let y = (raw_point.0 / (self.width() as u32)) as i32;
-        (y * (self.width()) + x) as usize
+        match directed_point.direction {
+            Direction::Up => {
+                if grid_y == 0 {
+                    return None;
+                }
+                Some(((self.width() - 1) * self.height()
+                    + grid_x * (self.height() - 1)
+                    + (grid_y - 1)) as usize)
+            }
+            Direction::Down => {
+                if grid_y >= self.height() - 1 {
+                    return None;
+                }
+                Some(((self.width() - 1) * self.height()
+                    + grid_x * (self.height() - 1)
+                    + grid_y) as usize)
+            }
+            Direction::Left => {
+                if grid_x == 0 {
+                    return None;
+                }
+                Some((grid_y * (self.width() - 1) + (grid_x - 1)) as usize)
+            }
+            Direction::Right => {
+                if grid_x >= self.width() - 1 {
+                    return None;
+                }
+                Some((grid_y * (self.width() - 1) + grid_x) as usize)
+            }
+            _ => None,
+        }
     }
-
     pub fn edge_prefix_sums<T>(
         &self,
         edge_buffer: &Vec<T>,
@@ -219,10 +244,10 @@ impl RawArea {
         // Fill vertical prefix sums
         for x in 0..width {
             let mut sum: T = T::default();
-            prefix_y[x * height] = sum;
+            prefix_y[x] = sum;
             for y in 0..(height - 1) {
-                let edge_index = (x * (height - 1) + y) as usize;
-                let prefix_index = x * height + y + 1;
+                let edge_index = ((width - 1) * height + x * (height - 1) + y) as usize;
+                let prefix_index = (y + 1) * width + x;
                 sum += edge_buffer[edge_index];
                 prefix_y[prefix_index] = sum;
             }
@@ -451,14 +476,14 @@ impl Grid {
         if !self.is_valid_point(point) {
             return None;
         }
-        let min_x = self.x_lines[0] as i32;
-        let min_y = self.y_lines[0] as i32;
+
         let grid_x = (point.0 % self.width as u32) as usize;
         let grid_y = (point.0 / self.width as u32) as usize;
         let x = self.x_lines[grid_x] as i32;
         let y = self.y_lines[grid_y] as i32;
+        let raw_width = self.max_x - self.min_x + 1;
         Some(RawPoint(
-            ((x - min_x) + (y - min_y) * (self.x_lines[self.width - 1] as i32)) as u32,
+            ((x - self.min_x) + (y - self.min_y) * raw_width) as u32,
         ))
     }
 
@@ -851,25 +876,8 @@ impl EdgeRouter {
         let mut raw_cost = vec![0.0; raw_num_segments as usize];
         let mut raw_history_cost = vec![0.0; raw_num_segments as usize];
 
-        // Create prefix sums along the x and y axes for fast capacity queries later.
-        let mut raw_capacity_prefix_x =
-            vec![0; ((raw_area.width()) * raw_area.height()) as usize];
-        let mut raw_capacity_prefix_y =
-            vec![0; (raw_area.width() * (raw_area.height())) as usize];
-
-        raw_area.edge_prefix_sums(
-            &raw_capacity,
-            &mut raw_capacity_prefix_x,
-            &mut raw_capacity_prefix_y,
-        );
-
-        let mut raw_usage_prefix_x = vec![0; ((raw_area.width()) * raw_area.height()) as usize];
-        let mut raw_usage_prefix_y = vec![0; (raw_area.width() * (raw_area.height())) as usize];
-
-        let mut raw_cost_prefix_x =
-            vec![0.0; ((raw_area.width()) * raw_area.height()) as usize];
-        let mut raw_cost_prefix_y =
-            vec![0.0; (raw_area.width() * (raw_area.height())) as usize];
+        let mut raw_cost_prefix_x = vec![0.0; ((raw_area.width()) * raw_area.height()) as usize];
+        let mut raw_cost_prefix_y = vec![0.0; (raw_area.width() * (raw_area.height())) as usize];
 
         let mut raw_history_cost_prefix_x =
             vec![0.0; ((raw_area.width()) * raw_area.height()) as usize];
@@ -884,9 +892,12 @@ impl EdgeRouter {
 
         // Now we iterate up to some maximum number of iterations
         let lambda = 2.0;
+        let mu: f64 = 0.5;
         let base_cost = 1.0;
+        let mut sorted_edges = edges.clone();
 
-        for _ in 0..max_iterations {
+        for i in 0..max_iterations {
+            println!("Routing iteration {}", i);
             // 1) Compute present costs from current usage
             for i in 0..raw_num_segments as usize {
                 // Cost is base + lambda * max(0, usage - capacity)
@@ -900,8 +911,27 @@ impl EdgeRouter {
                 raw_cost[i] = 1.0 + lambda * (overflow as f64);
             }
 
+            // // Print the cost as a grid (once vertical and then horizontal)
+            // for y in 0..raw_area.height() {
+            //     let mut row = String::new();
+            //     for x in 0..(raw_area.width() - 1) {
+            //         let edge_index = (y * (raw_area.width() - 1) + x) as usize;
+            //         row.push_str(&format!("{:.0} ", raw_cost[edge_index]));
+            //     }
+            //     println!("H{:03}: {}", y, row);
+            // }
+            // for y in 0..(raw_area.height() - 1) {
+            //     let mut row = String::new();
+            //     for x in 0..raw_area.width() {
+            //         let edge_index = ((raw_area.width() - 1) * raw_area.height()
+            //             + x * (raw_area.height() - 1)
+            //             + y) as usize;
+            //         row.push_str(&format!("{:.0} ", raw_cost[edge_index]));
+            //     }
+            //     println!("V{:03}: {}", y, row);
+            // }
+
             // Update prefix sums as the per edge costs have now all changed.
-            raw_area.edge_prefix_sums(&raw_usage, &mut raw_usage_prefix_x, &mut raw_usage_prefix_y);
             raw_area.edge_prefix_sums(&raw_cost, &mut raw_cost_prefix_x, &mut raw_cost_prefix_y);
             raw_area.edge_prefix_sums(
                 &raw_history_cost,
@@ -909,11 +939,31 @@ impl EdgeRouter {
                 &mut raw_history_cost_prefix_y,
             );
 
+            // Print prefix x sums for debugging
+            // println!("Raw cost prefix x sums:");
+            // for y in 0..raw_area.height() {
+            //     let mut row = String::new();
+            //     for x in 0..raw_area.width() {
+            //         let index = (y * raw_area.width() + x) as usize;
+            //         row.push_str(&format!("{:.0} ", raw_cost_prefix_x[index]));
+            //     }
+            //     println!("R{:03}: {}", y, row);
+            // }
+            // println!("Raw cost prefix y sums:");
+            // for y in 0..raw_area.height() {
+            //     let mut row = String::new();
+            //     for x in 0..raw_area.width() {
+            //         let index = (y * raw_area.width() + x) as usize;
+            //         row.push_str(&format!("{:.0} ", raw_cost_prefix_y[index]));
+            //     }
+            //     println!("R{:03}: {}", y, row);
+            // }
+
             // 2) Order nets by difficulty (span, channel width, past failures, etc.)
             // We want to route all edges, starting with the most difficult ones.
             // Difficulty is the span (Manhattan distance) between start and end point
             // plus the obstacle density in the bounding box of start and end point
-            let mut sorted_edges = edges.clone();
+
             sorted_edges.sort_by_key(|(_, _, start, end, _)| {
                 // TODO We could cache this value per edge to avoid recomputing it every iteration.
                 // TODO We could also use a spatial index to quickly find obstacles in the bounding box.
@@ -979,10 +1029,8 @@ impl EdgeRouter {
                     end_orientation,
                     |from_idx, to_idx, from_orientation, to_orientation| {
                         // Cost function
-                        let from_point =
-                            grid.grid_point_to_point(from_idx).unwrap();
-                        let to_point =
-                            grid.grid_point_to_point(to_idx).unwrap();
+                        let from_point = grid.grid_point_to_point(from_idx).unwrap();
+                        let to_point = grid.grid_point_to_point(to_idx).unwrap();
 
                         let turn_cost = if from_orientation != to_orientation {
                             1
@@ -991,65 +1039,25 @@ impl EdgeRouter {
                         };
 
                         // The current cost can be computed using the prefix sums on the raw grid.
-                        let current_cost = if from_point == to_point {
-                            0
-                        } else {
-                            if from_point.x == to_point.x {
-                                // Vertical move
-                                let to_upper = to_point.y > from_point.y;
-
-                                let upper_raw_point = if to_upper {
-                                    grid.grid_point_to_raw_point(to_idx).unwrap()
-                                } else {
-                                    grid.grid_point_to_raw_point(from_idx).unwrap()
-                                };
-                                let lower_raw_point = if to_upper {
-                                    grid.grid_point_to_raw_point(from_idx).unwrap()
-                                } else {
-                                    grid.grid_point_to_raw_point(to_idx).unwrap()
-                                };
-
-                                let prefix_index_lower =
-                                    raw_area.raw_point_to_prefix_y_index(lower_raw_point);
-                                let prefix_index_upper =
-                                    raw_area.raw_point_to_prefix_y_index(upper_raw_point);
-                                raw_cost_prefix_y[prefix_index_upper] as i32
-                                    - raw_cost_prefix_y[prefix_index_lower] as i32
-                            } else {
-                                // Horizontal move
-                                let to_left = to_point.x < from_point.x;
-
-                                let left_raw_point = if to_left {
-                                    grid.grid_point_to_raw_point(to_idx).unwrap()
-                                } else {
-                                    grid.grid_point_to_raw_point(from_idx).unwrap()
-                                };
-                                let right_raw_point = if to_left {
-                                    grid.grid_point_to_raw_point(from_idx).unwrap()
-                                } else {
-                                    grid.grid_point_to_raw_point(to_idx).unwrap()
-                                };
-
-                                let prefix_index_left =
-                                    raw_area.raw_point_to_prefix_x_index(left_raw_point);
-                                let prefix_index_right =
-                                    raw_area.raw_point_to_prefix_x_index(right_raw_point);
-
-                                println!("Right cost {} at {:?}", raw_cost_prefix_x[prefix_index_right], right_raw_point);
-                                println!("Left cost {} at {:?}", raw_cost_prefix_x[prefix_index_left], left_raw_point);
-
-                                raw_cost_prefix_x[prefix_index_right] as i32
-                                    - raw_cost_prefix_x[prefix_index_left] as i32
-                            }
-                        };
-                        println!(
-                            "Cost from {:?} to {:?}: turn_cost = {}, current_cost = {}",
+                        let current_cost = segment_cost_from_prefix_sums(
+                            &grid,
+                            raw_cost_prefix_x,
+                            raw_cost_prefix_y,
+                            from_idx,
+                            to_idx,
                             from_point,
                             to_point,
-                            turn_cost,
-                            current_cost
                         );
-                        turn_cost + current_cost
+                        let history_cost = segment_cost_from_prefix_sums(
+                            &grid,
+                            raw_history_cost_prefix_x,
+                            raw_history_cost_prefix_y,
+                            from_idx,
+                            to_idx,
+                            from_point,
+                            to_point,
+                        );
+                        (turn_cost as f64 + current_cost + mu*history_cost) as i32
                     },
                 )?;
                 // Convert grid path to actual points with directions
@@ -1065,25 +1073,42 @@ impl EdgeRouter {
                         }
                     })
                     .collect();
-                println!("Grid points: {:?}", grid_points);
 
                 let result_path: Vec<DirectedPoint> =
                     grid_point_path_to_directed_point_path(&grid_points, &end);
                 //println!("Routed path: {:?}", result_path);
+
+                for point in result_path.iter() {
+                    // Convert point plus drection to an edge index on the raw grid and update usage
+                    let segment_index = raw_area.directed_point_to_segment_index(directed_point);
+                    if let Some(segment_index) = segment_index {
+                        raw_usage[segment_index.0 as usize] += 1;
+                    }
+                }
+
                 result_paths.insert((start_raw_point, end_raw_point), result_path);
+
+                // Update usage based on routed paths
+
+            }
+            // 4) Compute overflow
+            let mut total_overflow = 0;
+            for i in 0..raw_num_segments as usize {
+                let usage = raw_usage[i];
+                let capacity = raw_capacity[i];
+                if usage > capacity {
+                    total_overflow += usage - capacity;
+                }
+            }
+            if overflow == 0 {
+                // All edges routed successfully
+                println!("All edges routed successfully in iteration {}", i);
+                break;
             }
 
-            // a) Skip locked nets (no overflow)
+            // 5) Update history cost based on overflow
 
-            // b) Rip-up old path
-
-            // c) Build avoid mask (edges that overflowed last iteration)
-
-            // d) Try local repair or global reroute
-
-            // e) If successful, update usage
-
-            // 4) If no nets overflowed, we're done
+            // 6) Select edges to rip up based on some criteria (e.g., high cost, long paths, etc.)
         }
 
         Ok(EdgeRoutingsResult::new(
@@ -1107,6 +1132,57 @@ impl EdgeRouter {
     }
 }
 
+fn segment_cost_from_prefix_sums(
+    grid: &Grid,
+    raw_cost_prefix_x: Vec<f64>,
+    raw_cost_prefix_y: Vec<f64>,
+    from_idx: GridPoint,
+    to_idx: GridPoint,
+    from_point: Point,
+    to_point: Point,
+) -> f64 {
+    let current_cost = if from_point == to_point {
+        0.0
+    } else {
+        if from_point.x == to_point.x {
+            // Vertical move
+            let to_upper = to_point.y > from_point.y;
+
+            let upper_raw_point = if to_upper {
+                grid.grid_point_to_raw_point(to_idx).unwrap()
+            } else {
+                grid.grid_point_to_raw_point(from_idx).unwrap()
+            };
+            let lower_raw_point = if to_upper {
+                grid.grid_point_to_raw_point(from_idx).unwrap()
+            } else {
+                grid.grid_point_to_raw_point(to_idx).unwrap()
+            };
+
+            raw_cost_prefix_y[upper_raw_point.0 as usize]
+                - raw_cost_prefix_y[lower_raw_point.0 as usize]
+        } else {
+            // Horizontal move
+            let to_left = to_point.x < from_point.x;
+
+            let left_raw_point = if to_left {
+                grid.grid_point_to_raw_point(to_idx).unwrap()
+            } else {
+                grid.grid_point_to_raw_point(from_idx).unwrap()
+            };
+            let right_raw_point = if to_left {
+                grid.grid_point_to_raw_point(from_idx).unwrap()
+            } else {
+                grid.grid_point_to_raw_point(to_idx).unwrap()
+            };
+
+            raw_cost_prefix_x[right_raw_point.0 as usize]
+                - raw_cost_prefix_x[left_raw_point.0 as usize]
+        }
+    };
+    current_cost
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct GridState {
     index: GridPoint,
@@ -1124,10 +1200,6 @@ fn route_visibility_astar<CostFn>(
 where
     CostFn: FnMut(GridPoint, GridPoint, Orientation, Orientation) -> i32,
 {
-    println!(
-        "Routing from grid index {:?} to {:?} in grid of size {} x {}",
-        start_grid_point, end_grid_point, masked_grid.grid.width, masked_grid.grid.height
-    );
     if start_grid_point.0 as usize >= masked_grid.point_mask.len()
         || end_grid_point.0 as usize >= masked_grid.point_mask.len()
     {
