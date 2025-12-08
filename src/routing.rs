@@ -177,8 +177,8 @@ impl RawArea {
         ))
     }
 
-    pub fn directed_point_to_segment_index(&self, directed_point: &Point) -> Option<usize> {
-        let raw_point = self.point_to_raw_point(directed_point)?;
+    pub fn directed_point_to_segment_index(&self, directed_point: &DirectedPoint) -> Option<usize> {
+        let raw_point = self.point_to_raw_point(&directed_point.as_point())?;
         let grid_x = (raw_point.0 % (self.width() as u32)) as i32;
         let grid_y = (raw_point.0 / (self.width() as u32)) as i32;
 
@@ -872,7 +872,6 @@ impl EdgeRouter {
         // We also need to maintain usage and capacity on the raw grid, initialized with usage from
         // existing edges. We could also use capacity to change how edges are routed here.
         let mut raw_usage = vec![0; raw_num_segments as usize];
-        let mut raw_capacity = vec![1; raw_num_segments as usize];
         let mut raw_cost = vec![0.0; raw_num_segments as usize];
         let mut raw_history_cost = vec![0.0; raw_num_segments as usize];
 
@@ -894,6 +893,7 @@ impl EdgeRouter {
         let lambda = 2.0;
         let mu: f64 = 0.5;
         let base_cost = 1.0;
+        let capacity = 1;
         let mut sorted_edges = edges.clone();
 
         for i in 0..max_iterations {
@@ -902,7 +902,6 @@ impl EdgeRouter {
             for i in 0..raw_num_segments as usize {
                 // Cost is base + lambda * max(0, usage - capacity)
                 let usage = raw_usage[i];
-                let capacity = raw_capacity[i];
                 let overflow = if usage > capacity {
                     usage - capacity
                 } else {
@@ -987,7 +986,7 @@ impl EdgeRouter {
                             * (min(node_br.y, max_y) - max(node_tl.y, min_y)).max(0);
                     }
                 }
-                -(span + (200.0 * obstacle_area as f32 / (total_area as f32)).round() as i32)
+                -(span + (((200.0 * obstacle_area as f32 / (total_area as f32)).round())) as i32)
             });
 
             // 3) For each net in order, find the cheapest path using A* or Dijkstra
@@ -1004,6 +1003,16 @@ impl EdgeRouter {
                 }
                 let start_raw_point = start_raw_point.unwrap();
                 let end_raw_point = end_raw_point.unwrap();
+
+                // If there is an old path for this edge, we need to remove its usage first
+                if let Some(old_path) = result_paths.get(&(start_raw_point, end_raw_point)) {
+                    for directed_point in old_path.iter() {
+                        let segment_index = raw_area.directed_point_to_segment_index(directed_point);
+                        if let Some(segment_index) = segment_index {
+                            raw_usage[segment_index as usize] -= 1;
+                        }
+                    }
+                }
 
                 let start_orientation: Orientation = start.direction.to_orientation();
                 let end_orientation: Orientation = end.direction.to_orientation();
@@ -1078,37 +1087,51 @@ impl EdgeRouter {
                     grid_point_path_to_directed_point_path(&grid_points, &end);
                 //println!("Routed path: {:?}", result_path);
 
-                for point in result_path.iter() {
+                for directed_point in result_path.iter() {
                     // Convert point plus drection to an edge index on the raw grid and update usage
                     let segment_index = raw_area.directed_point_to_segment_index(directed_point);
                     if let Some(segment_index) = segment_index {
-                        raw_usage[segment_index.0 as usize] += 1;
+                        raw_usage[segment_index as usize] += 1;
+                    }
+                }
+
+                // Update usage based on routed paths
+                for directed_point in &result_path {
+                    // Convert point plus drection to an edge index on the raw grid and update usage
+                    let segment_index = raw_area.directed_point_to_segment_index(directed_point);
+                    if let Some(segment_index) = segment_index {
+                        raw_usage[segment_index as usize] += 1;
                     }
                 }
 
                 result_paths.insert((start_raw_point, end_raw_point), result_path);
 
-                // Update usage based on routed paths
 
             }
+
             // 4) Compute overflow
             let mut total_overflow = 0;
             for i in 0..raw_num_segments as usize {
                 let usage = raw_usage[i];
-                let capacity = raw_capacity[i];
                 if usage > capacity {
                     total_overflow += usage - capacity;
                 }
             }
-            if overflow == 0 {
+            if total_overflow == 0 {
                 // All edges routed successfully
                 println!("All edges routed successfully in iteration {}", i);
                 break;
             }
 
             // 5) Update history cost based on overflow
+            for i in 0..raw_num_segments as usize {
+                let usage = raw_usage[i];
+                if usage > capacity {
+                    raw_history_cost[i] += (usage - capacity) as f64;
+                }
+            }
 
-            // 6) Select edges to rip up based on some criteria (e.g., high cost, long paths, etc.)
+            // 6) Select edges to rip up based on some criteria (e.g., high cost, long paths, etc.) and bump past failure cost
         }
 
         Ok(EdgeRoutingsResult::new(
