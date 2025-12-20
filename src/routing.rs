@@ -123,6 +123,58 @@ pub struct EdgeRoutingsResult {
     pub trace: Option<RoutingTrace>,
 }
 
+/// Wrapper around a routed path that provides helper iteration methods.
+/// Currently unused; kept for upcoming refactors.
+#[allow(dead_code)]
+#[derive(Clone, PartialEq, Debug)]
+pub struct DirectedPath(pub Vec<DirectedPoint>);
+
+impl DirectedPath {
+    pub fn new(path: Vec<DirectedPoint>) -> Self {
+        DirectedPath(path)
+    }
+
+    pub fn as_slice(&self) -> &[DirectedPoint] {
+        &self.0
+    }
+
+    pub fn into_inner(self) -> Vec<DirectedPoint> {
+        self.0
+    }
+
+    /// Iterate over segment indices without counting consecutive duplicates.
+    pub fn segments<'a>(&'a self, raw_area: &'a RawArea) -> DirectedPathSegments<'a> {
+        DirectedPathSegments {
+            points: self.0.iter(),
+            raw_area,
+            last_segment_index: None,
+        }
+    }
+}
+
+pub struct DirectedPathSegments<'a> {
+    points: std::slice::Iter<'a, DirectedPoint>,
+    raw_area: &'a RawArea,
+    last_segment_index: Option<usize>,
+}
+
+impl<'a> Iterator for DirectedPathSegments<'a> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(point) = self.points.next() {
+            if let Some(segment_index) = self.raw_area.directed_point_to_segment_index(point) {
+                if self.last_segment_index == Some(segment_index) {
+                    continue;
+                }
+                self.last_segment_index = Some(segment_index);
+                return Some(segment_index);
+            }
+        }
+        None
+    }
+}
+
 #[pymethods]
 impl EdgeRoutingsResult {
     #[new]
