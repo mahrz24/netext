@@ -123,29 +123,30 @@ pub struct EdgeRoutingsResult {
     pub trace: Option<RoutingTrace>,
 }
 
-/// Wrapper around a routed path that provides helper iteration methods.
-/// Currently unused; kept for upcoming refactors.
+/// Wrapper around a routed path of grid points that provides helper iteration methods.
 #[allow(dead_code)]
 #[derive(Clone, PartialEq, Debug)]
-pub struct DirectedPath(pub Vec<DirectedPoint>);
+pub struct Path {
+    pub points: Vec<Point>,
+}
 
-impl DirectedPath {
-    pub fn new(path: Vec<DirectedPoint>) -> Self {
-        DirectedPath(path)
+impl Path {
+    pub fn new(points: Vec<Point>) -> Self {
+        Path { points }
     }
 
-    pub fn as_slice(&self) -> &[DirectedPoint] {
-        &self.0
+    pub fn as_slice(&self) -> &[Point] {
+        &self.points
     }
 
-    pub fn into_inner(self) -> Vec<DirectedPoint> {
-        self.0
+    pub fn into_inner(self) -> Vec<Point> {
+        self.points
     }
 
     /// Iterate over segment indices without counting consecutive duplicates.
-pub fn segments<'a>(&'a self, raw_area: &'a RawArea) -> DirectedPathSegments<'a> {
-        DirectedPathSegments {
-            points: self.0.iter(),
+    pub fn segments<'a>(&'a self, raw_area: &'a RawArea) -> PathSegments<'a> {
+        PathSegments {
+            points: self.points.iter(),
             raw_area,
             prev_point: None,
             last_segment_index: None,
@@ -153,13 +154,13 @@ pub fn segments<'a>(&'a self, raw_area: &'a RawArea) -> DirectedPathSegments<'a>
     }
 }
 
-pub struct DirectedPathSegments<'a> {
-    points: std::slice::Iter<'a, DirectedPoint>,
+pub struct PathSegments<'a> {
+    points: std::slice::Iter<'a, Point>,
     raw_area: &'a RawArea,
-    prev_point: Option<&'a DirectedPoint>,
+    prev_point: Option<&'a Point>,
     last_segment_index: Option<usize>,
 }
-impl<'a> Iterator for DirectedPathSegments<'a> {
+impl<'a> Iterator for PathSegments<'a> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -170,9 +171,7 @@ impl<'a> Iterator for DirectedPathSegments<'a> {
                     continue; // duplicate point marking a turn
                 }
 
-                if let Some(idx) =
-                    self.raw_area.segment_index_between(&prev.as_point(), &current.as_point())
-                {
+                if let Some(idx) = self.raw_area.segment_index_between(prev, current) {
                     self.prev_point = Some(current);
                     if self.last_segment_index != Some(idx) {
                         self.last_segment_index = Some(idx);
@@ -241,66 +240,36 @@ impl RawArea {
         ))
     }
 
-    fn segment_index_between(&self, from: &Point, to: &Point) -> Option<usize> {
+    pub fn segment_index_between(&self, from: &Point, to: &Point) -> Option<usize> {
         let dx = to.x - from.x;
         let dy = to.y - from.y;
-        let dir = if dx == 1 && dy == 0 {
-            Direction::Right
+
+        // Grid coordinates relative to top-left.
+        let grid_from_x = from.x - self.top_left.x;
+        let grid_from_y = from.y - self.top_left.y;
+
+        if dx == 1 && dy == 0 {
+            // Right
+            Some((grid_from_y * (self.width() - 1) + grid_from_x) as usize)
         } else if dx == -1 && dy == 0 {
-            Direction::Left
+            // Left
+            Some((grid_from_y * (self.width() - 1) + (grid_from_x - 1)) as usize)
         } else if dx == 0 && dy == 1 {
-            Direction::Down
+            // Down
+            Some(
+                ((self.width() - 1) * self.height()
+                    + grid_from_x * (self.height() - 1)
+                    + grid_from_y) as usize,
+            )
         } else if dx == 0 && dy == -1 {
-            Direction::Up
+            // Up
+            Some(
+                ((self.width() - 1) * self.height()
+                    + grid_from_x * (self.height() - 1)
+                    + (grid_from_y - 1)) as usize,
+            )
         } else {
-            return None;
-        };
-        self.directed_point_to_segment_index(&DirectedPoint {
-            x: to.x,
-            y: to.y,
-            direction: dir,
-            debug: false,
-        })
-    }
-
-    pub fn directed_point_to_segment_index(&self, directed_point: &DirectedPoint) -> Option<usize> {
-        let raw_point = self.point_to_raw_point(&directed_point.as_point())?;
-        let grid_x = (raw_point.0 % (self.width() as u32)) as i32;
-        let grid_y = (raw_point.0 / (self.width() as u32)) as i32;
-
-        match directed_point.direction {
-            Direction::Up => {
-                if grid_y == 0 {
-                    return None;
-                }
-                Some(
-                    ((self.width() - 1) * self.height()
-                        + grid_x * (self.height() - 1)
-                        + (grid_y - 1)) as usize,
-                )
-            }
-            Direction::Down => {
-                if grid_y >= self.height() - 1 {
-                    return None;
-                }
-                Some(
-                    ((self.width() - 1) * self.height() + grid_x * (self.height() - 1) + grid_y)
-                        as usize,
-                )
-            }
-            Direction::Left => {
-                if grid_x == 0 {
-                    return None;
-                }
-                Some((grid_y * (self.width() - 1) + (grid_x - 1)) as usize)
-            }
-            Direction::Right => {
-                if grid_x >= self.width() - 1 {
-                    return None;
-                }
-                Some((grid_y * (self.width() - 1) + grid_x) as usize)
-            }
-            _ => None,
+            None
         }
     }
     pub fn edge_prefix_sums<T>(
@@ -968,7 +937,8 @@ impl EdgeRouter {
         // for the initial routing, the usage is zero everywhere and the cose is just the length of the edge.
         // hence we can pass a simplified cost function to the A*
 
-        let mut result_paths: HashMap<(RawPoint, RawPoint), Vec<DirectedPoint>> = HashMap::new();
+        let mut result_paths: HashMap<(RawPoint, RawPoint), (Path, DirectedPoint, DirectedPoint)> =
+            HashMap::new();
 
         // Now we iterate up to some maximum number of iterations
         let lambda = 2.0;
@@ -1155,15 +1125,14 @@ impl EdgeRouter {
                     })
                     .collect();
 
-                let result_path =
-                    DirectedPath::new(grid_point_path_to_directed_point_path(&grid_points, &end));
+                let result_path = Path::new(grid_points);
 
                 // Update usage based on routed paths
                 for segment_index in result_path.segments(&raw_area) {
                     raw_usage[segment_index as usize] += 1;
                 }
 
-                result_paths.insert((start_raw_point, end_raw_point), result_path.into_inner());
+                result_paths.insert((start_raw_point, end_raw_point), (result_path, *start, *end));
             }
 
             // 4) Compute overflow
@@ -1198,9 +1167,8 @@ impl EdgeRouter {
                 let end_raw_point = raw_area.point_to_raw_point(&end.as_point()).unwrap();
 
                 let mut has_overflow = false;
-                if let Some(routed_path) = result_paths.get(&(start_raw_point, end_raw_point)) {
-                    for segment_index in DirectedPath::new(routed_path.clone()).segments(&raw_area)
-                    {
+                if let Some((routed_path, _, _)) = result_paths.get(&(start_raw_point, end_raw_point)) {
+                    for segment_index in routed_path.segments(&raw_area) {
                         let usage = raw_usage[segment_index as usize];
                         if usage > capacity {
                             has_overflow = true;
@@ -1210,10 +1178,8 @@ impl EdgeRouter {
                 }
                 if has_overflow {
                     // Remove usage of this path by adding to the usage_diff
-                    if let Some(routed_path) = result_paths.get(&(start_raw_point, end_raw_point)) {
-                        for segment_index in
-                            DirectedPath::new(routed_path.clone()).segments(&raw_area)
-                        {
+                    if let Some((routed_path, _, _)) = result_paths.get(&(start_raw_point, end_raw_point)) {
+                        for segment_index in routed_path.segments(&raw_area) {
                             raw_usage[segment_index as usize] -= 1;
                         }
                     }
@@ -1222,10 +1188,16 @@ impl EdgeRouter {
             }
         }
 
-        Ok(EdgeRoutingsResult::new(
-            result_paths.values().cloned().collect(),
-            None,
-        ))
+        let mut directed_paths: Vec<Vec<DirectedPoint>> = Vec::new();
+        for (_, (path, start, end)) in result_paths.iter() {
+            directed_paths.push(point_path_to_directed_point_path(
+                &path.points,
+                start,
+                end,
+            ));
+        }
+
+        Ok(EdgeRoutingsResult::new(directed_paths, None))
     }
 
     fn route_edge(
@@ -1432,14 +1404,15 @@ where
     ))
 }
 
-fn grid_point_path_to_directed_point_path(
-    grid_points: &Vec<Point>,
+fn point_path_to_directed_point_path(
+    points: &Vec<Point>,
+    start: &DirectedPoint,
     end: &DirectedPoint,
 ) -> Vec<DirectedPoint> {
     // Build the full path by inserting intermediate directed points on the raw grid.
     let mut result_path = Vec::new();
 
-    for window in grid_points.windows(2) {
+    for window in points.windows(2) {
         let window_start = window[0];
         let window_end = window[1];
 
@@ -1463,7 +1436,11 @@ fn grid_point_path_to_directed_point_path(
             result_path.push(DirectedPoint {
                 x: window_start.x,
                 y: window_start.y,
-                direction,
+                direction: if result_path.is_empty() {
+                    start.direction
+                } else {
+                    direction
+                },
                 debug: false,
             });
 
@@ -1487,7 +1464,11 @@ fn grid_point_path_to_directed_point_path(
             result_path.push(DirectedPoint {
                 x: window_start.x,
                 y: window_start.y,
-                direction,
+                direction: if result_path.is_empty() {
+                    start.direction
+                } else {
+                    direction
+                },
                 debug: false,
             });
 
