@@ -130,6 +130,13 @@ pub struct Path {
     pub points: Vec<Point>,
 }
 
+#[derive(Clone, PartialEq, Debug)]
+pub struct PathWithEndpoints {
+    pub path: Path,
+    pub start: DirectedPoint,
+    pub end: DirectedPoint,
+}
+
 impl Path {
     pub fn new(points: Vec<Point>) -> Self {
         Path { points }
@@ -151,6 +158,20 @@ impl Path {
             prev_point: None,
             last_segment_index: None,
         }
+    }
+}
+
+impl PathWithEndpoints {
+    pub fn new(path: Path, start: DirectedPoint, end: DirectedPoint) -> Self {
+        PathWithEndpoints { path, start, end }
+    }
+
+    pub fn segments<'a>(&'a self, raw_area: &'a RawArea) -> PathSegments<'a> {
+        self.path.segments(raw_area)
+    }
+
+    pub fn to_directed_points(&self) -> Vec<DirectedPoint> {
+        point_path_to_directed_point_path(&self.path.points, &self.start, &self.end)
     }
 }
 
@@ -937,8 +958,7 @@ impl EdgeRouter {
         // for the initial routing, the usage is zero everywhere and the cose is just the length of the edge.
         // hence we can pass a simplified cost function to the A*
 
-        let mut result_paths: HashMap<(RawPoint, RawPoint), (Path, DirectedPoint, DirectedPoint)> =
-            HashMap::new();
+        let mut result_paths: HashMap<(RawPoint, RawPoint), PathWithEndpoints> = HashMap::new();
 
         // Now we iterate up to some maximum number of iterations
         let lambda = 2.0;
@@ -1132,7 +1152,10 @@ impl EdgeRouter {
                     raw_usage[segment_index as usize] += 1;
                 }
 
-                result_paths.insert((start_raw_point, end_raw_point), (result_path, *start, *end));
+                result_paths.insert(
+                    (start_raw_point, end_raw_point),
+                    PathWithEndpoints::new(result_path, *start, *end),
+                );
             }
 
             // 4) Compute overflow
@@ -1167,7 +1190,7 @@ impl EdgeRouter {
                 let end_raw_point = raw_area.point_to_raw_point(&end.as_point()).unwrap();
 
                 let mut has_overflow = false;
-                if let Some((routed_path, _, _)) = result_paths.get(&(start_raw_point, end_raw_point)) {
+                if let Some(routed_path) = result_paths.get(&(start_raw_point, end_raw_point)) {
                     for segment_index in routed_path.segments(&raw_area) {
                         let usage = raw_usage[segment_index as usize];
                         if usage > capacity {
@@ -1178,7 +1201,7 @@ impl EdgeRouter {
                 }
                 if has_overflow {
                     // Remove usage of this path by adding to the usage_diff
-                    if let Some((routed_path, _, _)) = result_paths.get(&(start_raw_point, end_raw_point)) {
+                    if let Some(routed_path) = result_paths.get(&(start_raw_point, end_raw_point)) {
                         for segment_index in routed_path.segments(&raw_area) {
                             raw_usage[segment_index as usize] -= 1;
                         }
@@ -1189,12 +1212,8 @@ impl EdgeRouter {
         }
 
         let mut directed_paths: Vec<Vec<DirectedPoint>> = Vec::new();
-        for (_, (path, start, end)) in result_paths.iter() {
-            directed_paths.push(point_path_to_directed_point_path(
-                &path.points,
-                start,
-                end,
-            ));
+        for (_, path_with_endpoints) in result_paths.iter() {
+            directed_paths.push(path_with_endpoints.to_directed_points());
         }
 
         Ok(EdgeRoutingsResult::new(directed_paths, None))
