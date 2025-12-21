@@ -176,24 +176,142 @@ impl PathWithEndpoints {
     }
 
     pub fn to_directed_points(&self) -> Vec<DirectedPoint> {
-        point_path_to_directed_point_path(&self.path.points, &self.start, &self.end)
+        self.point_path_to_directed_points()
+    }
+
+    fn point_path_to_directed_points(&self) -> Vec<DirectedPoint> {
+        let mut result_path = Vec::new();
+
+        for window in self.path.points.windows(2) {
+            let window_start = window[0];
+            let window_end = window[1];
+
+            // Skip duplicate points.
+            if window_start == window_end {
+                continue;
+            }
+
+            if window_start.x == window_end.x {
+                // Vertical segment
+                let direction = if window_end.y < window_start.y {
+                    Direction::Up
+                } else {
+                    Direction::Down
+                };
+                let direction_offset = if direction == Direction::Up { -1 } else { 1 };
+
+                result_path.push(DirectedPoint {
+                    x: window_start.x,
+                    y: window_start.y,
+                    direction: if result_path.is_empty() {
+                        self.start.direction
+                    } else {
+                        direction
+                    },
+                    debug: false,
+                });
+
+                for y in 1..=(window_end.y - window_start.y).abs() {
+                    result_path.push(DirectedPoint {
+                        x: window_start.x,
+                        y: window_start.y + y * direction_offset,
+                        direction: direction.opposite(),
+                        debug: false,
+                    });
+                }
+            } else if window_start.y == window_end.y {
+                // Horizontal segment
+                let direction = if window_end.x > window_start.x {
+                    Direction::Right
+                } else {
+                    Direction::Left
+                };
+
+                result_path.push(DirectedPoint {
+                    x: window_start.x,
+                    y: window_start.y,
+                    direction: if result_path.is_empty() {
+                        self.start.direction
+                    } else {
+                        direction
+                    },
+                    debug: false,
+                });
+
+                let direction_offset = if direction == Direction::Left { -1 } else { 1 };
+                for x in 1..=(window_end.x - window_start.x).abs() {
+                    result_path.push(DirectedPoint {
+                        x: window_start.x + x * direction_offset,
+                        y: window_start.y,
+                        direction: direction.opposite(),
+                        debug: false,
+                    });
+                }
+            } else {
+                // Diagonals should not occur.
+            }
+        }
+
+        // Add final endpoint.
+        result_path.push(DirectedPoint {
+            x: self.end.x,
+            y: self.end.y,
+            direction: self.end.direction.opposite(),
+            debug: false,
+        });
+
+        result_path
     }
 }
 
 pub struct PathSegments<'a> {
-    points: std::slice::Iter<'a, Point>,
-    raw_area: &'a RawArea,
-    prev_point: Option<&'a Point>,
-    last_segment_index: Option<usize>,
+    indices: Vec<usize>,
+    position: usize,
+    _phantom: PhantomData<&'a ()>,
 }
 
 impl<'a> PathSegments<'a> {
     fn new(path: &'a Path, raw_area: &'a RawArea) -> Self {
+        let mut indices = Vec::new();
+
+        for window in path.points.windows(2) {
+            let from = window[0];
+            let to = window[1];
+
+            // Skip duplicate points.
+            if (from.x, from.y) == (to.x, to.y) {
+                continue;
+            }
+
+            // Only handle Manhattan steps.
+            if from.x != to.x && from.y != to.y {
+                continue;
+            }
+
+            let step_x = (to.x - from.x).signum();
+            let step_y = (to.y - from.y).signum();
+            let steps = (to.x - from.x).abs().max((to.y - from.y).abs());
+
+            let mut current = from;
+            for _ in 0..steps {
+                let next = Point {
+                    x: current.x + step_x,
+                    y: current.y + step_y,
+                };
+
+                if let Some(idx) = raw_area.segment_index_between(&current, &next) {
+                    if indices.last().copied() != Some(idx) {
+                        indices.push(idx);
+                    }
+                }
+                current = next;
+            }
+        }
+
         PathSegments {
-            points: path.points.iter(),
-            raw_area,
-            prev_point: None,
-            last_segment_index: None,
+            indices,
+            position: 0,
+            _phantom: PhantomData,
         }
     }
 }
@@ -207,25 +325,12 @@ impl<'a> Iterator for PathSegments<'a> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(current) = self.points.next() {
-            if let Some(prev) = self.prev_point {
-                if current.x == prev.x && current.y == prev.y {
-                    self.prev_point = Some(current);
-                    continue; // duplicate point marking a turn
-                }
-
-                if let Some(idx) = self.raw_area.segment_index_between(prev, current) {
-                    self.prev_point = Some(current);
-                    if self.last_segment_index != Some(idx) {
-                        self.last_segment_index = Some(idx);
-                        return Some(idx);
-                    }
-                    continue;
-                }
-            }
-            self.prev_point = Some(current);
+        if self.position >= self.indices.len() {
+            return None;
         }
-        None
+        let idx = self.indices[self.position];
+        self.position += 1;
+        Some(idx)
     }
 }
 
@@ -335,6 +440,16 @@ impl RawArea {
         Some(RawPoint(
             ((point.x - self.top_left.x) + (point.y - self.top_left.y) * (self.width())) as u32,
         ))
+    }
+
+    pub fn raw_index_to_point(&self, raw_index: usize) -> Point {
+        let width = self.width() as usize;
+        let x = raw_index % width;
+        let y = raw_index / width;
+        Point {
+            x: self.top_left.x + x as i32,
+            y: self.top_left.y + y as i32,
+        }
     }
 
     pub fn segment_index_between(&self, from: &Point, to: &Point) -> Option<usize> {
@@ -1257,19 +1372,73 @@ impl EdgeRouter {
 
             // 4) Compute overflow
             let mut total_overflow = 0;
+            let mut edge_overflow = 0;
+            let mut corner_overflow = 0;
+            let mut overflow_details: Vec<String> = Vec::new();
+
+            let horiz_count = (raw_area.width() as usize - 1) * raw_area.height() as usize;
+            let width = raw_area.width() as usize;
+
             for i in 0..raw_num_segments as usize {
                 let usage = raw_usage[i];
                 if usage > capacity {
-                    total_overflow += usage - capacity;
+                    let over = usage - capacity;
+                    total_overflow += over;
+                    edge_overflow += over;
+
+                    if overflow_details.len() < 10 {
+                        if i < horiz_count {
+                            let x = i % (raw_area.width() as usize - 1);
+                            let y = i / (raw_area.width() as usize - 1);
+                            let p1 = raw_area.raw_index_to_point(y * width + x);
+                            let p2 = raw_area.raw_index_to_point(y * width + x + 1);
+                            let closest = closest_node_name(&placed_nodes_vector, p1);
+                            overflow_details.push(format!(
+                                "edge H ({},{})-({},{}) overflow {} closest {:?}",
+                                p1.x, p1.y, p2.x, p2.y, over, closest
+                            ));
+                        } else {
+                            let vert_idx = i - horiz_count;
+                            let x = vert_idx / (raw_area.height() as usize - 1);
+                            let y = vert_idx % (raw_area.height() as usize - 1);
+                            let p1 = raw_area.raw_index_to_point(y * width + x);
+                            let p2 = raw_area.raw_index_to_point((y + 1) * width + x);
+                            let closest = closest_node_name(&placed_nodes_vector, p1);
+                            overflow_details.push(format!(
+                                "edge V ({},{})-({},{}) overflow {} closest {:?}",
+                                p1.x, p1.y, p2.x, p2.y, over, closest
+                            ));
+                        }
+                    }
                 }
             }
             for i in 0..raw_area.size() {
                 let usage = raw_corner_usage[i];
                 if usage > corner_capacity {
-                    total_overflow += usage - corner_capacity;
+                    let over = usage - corner_capacity;
+                    total_overflow += over;
+                    corner_overflow += over;
+
+                    if overflow_details.len() < 10 {
+                        let p = raw_area.raw_index_to_point(i);
+                        let closest = closest_node_name(&placed_nodes_vector, p);
+                        overflow_details.push(format!(
+                            "corner ({},{}) overflow {} closest {:?}",
+                            p.x, p.y, over, closest
+                        ));
+                    }
                 }
             }
-            println!("Total overflow after iteration {}: {}\n", i, total_overflow);
+            println!(
+                "Total overflow after iteration {}: {} (edges {}, corners {})",
+                i, total_overflow, edge_overflow, corner_overflow
+            );
+            if !overflow_details.is_empty() {
+                println!("Overflow locations (max 10):");
+                for detail in overflow_details.iter() {
+                    println!("  {}", detail);
+                }
+            }
 
 
             if total_overflow == 0 {
@@ -1416,6 +1585,22 @@ fn segment_cost_from_prefix_sums(
     current_cost
 }
 
+fn closest_node_name(nodes: &Vec<PlacedRectangularNode>, point: Point) -> Option<(i32, Point)> {
+    nodes
+        .iter()
+        .map(|n| {
+            let tl = n.top_left();
+            let br = n.bottom_right();
+            let center = Point {
+                x: (tl.x + br.x) / 2,
+                y: (tl.y + br.y) / 2,
+            };
+            let dist = (center.x - point.x).abs() + (center.y - point.y).abs();
+            (dist, center)
+        })
+        .min_by_key(|(d, _)| *d)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct GridState {
     index: GridPoint,
@@ -1552,95 +1737,4 @@ where
     Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
         "Goal not found.",
     ))
-}
-
-fn point_path_to_directed_point_path(
-    points: &Vec<Point>,
-    start: &DirectedPoint,
-    end: &DirectedPoint,
-) -> Vec<DirectedPoint> {
-    // Build the full path by inserting intermediate directed points on the raw grid.
-    let mut result_path = Vec::new();
-
-    for window in points.windows(2) {
-        let window_start = window[0];
-        let window_end = window[1];
-
-        // Skip duplicate points, which indicate direction switches, we basically
-        // reconstruct the path with directions here anyway.
-        if window_start == window_end {
-            continue;
-        }
-
-        // Determine if the movement is vertical or horizontal.
-        if window_start.x == window_end.x {
-            // Vertical segment.
-            let direction = if window_end.y < window_start.y {
-                Direction::Up
-            } else {
-                Direction::Down
-            };
-            // Fill intermediate points between start and end (including the start).
-            let direction_offset = if direction == Direction::Up { -1 } else { 1 };
-
-            result_path.push(DirectedPoint {
-                x: window_start.x,
-                y: window_start.y,
-                direction: if result_path.is_empty() {
-                    start.direction
-                } else {
-                    direction
-                },
-                debug: false,
-            });
-
-            for y in 1..=(window_end.y - window_start.y).abs() {
-                result_path.push(DirectedPoint {
-                    x: window_start.x,
-                    y: window_start.y + y * direction_offset,
-                    direction: direction.opposite(),
-                    debug: false,
-                });
-            }
-        } else if window_start.y == window_end.y {
-            // Horizontal segment.
-            let direction = if window_end.x > window_start.x {
-                Direction::Right
-            } else {
-                Direction::Left
-            };
-
-            // Fill intermediate points between start and end (including the start).
-            result_path.push(DirectedPoint {
-                x: window_start.x,
-                y: window_start.y,
-                direction: if result_path.is_empty() {
-                    start.direction
-                } else {
-                    direction
-                },
-                debug: false,
-            });
-
-            let direction_offset = if direction == Direction::Left { -1 } else { 1 };
-            for x in 1..=(window_end.x - window_start.x).abs() {
-                result_path.push(DirectedPoint {
-                    x: window_start.x + x * direction_offset,
-                    y: window_start.y,
-                    direction: direction.opposite(),
-                    debug: false,
-                });
-            }
-        } else {
-            // In case of diagonal movement (should not occur in our grid routing), just push the end.
-        }
-    }
-    // Add the grid endpoint.
-    result_path.push(DirectedPoint {
-        x: end.x,
-        y: end.y,
-        direction: end.direction.opposite(),
-        debug: false,
-    });
-    result_path
 }
