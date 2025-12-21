@@ -6,6 +6,7 @@ use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::marker::PhantomData;
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::result;
@@ -152,12 +153,12 @@ impl Path {
 
     /// Iterate over segment indices without counting consecutive duplicates.
     pub fn segments<'a>(&'a self, raw_area: &'a RawArea) -> PathSegments<'a> {
-        PathSegments {
-            points: self.points.iter(),
-            raw_area,
-            prev_point: None,
-            last_segment_index: None,
-        }
+        PathSegments::new(self, raw_area)
+    }
+
+    /// Iterate over raw grid points where the path turns.
+    pub fn corners<'a>(&'a self, raw_area: &'a RawArea) -> PathCorners<'a> {
+        PathCorners::new(self, raw_area)
     }
 }
 
@@ -170,6 +171,10 @@ impl PathWithEndpoints {
         self.path.segments(raw_area)
     }
 
+    pub fn corners<'a>(&'a self, raw_area: &'a RawArea) -> PathCorners<'a> {
+        self.path.corners(raw_area)
+    }
+
     pub fn to_directed_points(&self) -> Vec<DirectedPoint> {
         point_path_to_directed_point_path(&self.path.points, &self.start, &self.end)
     }
@@ -180,6 +185,23 @@ pub struct PathSegments<'a> {
     raw_area: &'a RawArea,
     prev_point: Option<&'a Point>,
     last_segment_index: Option<usize>,
+}
+
+impl<'a> PathSegments<'a> {
+    fn new(path: &'a Path, raw_area: &'a RawArea) -> Self {
+        PathSegments {
+            points: path.points.iter(),
+            raw_area,
+            prev_point: None,
+            last_segment_index: None,
+        }
+    }
+}
+
+pub struct PathCorners<'a> {
+    indices: Vec<usize>,
+    position: usize,
+    _phantom: PhantomData<&'a ()>,
 }
 impl<'a> Iterator for PathSegments<'a> {
     type Item = usize;
@@ -204,6 +226,60 @@ impl<'a> Iterator for PathSegments<'a> {
             self.prev_point = Some(current);
         }
         None
+    }
+}
+
+impl<'a> PathCorners<'a> {
+    fn new(path: &Path, raw_area: &RawArea) -> Self {
+        let mut indices = Vec::new();
+        let mut prev_dir: Option<(i32, i32)> = None;
+
+        for window in path.points.windows(2) {
+            let from = window[0];
+            let to = window[1];
+
+            let dx = to.x - from.x;
+            let dy = to.y - from.y;
+
+            // Only consider Manhattan steps.
+            if dx != 0 && dy != 0 {
+                prev_dir = None;
+                continue;
+            }
+            let dir = (dx.signum(), dy.signum());
+
+            if let Some(prev) = prev_dir {
+                if prev != dir {
+                    if let Some(raw_idx) = raw_area.point_to_raw_point(&from) {
+                        let idx = raw_idx.0 as usize;
+                        if indices.last().copied() != Some(idx) {
+                            indices.push(idx);
+                        }
+                    }
+                }
+            }
+
+            prev_dir = Some(dir);
+        }
+
+        PathCorners {
+            indices,
+            position: 0,
+            _phantom: PhantomData,
+        }
+    }
+}
+
+impl<'a> Iterator for PathCorners<'a> {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.position >= self.indices.len() {
+            return None;
+        }
+        let idx = self.indices[self.position];
+        self.position += 1;
+        Some(idx)
     }
 }
 
@@ -945,6 +1021,8 @@ impl EdgeRouter {
         let mut raw_usage = vec![0; raw_num_segments as usize];
         let mut raw_cost = vec![0.0; raw_num_segments as usize];
         let mut raw_history_cost = vec![0.0; raw_num_segments as usize];
+        let mut raw_corner_usage = vec![0; raw_area.size()];
+        let mut raw_corner_history = vec![0.0; raw_area.size()];
 
         let mut raw_cost_prefix_x = vec![0.0; ((raw_area.width()) * raw_area.height()) as usize];
         let mut raw_cost_prefix_y = vec![0.0; (raw_area.width() * (raw_area.height())) as usize];
@@ -965,6 +1043,8 @@ impl EdgeRouter {
         let mu: f64 = 0.5;
         let base_cost = 1.0;
         let capacity = 1;
+        let corner_lambda = 5.0;
+        let corner_capacity = 1;
         let mut op_edges = edges.clone();
 
         for i in 0..max_iterations {
@@ -1128,7 +1208,21 @@ impl EdgeRouter {
                             from_point,
                             to_point,
                         );
-                        (turn_cost as f64 + current_cost + mu * history_cost) as i32
+                        let corner_penalty = if from_orientation != to_orientation {
+                            let corner_idx = raw_area.point_to_raw_point(&from_point).unwrap().0 as usize;
+                            let usage = raw_corner_usage[corner_idx];
+                            let overflow = if usage > corner_capacity {
+                                usage - corner_capacity
+                            } else {
+                                0
+                            };
+                            let history = raw_corner_history[corner_idx];
+                            let reuse_penalty = if usage > 0 { base_cost } else { 0.0 };
+                            reuse_penalty + corner_lambda * (overflow as f64) + mu * history
+                        } else {
+                            0.0
+                        };
+                        (turn_cost as f64 + current_cost + mu * history_cost + corner_penalty) as i32
                     },
                 )?;
                 // Convert grid path to actual points with directions
@@ -1151,6 +1245,9 @@ impl EdgeRouter {
                 for segment_index in result_path.segments(&raw_area) {
                     raw_usage[segment_index as usize] += 1;
                 }
+                for corner_index in result_path.corners(&raw_area) {
+                    raw_corner_usage[corner_index] += 1;
+                }
 
                 result_paths.insert(
                     (start_raw_point, end_raw_point),
@@ -1166,18 +1263,40 @@ impl EdgeRouter {
                     total_overflow += usage - capacity;
                 }
             }
+            for i in 0..raw_area.size() {
+                let usage = raw_corner_usage[i];
+                if usage > corner_capacity {
+                    total_overflow += usage - corner_capacity;
+                }
+            }
             println!("Total overflow after iteration {}: {}\n", i, total_overflow);
+
+
             if total_overflow == 0 {
                 // All edges routed successfully
                 println!("All edges routed successfully in iteration {}", i);
                 break;
             }
 
+            if i == max_iterations - 1 {
+                println!(
+                    "Reached maximum iterations ({}), stopping routing.",
+                    max_iterations
+                );
+            }
+
+
             // 5) Update history cost based on overflow
             for i in 0..raw_num_segments as usize {
                 let usage = raw_usage[i];
                 if usage > capacity {
                     raw_history_cost[i] += (usage - capacity) as f64;
+                }
+            }
+            for i in 0..raw_area.size() {
+                let usage = raw_corner_usage[i];
+                if usage > corner_capacity {
+                    raw_corner_history[i] += (usage - corner_capacity) as f64;
                 }
             }
 
@@ -1198,12 +1317,24 @@ impl EdgeRouter {
                             break;
                         }
                     }
+                    if !has_overflow {
+                        for corner_index in routed_path.corners(&raw_area) {
+                            let usage = raw_corner_usage[corner_index];
+                            if usage > corner_capacity {
+                                has_overflow = true;
+                                break;
+                            }
+                        }
+                    }
                 }
                 if has_overflow {
                     // Remove usage of this path by adding to the usage_diff
                     if let Some(routed_path) = result_paths.get(&(start_raw_point, end_raw_point)) {
                         for segment_index in routed_path.segments(&raw_area) {
                             raw_usage[segment_index as usize] -= 1;
+                        }
+                        for corner_index in routed_path.corners(&raw_area) {
+                            raw_corner_usage[corner_index] -= 1;
                         }
                     }
                     op_edges.push((u.clone(), v.clone(), *start, *end, config.clone()));
