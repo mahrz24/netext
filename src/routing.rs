@@ -28,27 +28,15 @@ use crate::{
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct RoutingConfig {
     neighborhood: Neighborhood,
-    generate_trace: bool,
 }
 
 #[pymethods]
 impl RoutingConfig {
     #[new]
-    fn new(neighborhood: Neighborhood, generate_trace: Option<bool>) -> Self {
+    fn new(neighborhood: Neighborhood) -> Self {
         RoutingConfig {
             neighborhood,
-            generate_trace: generate_trace.unwrap_or(false),
         }
-    }
-
-    #[getter]
-    fn get_generate_trace(&self) -> bool {
-        self.generate_trace
-    }
-
-    #[setter]
-    fn set_generate_trace(&mut self, value: bool) {
-        self.generate_trace = value;
     }
 }
 
@@ -56,7 +44,6 @@ impl Default for RoutingConfig {
     fn default() -> Self {
         RoutingConfig {
             neighborhood: Neighborhood::Orthogonal,
-            generate_trace: false,
         }
     }
 }
@@ -1181,26 +1168,6 @@ impl EdgeRouter {
                 raw_cost[i] = 1.0 + lambda * (overflow as f64);
             }
 
-            // // Print the cost as a grid (once vertical and then horizontal)
-            // for y in 0..raw_area.height() {
-            //     let mut row = String::new();
-            //     for x in 0..(raw_area.width() - 1) {
-            //         let edge_index = (y * (raw_area.width() - 1) + x) as usize;
-            //         row.push_str(&format!("{:.0} ", raw_cost[edge_index]));
-            //     }
-            //     println!("H{:03}: {}", y, row);
-            // }
-            // for y in 0..(raw_area.height() - 1) {
-            //     let mut row = String::new();
-            //     for x in 0..raw_area.width() {
-            //         let edge_index = ((raw_area.width() - 1) * raw_area.height()
-            //             + x * (raw_area.height() - 1)
-            //             + y) as usize;
-            //         row.push_str(&format!("{:.0} ", raw_cost[edge_index]));
-            //     }
-            //     println!("V{:03}: {}", y, row);
-            // }
-
             // Update prefix sums as the per edge costs have now all changed.
             raw_area.edge_prefix_sums(&raw_cost, &mut raw_cost_prefix_x, &mut raw_cost_prefix_y);
             raw_area.edge_prefix_sums(
@@ -1208,26 +1175,6 @@ impl EdgeRouter {
                 &mut raw_history_cost_prefix_x,
                 &mut raw_history_cost_prefix_y,
             );
-
-            // Print prefix x sums for debugging
-            // println!("Raw cost prefix x sums:");
-            // for y in 0..raw_area.height() {
-            //     let mut row = String::new();
-            //     for x in 0..raw_area.width() {
-            //         let index = (y * raw_area.width() + x) as usize;
-            //         row.push_str(&format!("{:.0} ", raw_cost_prefix_x[index]));
-            //     }
-            //     println!("R{:03}: {}", y, row);
-            // }
-            // println!("Raw cost prefix y sums:");
-            // for y in 0..raw_area.height() {
-            //     let mut row = String::new();
-            //     for x in 0..raw_area.width() {
-            //         let index = (y * raw_area.width() + x) as usize;
-            //         row.push_str(&format!("{:.0} ", raw_cost_prefix_y[index]));
-            //     }
-            //     println!("R{:03}: {}", y, row);
-            // }
 
             // 2) Order nets by difficulty (span, channel width, past failures, etc.)
             // We want to route all edges, starting with the most difficult ones.
@@ -1244,7 +1191,7 @@ impl EdgeRouter {
                 let min_y = min(start.as_point().y, end.as_point().y);
                 let max_y = max(start.as_point().y, end.as_point().y);
                 let mut obstacle_area = 0;
-                let mut total_area = (max_x - min_x) * (max_y - min_y);
+                let total_area = (max_x - min_x) * (max_y - min_y);
                 for node in &placed_nodes_vector {
                     let node_tl = node.top_left();
                     let node_br = node.bottom_right();

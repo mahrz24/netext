@@ -1,12 +1,8 @@
 from collections.abc import Hashable
 import netext._core as core
-from netext._core import DirectedPoint, Point
+from netext._core import DirectedPoint
 from netext.edge_routing.edge import EdgePath
 from netext.edge_routing.modes import EdgeRoutingMode
-from rich.color import Color
-from rich.console import Console
-from rich.style import Style
-from rich.text import Text
 
 
 def _edge_routing_mode_to_routing_config(edge_routing_mode: EdgeRoutingMode) -> core.RoutingConfig:
@@ -14,12 +10,10 @@ def _edge_routing_mode_to_routing_config(edge_routing_mode: EdgeRoutingMode) -> 
         case EdgeRoutingMode.ORTHOGONAL:
             return core.RoutingConfig(
                 neighborhood=core.Neighborhood.ORTHOGONAL,
-                generate_trace=True,
             )
         case _:
             return core.RoutingConfig(
                 neighborhood=core.Neighborhood.MOORE,
-                generate_trace=True,
             )
 
 
