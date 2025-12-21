@@ -1512,6 +1512,99 @@ impl EdgeRouter {
         }
 
         let mut directed_paths: Vec<Vec<DirectedPoint>> = Vec::new();
+        // Optional debug output for short inspection of routed paths. Enabled via the
+        // RoutingConfig.generate_trace flag or the NETEXT_ROUTING_DEBUG env var.
+        let env_debug = std::env::var("NETEXT_ROUTING_DEBUG").is_ok();
+        let debug_enabled = env_debug || edges.iter().any(|(_, _, _, _, cfg)| cfg.generate_trace);
+        if debug_enabled {
+            let mut printed = 0usize;
+            eprintln!(
+                "[netext] routing debug: {} paths (showing up to 5)",
+                result_paths.len()
+            );
+            for (_u, _v, start, end, cfg) in &edges {
+                if printed >= 5 {
+                    break;
+                }
+                if !cfg.generate_trace && !env_debug {
+                    continue;
+                }
+                let key = (
+                    raw_area.point_to_raw_point(&start.as_point()).unwrap(),
+                    raw_area.point_to_raw_point(&end.as_point()).unwrap(),
+                );
+                if let Some(path_with_endpoints) = result_paths.get(&key) {
+                    let points = &path_with_endpoints.path.points;
+                    let first_step_direction = points
+                        .windows(2)
+                        .next()
+                        .and_then(|w| {
+                            let dx = w[1].x - w[0].x;
+                            let dy = w[1].y - w[0].y;
+                            match (dx.signum(), dy.signum()) {
+                                (1, 0) => Some(Direction::Right),
+                                (-1, 0) => Some(Direction::Left),
+                                (0, 1) => Some(Direction::Down),
+                                (0, -1) => Some(Direction::Up),
+                                _ => None,
+                            }
+                        })
+                        .unwrap_or(Direction::Center);
+                    let mut first_turn: Option<Direction> = None;
+                    let mut first_turn_step: Option<usize> = None;
+                    if points.len() >= 3 {
+                        let mut prev_dir: Option<(i32, i32)> = None;
+                        for (idx, window) in points.windows(2).enumerate() {
+                            let dx = window[1].x - window[0].x;
+                            let dy = window[1].y - window[0].y;
+                            if dx == 0 && dy == 0 {
+                                continue;
+                            }
+                            let dir = (dx.signum(), dy.signum());
+                            if let Some(prev) = prev_dir {
+                                if prev != dir {
+                                    first_turn = Some(match dir {
+                                        (1, 0) => Direction::Right,
+                                        (-1, 0) => Direction::Left,
+                                        (0, 1) => Direction::Down,
+                                        (0, -1) => Direction::Up,
+                                        _ => Direction::Center,
+                                    });
+                                    first_turn_step = Some(idx);
+                                    break;
+                                }
+                            }
+                            prev_dir = Some(dir);
+                        }
+                    }
+                    // Only report edges that turn immediately after the first step.
+                    if first_turn_step != Some(1) {
+                        continue;
+                    }
+                    let preview: String = path_with_endpoints
+                        .to_directed_points()
+                        .into_iter()
+                        .take(10)
+                        .map(|dp| format!("({},{}){:?}", dp.x, dp.y, dp.direction))
+                        .collect::<Vec<String>>()
+                        .join(" ");
+                    eprintln!(
+                        "[netext] edge ({},{}) -> ({},{}) len={} first_step={:?} start_dir={:?} first_turn={:?} path={}",
+                        start.x,
+                        start.y,
+                        end.x,
+                        end.y,
+                        points.len(),
+                        first_step_direction,
+                        start.direction,
+                        first_turn,
+                        preview
+                    );
+                    printed += 1;
+                }
+            }
+        }
+
         for (_, path_with_endpoints) in result_paths.iter() {
             directed_paths.push(path_with_endpoints.to_directed_points());
         }
