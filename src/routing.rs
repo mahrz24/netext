@@ -5,11 +5,15 @@ use std::cmp::min;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
+use std::collections::HashSet;
+use std::fs;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::result;
+
+use serde_json::json;
 
 use pyo3::prelude::*;
 
@@ -19,7 +23,6 @@ use crate::{
     geometry::{BoundingBox, DirectedPoint, Direction, Neighborhood, PlacedRectangularNode, Point},
     pyindexset::PyIndexSet,
 };
-use std::collections::HashSet;
 
 #[pyclass]
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -1095,6 +1098,9 @@ impl EdgeRouter {
         )>,
     ) -> PyResult<EdgeRoutingsResult> {
         let max_iterations = 10;
+        let trace_path = std::env::var("NETEXT_ROUTING_TRACE_JSON").ok();
+        let trace_enabled = trace_path.is_some();
+        let mut iteration_logs = Vec::new();
 
         // First we generate a grid from all start and end point projections and midpoints.
         let grid = Grid::from_edges_and_nodes(
@@ -1227,8 +1233,6 @@ impl EdgeRouter {
             // We want to route all edges, starting with the most difficult ones.
             // Difficulty is the span (Manhattan distance) between start and end point
             // plus the obstacle density in the bounding box of start and end point
-            println!("Routing n={} edges", op_edges.len());
-
             let mut sorted_edges = op_edges.clone();
             sorted_edges.sort_by_key(|(_, _, start, end, _)| {
                 // TODO We could cache this value per edge to avoid recomputing it every iteration.
@@ -1259,7 +1263,10 @@ impl EdgeRouter {
             // 3) For each net in order, find the cheapest path using A* or Dijkstra
 
             // Now we route all edges once, storing their paths and updating usage.
-            for (u, v, start, end, _) in &sorted_edges {
+            let mut routed_edges_trace: Vec<((RawPoint, RawPoint), serde_json::Map<String, serde_json::Value>)> =
+                Vec::new();
+            let mut overflow_map: HashMap<(RawPoint, RawPoint), bool> = HashMap::new();
+            for (_u, _v, start, end, _) in &sorted_edges {
                 let start_raw_point = raw_area.point_to_raw_point(&start.as_point());
                 let end_raw_point = raw_area.point_to_raw_point(&end.as_point());
 
@@ -1354,20 +1361,66 @@ impl EdgeRouter {
                     })
                     .collect();
 
-                let result_path = Path::new(grid_points);
+                let path = Path::new(grid_points);
+                let path_with_endpoints = PathWithEndpoints::new(path, *start, *end);
 
                 // Update usage based on routed paths
-                for segment_index in result_path.segments(&raw_area) {
+                for segment_index in path_with_endpoints.segments(&raw_area) {
                     raw_usage[segment_index as usize] += 1;
                 }
-                for corner_index in result_path.corners(&raw_area) {
+                for corner_index in path_with_endpoints.corners(&raw_area) {
                     raw_corner_usage[corner_index] += 1;
                 }
 
-                result_paths.insert(
-                    (start_raw_point, end_raw_point),
-                    PathWithEndpoints::new(result_path, *start, *end),
-                );
+                if trace_enabled {
+                    let grid_path_trace: Vec<serde_json::Value> = grid_path
+                        .iter()
+                        .map(|(grid_idx, orientation)| {
+                            let (gx, gy) = grid.grid_point_to_raw_coords(*grid_idx).unwrap_or((0, 0));
+                            json!({
+                                "grid_index": grid_idx.0,
+                                "raw": { "x": gx, "y": gy },
+                                "orientation": format!("{:?}", orientation)
+                            })
+                        })
+                        .collect();
+
+                    let raw_path_trace: Vec<serde_json::Value> = path_with_endpoints
+                        .path
+                        .points
+                        .iter()
+                        .map(|p| json!({ "x": p.x, "y": p.y }))
+                        .collect();
+
+                    let directed_trace: Vec<serde_json::Value> = path_with_endpoints
+                        .to_directed_points()
+                        .into_iter()
+                        .map(|dp| {
+                            json!({
+                                "x": dp.x,
+                                "y": dp.y,
+                                "direction": format!("{:?}", dp.direction)
+                            })
+                        })
+                        .collect();
+
+                    let mut entry = serde_json::Map::new();
+                    entry.insert(
+                        "start".to_string(),
+                        json!({"x": start.x, "y": start.y, "direction": format!("{:?}", start.direction)}),
+                    );
+                    entry.insert(
+                        "end".to_string(),
+                        json!({"x": end.x, "y": end.y, "direction": format!("{:?}", end.direction)}),
+                    );
+                    entry.insert("grid_path".to_string(), serde_json::Value::Array(grid_path_trace));
+                    entry.insert("raw_path".to_string(), serde_json::Value::Array(raw_path_trace));
+                    entry.insert("directed_path".to_string(), serde_json::Value::Array(directed_trace));
+                    routed_edges_trace.push(((start_raw_point, end_raw_point), entry));
+                    overflow_map.entry((start_raw_point, end_raw_point)).or_insert(false);
+                }
+
+                result_paths.insert((start_raw_point, end_raw_point), path_with_endpoints);
             }
 
             // 4) Compute overflow
@@ -1429,184 +1482,155 @@ impl EdgeRouter {
                     }
                 }
             }
-            println!(
-                "Total overflow after iteration {}: {} (edges {}, corners {})",
-                i, total_overflow, edge_overflow, corner_overflow
-            );
-            if !overflow_details.is_empty() {
-                println!("Overflow locations (max 10):");
-                for detail in overflow_details.iter() {
-                    println!("  {}", detail);
-                }
-            }
+            let finished = total_overflow == 0;
 
-
-            if total_overflow == 0 {
-                // All edges routed successfully
-                println!("All edges routed successfully in iteration {}", i);
-                break;
-            }
-
-            if i == max_iterations - 1 {
-                println!(
-                    "Reached maximum iterations ({}), stopping routing.",
-                    max_iterations
-                );
-            }
-
-
-            // 5) Update history cost based on overflow
-            for i in 0..raw_num_segments as usize {
-                let usage = raw_usage[i];
-                if usage > capacity {
-                    raw_history_cost[i] += (usage - capacity) as f64;
-                }
-            }
-            for i in 0..raw_area.size() {
-                let usage = raw_corner_usage[i];
-                if usage > corner_capacity {
-                    raw_corner_history[i] += (usage - corner_capacity) as f64;
-                }
-            }
-
-            // 6) Select edges to rip up based on some criteria
-            op_edges.clear();
-
-            // For simplicity, we rip up all edges that have any overflow on their paths.
-            for (u, v, start, end, config) in &sorted_edges {
-                let start_raw_point = raw_area.point_to_raw_point(&start.as_point()).unwrap();
-                let end_raw_point = raw_area.point_to_raw_point(&end.as_point()).unwrap();
-
-                let mut has_overflow = false;
-                if let Some(routed_path) = result_paths.get(&(start_raw_point, end_raw_point)) {
-                    for segment_index in routed_path.segments(&raw_area) {
-                        let usage = raw_usage[segment_index as usize];
-                        if usage > capacity {
-                            has_overflow = true;
-                            break;
-                        }
+            if !finished {
+                // 5) Update history cost based on overflow
+                for i in 0..raw_num_segments as usize {
+                    let usage = raw_usage[i];
+                    if usage > capacity {
+                        raw_history_cost[i] += (usage - capacity) as f64;
                     }
-                    if !has_overflow {
-                        for corner_index in routed_path.corners(&raw_area) {
-                            let usage = raw_corner_usage[corner_index];
-                            if usage > corner_capacity {
+                }
+                for i in 0..raw_area.size() {
+                    let usage = raw_corner_usage[i];
+                    if usage > corner_capacity {
+                        raw_corner_history[i] += (usage - corner_capacity) as f64;
+                    }
+                }
+
+                // 6) Select edges to rip up based on some criteria
+                op_edges.clear();
+
+                // For simplicity, we rip up all edges that have any overflow on their paths.
+                for (u, v, start, end, config) in &sorted_edges {
+                    let start_raw_point = raw_area.point_to_raw_point(&start.as_point()).unwrap();
+                    let end_raw_point = raw_area.point_to_raw_point(&end.as_point()).unwrap();
+
+                    let mut has_overflow = false;
+                    if let Some(routed_path) = result_paths.get(&(start_raw_point, end_raw_point)) {
+                        for segment_index in routed_path.segments(&raw_area) {
+                            let usage = raw_usage[segment_index as usize];
+                            if usage > capacity {
                                 has_overflow = true;
                                 break;
                             }
                         }
-                    }
-                }
-                if has_overflow {
-                    // Remove usage of this path by adding to the usage_diff
-                    if let Some(routed_path) = result_paths.get(&(start_raw_point, end_raw_point)) {
-                        for segment_index in routed_path.segments(&raw_area) {
-                            raw_usage[segment_index as usize] -= 1;
-                        }
-                        for corner_index in routed_path.corners(&raw_area) {
-                            raw_corner_usage[corner_index] -= 1;
+                        if !has_overflow {
+                            for corner_index in routed_path.corners(&raw_area) {
+                                let usage = raw_corner_usage[corner_index];
+                                if usage > corner_capacity {
+                                    has_overflow = true;
+                                    break;
+                                }
+                            }
                         }
                     }
-                    op_edges.push((u.clone(), v.clone(), *start, *end, config.clone()));
+                    if has_overflow {
+                        if trace_enabled {
+                            overflow_map.insert((start_raw_point, end_raw_point), true);
+                        }
+                        // Remove usage of this path by adding to the usage_diff
+                        if let Some(routed_path) = result_paths.get(&(start_raw_point, end_raw_point)) {
+                            for segment_index in routed_path.segments(&raw_area) {
+                                raw_usage[segment_index as usize] -= 1;
+                            }
+                            for corner_index in routed_path.corners(&raw_area) {
+                                raw_corner_usage[corner_index] -= 1;
+                            }
+                        }
+                        op_edges.push((u.clone(), v.clone(), *start, *end, config.clone()));
+                    }
                 }
+            } else {
+                op_edges.clear();
+            }
+
+            if trace_enabled {
+                let mut routed_edges_output: Vec<serde_json::Value> = Vec::new();
+                for (key, mut entry) in routed_edges_trace.into_iter() {
+                    let overflow = *overflow_map.get(&key).unwrap_or(&false);
+                    entry.insert("overflow".to_string(), json!(overflow));
+                    routed_edges_output.push(serde_json::Value::Object(entry));
+                }
+
+                let all_paths_snapshot: Vec<serde_json::Value> = result_paths
+                    .iter()
+                    .map(|(key, path_with_endpoints)| {
+                        let start_point = raw_area.raw_index_to_point(key.0 .0 as usize);
+                        let end_point = raw_area.raw_index_to_point(key.1 .0 as usize);
+                        let directed_trace: Vec<serde_json::Value> = path_with_endpoints
+                            .to_directed_points()
+                            .into_iter()
+                            .map(|dp| {
+                                json!({
+                                    "x": dp.x,
+                                    "y": dp.y,
+                                    "direction": format!("{:?}", dp.direction)
+                                })
+                            })
+                            .collect();
+                        json!({
+                            "start_raw_index": key.0 .0,
+                            "end_raw_index": key.1 .0,
+                            "start_raw_point": { "x": start_point.x, "y": start_point.y },
+                            "end_raw_point": { "x": end_point.x, "y": end_point.y },
+                            "directed_path": directed_trace
+                        })
+                    })
+                    .collect();
+
+                let ripped_up_next: Vec<serde_json::Value> = op_edges
+                    .iter()
+                    .map(|(_, _, start, end, _)| {
+                        json!({
+                            "start": { "x": start.x, "y": start.y, "direction": format!("{:?}", start.direction) },
+                            "end": { "x": end.x, "y": end.y, "direction": format!("{:?}", end.direction) }
+                        })
+                    })
+                    .collect();
+
+                iteration_logs.push(json!({
+                    "iteration": i,
+                    "routed_edges": routed_edges_output,
+                    "all_paths": all_paths_snapshot,
+                    "ripped_up_next": ripped_up_next,
+                    "raw_usage": raw_usage.clone(),
+                    "raw_corner_usage": raw_corner_usage.clone(),
+                    "overflow": {
+                        "total": total_overflow,
+                        "edges": edge_overflow,
+                        "corners": corner_overflow,
+                        "details": overflow_details,
+                    }
+                }));
+            }
+
+            if finished {
+                break;
             }
         }
 
         let mut directed_paths: Vec<Vec<DirectedPoint>> = Vec::new();
-        // Optional debug output for short inspection of routed paths. Enabled via the
-        // RoutingConfig.generate_trace flag or the NETEXT_ROUTING_DEBUG env var.
-        let env_debug = std::env::var("NETEXT_ROUTING_DEBUG").is_ok();
-        let debug_enabled = env_debug || edges.iter().any(|(_, _, _, _, cfg)| cfg.generate_trace);
-        if debug_enabled {
-            let mut printed = 0usize;
-            eprintln!(
-                "[netext] routing debug: {} paths (showing up to 5)",
-                result_paths.len()
-            );
-            for (_u, _v, start, end, cfg) in &edges {
-                if printed >= 5 {
-                    break;
-                }
-                if !cfg.generate_trace && !env_debug {
-                    continue;
-                }
-                let key = (
-                    raw_area.point_to_raw_point(&start.as_point()).unwrap(),
-                    raw_area.point_to_raw_point(&end.as_point()).unwrap(),
-                );
-                if let Some(path_with_endpoints) = result_paths.get(&key) {
-                    let points = &path_with_endpoints.path.points;
-                    let first_step_direction = points
-                        .windows(2)
-                        .next()
-                        .and_then(|w| {
-                            let dx = w[1].x - w[0].x;
-                            let dy = w[1].y - w[0].y;
-                            match (dx.signum(), dy.signum()) {
-                                (1, 0) => Some(Direction::Right),
-                                (-1, 0) => Some(Direction::Left),
-                                (0, 1) => Some(Direction::Down),
-                                (0, -1) => Some(Direction::Up),
-                                _ => None,
-                            }
-                        })
-                        .unwrap_or(Direction::Center);
-                    let mut first_turn: Option<Direction> = None;
-                    let mut first_turn_step: Option<usize> = None;
-                    if points.len() >= 3 {
-                        let mut prev_dir: Option<(i32, i32)> = None;
-                        for (idx, window) in points.windows(2).enumerate() {
-                            let dx = window[1].x - window[0].x;
-                            let dy = window[1].y - window[0].y;
-                            if dx == 0 && dy == 0 {
-                                continue;
-                            }
-                            let dir = (dx.signum(), dy.signum());
-                            if let Some(prev) = prev_dir {
-                                if prev != dir {
-                                    first_turn = Some(match dir {
-                                        (1, 0) => Direction::Right,
-                                        (-1, 0) => Direction::Left,
-                                        (0, 1) => Direction::Down,
-                                        (0, -1) => Direction::Up,
-                                        _ => Direction::Center,
-                                    });
-                                    first_turn_step = Some(idx);
-                                    break;
-                                }
-                            }
-                            prev_dir = Some(dir);
-                        }
-                    }
-                    // Only report edges that turn immediately after the first step.
-                    if first_turn_step != Some(1) {
-                        continue;
-                    }
-                    let preview: String = path_with_endpoints
-                        .to_directed_points()
-                        .into_iter()
-                        .take(10)
-                        .map(|dp| format!("({},{}){:?}", dp.x, dp.y, dp.direction))
-                        .collect::<Vec<String>>()
-                        .join(" ");
-                    eprintln!(
-                        "[netext] edge ({},{}) -> ({},{}) len={} first_step={:?} start_dir={:?} first_turn={:?} path={}",
-                        start.x,
-                        start.y,
-                        end.x,
-                        end.y,
-                        points.len(),
-                        first_step_direction,
-                        start.direction,
-                        first_turn,
-                        preview
-                    );
-                    printed += 1;
-                }
-            }
-        }
-
         for (_, path_with_endpoints) in result_paths.iter() {
             directed_paths.push(path_with_endpoints.to_directed_points());
+        }
+
+        if let Some(path) = trace_path {
+            let trace_json = json!({ "iterations": iteration_logs });
+            let serialized = serde_json::to_string_pretty(&trace_json).map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
+                    "Failed to serialize routing trace: {}",
+                    e
+                ))
+            })?;
+            fs::write(&path, serialized).map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyIOError, _>(format!(
+                    "Failed to write routing trace to {}: {}",
+                    path,
+                    e
+                ))
+            })?;
         }
 
         Ok(EdgeRoutingsResult::new(directed_paths, None))
