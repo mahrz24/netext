@@ -1088,6 +1088,8 @@ impl EdgeRouter {
         let trace_path = std::env::var("NETEXT_ROUTING_TRACE_JSON").ok();
         let trace_enabled = trace_path.is_some();
         let mut iteration_logs = Vec::new();
+        let mut layout_nodes = Vec::new();
+        let mut grid_points_trace = Vec::new();
 
         // First we generate a grid from all start and end point projections and midpoints.
         let grid = Grid::from_edges_and_nodes(
@@ -1123,6 +1125,29 @@ impl EdgeRouter {
 
         let masked_grid =
             MaskedGrid::from_nodes(&grid, &placed_nodes_vector, &start_end_grid_points_vector);
+
+        if trace_enabled {
+            for idx in 0..grid.size {
+                let gp = GridPoint(idx as u32);
+                if let Some((gx, gy)) = grid.grid_point_to_raw_coords(gp) {
+                    grid_points_trace.push(json!({
+                        "index": idx,
+                        "raw": { "x": gx, "y": gy }
+                    }));
+                }
+            }
+            for (id, node) in &self.placed_nodes {
+                let tl = node.top_left();
+                let br = node.bottom_right();
+                layout_nodes.push(json!({
+                    "id": id,
+                    "center": { "x": node.center.x, "y": node.center.y },
+                    "size": { "width": node.node.size.width, "height": node.node.size.height },
+                    "top_left": { "x": tl.x, "y": tl.y },
+                    "bottom_right": { "x": br.x, "y": br.y },
+                }));
+            }
+        }
 
         // We also need to maintain usage and capacity on the raw grid, initialized with usage from
         // existing edges. We could also use capacity to change how edges are routed here.
@@ -1374,7 +1399,6 @@ impl EdgeRouter {
             let mut total_overflow = 0;
             let mut edge_overflow = 0;
             let mut corner_overflow = 0;
-            let mut overflow_details: Vec<String> = Vec::new();
 
             let horiz_count = (raw_area.width() as usize - 1) * raw_area.height() as usize;
             let width = raw_area.width() as usize;
@@ -1385,31 +1409,6 @@ impl EdgeRouter {
                     let over = usage - capacity;
                     total_overflow += over;
                     edge_overflow += over;
-
-                    if overflow_details.len() < 10 {
-                        if i < horiz_count {
-                            let x = i % (raw_area.width() as usize - 1);
-                            let y = i / (raw_area.width() as usize - 1);
-                            let p1 = raw_area.raw_index_to_point(y * width + x);
-                            let p2 = raw_area.raw_index_to_point(y * width + x + 1);
-                            let closest = closest_node_name(&placed_nodes_vector, p1);
-                            overflow_details.push(format!(
-                                "edge H ({},{})-({},{}) overflow {} closest {:?}",
-                                p1.x, p1.y, p2.x, p2.y, over, closest
-                            ));
-                        } else {
-                            let vert_idx = i - horiz_count;
-                            let x = vert_idx / (raw_area.height() as usize - 1);
-                            let y = vert_idx % (raw_area.height() as usize - 1);
-                            let p1 = raw_area.raw_index_to_point(y * width + x);
-                            let p2 = raw_area.raw_index_to_point((y + 1) * width + x);
-                            let closest = closest_node_name(&placed_nodes_vector, p1);
-                            overflow_details.push(format!(
-                                "edge V ({},{})-({},{}) overflow {} closest {:?}",
-                                p1.x, p1.y, p2.x, p2.y, over, closest
-                            ));
-                        }
-                    }
                 }
             }
             for i in 0..raw_area.size() {
@@ -1418,17 +1417,18 @@ impl EdgeRouter {
                     let over = usage - corner_capacity;
                     total_overflow += over;
                     corner_overflow += over;
-
-                    if overflow_details.len() < 10 {
-                        let p = raw_area.raw_index_to_point(i);
-                        let closest = closest_node_name(&placed_nodes_vector, p);
-                        overflow_details.push(format!(
-                            "corner ({},{}) overflow {} closest {:?}",
-                            p.x, p.y, over, closest
-                        ));
-                    }
                 }
             }
+            let trace_usage_snapshot = if trace_enabled {
+                Some(raw_usage.clone())
+            } else {
+                None
+            };
+            let trace_corner_snapshot = if trace_enabled {
+                Some(raw_corner_usage.clone())
+            } else {
+                None
+            };
             let finished = total_overflow == 0;
 
             if !finished {
@@ -1542,13 +1542,12 @@ impl EdgeRouter {
                     "routed_edges": routed_edges_output,
                     "all_paths": all_paths_snapshot,
                     "ripped_up_next": ripped_up_next,
-                    "raw_usage": raw_usage.clone(),
-                    "raw_corner_usage": raw_corner_usage.clone(),
+                    "raw_usage": trace_usage_snapshot.clone().unwrap_or_else(|| raw_usage.clone()),
+                    "raw_corner_usage": trace_corner_snapshot.clone().unwrap_or_else(|| raw_corner_usage.clone()),
                     "overflow": {
                         "total": total_overflow,
                         "edges": edge_overflow,
-                        "corners": corner_overflow,
-                        "details": overflow_details,
+                        "corners": corner_overflow
                     }
                 }));
             }
@@ -1564,7 +1563,20 @@ impl EdgeRouter {
         }
 
         if let Some(path) = trace_path {
-            let trace_json = json!({ "iterations": iteration_logs });
+            let raw_area_json = json!({
+                "top_left": { "x": raw_area.top_left.x, "y": raw_area.top_left.y },
+                "bottom_right": { "x": raw_area.bottom_right.x, "y": raw_area.bottom_right.y },
+                "width": raw_area.width(),
+                "height": raw_area.height(),
+            });
+            let trace_json = json!({
+                "layout": {
+                    "nodes": layout_nodes,
+                    "grid_points": grid_points_trace,
+                    "raw_area": raw_area_json
+                },
+                "iterations": iteration_logs
+            });
             let serialized = serde_json::to_string_pretty(&trace_json).map_err(|e| {
                 PyErr::new::<pyo3::exceptions::PyValueError, _>(format!(
                     "Failed to serialize routing trace: {}",
