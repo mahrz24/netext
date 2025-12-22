@@ -1769,6 +1769,13 @@ where
         for (neighbor_index, neighbor_orientation) in
             masked_grid.neighbors(current_state.index, current_state.orientation)
         {
+            // Do not allow in-place orientation flips at the start or end grid point.
+            if neighbor_index == current_state.index
+                && (current_state.index == start_grid_point || current_state.index == end_grid_point)
+            {
+                continue;
+            }
+
             if !masked_grid.point_mask[neighbor_index] {
                 continue;
             }

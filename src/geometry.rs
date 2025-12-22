@@ -255,15 +255,18 @@ pub struct PlacedRectangularNode {
 impl BoundingBox for PlacedRectangularNode {
     fn top_left(&self) -> Point {
         Point {
-            x: self.center.x - self.node.size.width / 2,
-            y: self.center.y - self.node.size.height / 2,
+            // Align bounding boxes with the Python ShapeBuffer extents:
+            // left/top are exactly width/2 (rounded down) away from the center.
+            x: self.center.x - (self.node.size.width / 2),
+            y: self.center.y - (self.node.size.height / 2),
         }
     }
 
     fn bottom_right(&self) -> Point {
         Point {
-            x: self.center.x + self.node.size.width / 2,
-            y: self.center.y + self.node.size.height / 2,
+            // Right/bottom stop one cell earlier for even sizes, matching ShapeBuffer.right_x/bottom_y.
+            x: self.center.x + ((self.node.size.width - 1) / 2),
+            y: self.center.y + ((self.node.size.height - 1) / 2),
         }
     }
 }
