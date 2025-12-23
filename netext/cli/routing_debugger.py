@@ -147,6 +147,9 @@ def char_for_dirs(prev_dir: tuple[int, int] | None, next_dir: tuple[int, int] | 
     return "·"
 
 
+EDGE_DISPLAY_MODES = ["edges", "edges_endpoints", "endpoints", "none"]
+
+
 class RoutingTraceApp(App):
     CSS = """
 Screen {
@@ -181,6 +184,7 @@ Screen {
         ("j", "next_edge", "Next edge"),
         ("k", "prev_edge", "Prev edge"),
         ("u", "toggle_nodes", "Toggle nodes"),
+        ("e", "toggle_edges", "Toggle edges"),
     ]
 
     def __init__(self, trace_path: Path):
@@ -195,6 +199,7 @@ Screen {
         self.show_heat_corners = False
         self.selected_edge_index = 0
         self.show_nodes = True
+        self.edge_display_mode = "edges"
 
     def compose(self) -> ComposeResult:
         self.layout, self.iterations = load_trace(self.trace_path)
@@ -242,6 +247,11 @@ Screen {
         self.show_nodes = not self.show_nodes
         self.refresh_view()
 
+    def action_toggle_edges(self) -> None:
+        idx = EDGE_DISPLAY_MODES.index(self.edge_display_mode)
+        self.edge_display_mode = EDGE_DISPLAY_MODES[(idx + 1) % len(EDGE_DISPLAY_MODES)]
+        self.refresh_view()
+
     def action_next_edge(self) -> None:
         paths = self.iterations[self.iter_index].all_paths
         if not paths:
@@ -278,7 +288,12 @@ Screen {
         text.append(f"Iteration {self.iter_index + 1}/{len(self.iterations)}  ")
         text.append(f"Overflow total: {iteration.overflow.get('total', 0)}  ")
         text.append(
-            f"[H:{'on' if self.show_heat_h else 'off'} V:{'on' if self.show_heat_v else 'off'} C:{'on' if self.show_heat_corners else 'off'} Rip:{'on' if self.show_ripups else 'off'}]"
+            f"[H:{'on' if self.show_heat_h else 'off'} "
+            f"V:{'on' if self.show_heat_v else 'off'} "
+            f"C:{'on' if self.show_heat_corners else 'off'} "
+            f"E:{self.edge_display_mode} "
+            f"N:{'on' if self.show_nodes else 'off'} "
+            f"Rip:{'on' if self.show_ripups else 'off'}]"
         )
         return text
 
@@ -351,7 +366,7 @@ Screen {
                 if color:
                     cx, cy = x, y
                     if 0 <= cx < width and 0 <= cy < height:
-                        cells[cy][cx].set(char="∙", bg=color)
+                        cells[cy][cx].set(char="·", bg=color)
 
         # Heatmap for corners (grid points)
         if self.show_heat_corners:
@@ -363,14 +378,22 @@ Screen {
                 y = layout.top_left[1] + (idx // width)
                 cx, cy = cell_from_raw(x, y)
                 if 0 <= cx < width and 0 <= cy < height:
-                    cells[cy][cx].set(char="•", bg=color)
+                    cells[cy][cx].set(char="·", bg=color)
 
         # Grid points
         for gp in layout.grid_points:
             gx, gy = gp["raw"]["x"], gp["raw"]["y"]
             cx, cy = cell_from_raw(gx, gy)
             if 0 <= cx < width and 0 <= cy < height:
-                cells[cy][cx].set(char="·", fg="#6b7280")
+                blocked = gp.get("blocked", False)
+                masked_adjacent = gp.get("masked_adjacent", False)
+                if blocked:
+                    fg = "#9f0d0d"
+                elif masked_adjacent:
+                    fg = "#06b6d4"
+                else:
+                    fg = "#6b7280"
+                cells[cy][cx].set(char="·", fg=fg)
 
         # Determine ripped-up edges (start/end match)
         ripup_pairs = {
@@ -378,49 +401,61 @@ Screen {
             for edge in iteration.ripped_up_next
         }
 
-        # Paths
-        selected_path = None
-        # First pass: draw non-selected edges
-        for idx, path_entry in enumerate(iteration.all_paths):
-            directed = path_entry.get("directed_path", [])
-            if not directed:
-                continue
-            if idx == self.selected_edge_index:
-                selected_path = path_entry
-                continue
-            start = directed[0]
-            end = directed[-1]
-            ripup = (start["x"], start["y"], end["x"], end["y"]) in ripup_pairs if self.show_ripups else False
-            color = "#a855f7" if ripup else "#2563eb"
-            # Deduplicate consecutive identical points to preserve corners
-            points: list[tuple[int, int]] = []
-            for p in directed:
-                pt = (p["x"], p["y"])
-                if not points or points[-1] != pt:
-                    points.append(pt)
-            for i, point in enumerate(points):
-                prev_dir = direction(points[i - 1], point) if i > 0 else None
-                next_dir = direction(point, points[i + 1]) if i + 1 < len(points) else None
-                char = char_for_dirs(prev_dir, next_dir)
-                cx, cy = cell_from_raw(point[0], point[1])
-                if 0 <= cx < width and 0 <= cy < height:
-                    cells[cy][cx].set(char=char, fg=color)
+        # Paths and endpoints
+        draw_edges = self.edge_display_mode in ("edges", "edges_endpoints")
+        draw_endpoints = self.edge_display_mode in ("endpoints", "edges_endpoints")
 
-        # Selected edge drawn last on top with heavy strokes
-        if selected_path:
-            directed = selected_path.get("directed_path", [])
-            points: list[tuple[int, int]] = []
-            for p in directed:
-                pt = (p["x"], p["y"])
-                if not points or points[-1] != pt:
-                    points.append(pt)
-            for i, point in enumerate(points):
-                prev_dir = direction(points[i - 1], point) if i > 0 else None
-                next_dir = direction(point, points[i + 1]) if i + 1 < len(points) else None
-                char = char_for_dirs(prev_dir, next_dir).translate(str.maketrans("─│┌┐└┘", "━┃┏┓┗┛"))
-                cx, cy = cell_from_raw(point[0], point[1])
-                if 0 <= cx < width and 0 <= cy < height:
-                    cells[cy][cx].set(char=char, fg="#facc15")
+        selected_path = None
+        if draw_edges:
+            # First pass: draw non-selected edges
+            for idx, path_entry in enumerate(iteration.all_paths):
+                directed = path_entry.get("directed_path", [])
+                if not directed:
+                    continue
+                if idx == self.selected_edge_index:
+                    selected_path = path_entry
+                    continue
+                start = directed[0]
+                end = directed[-1]
+                ripup = (start["x"], start["y"], end["x"], end["y"]) in ripup_pairs if self.show_ripups else False
+                color = "#a855f7" if ripup else "#2563eb"
+                # Deduplicate consecutive identical points to preserve corners
+                points: list[tuple[int, int]] = []
+                for p in directed:
+                    pt = (p["x"], p["y"])
+                    if not points or points[-1] != pt:
+                        points.append(pt)
+                for point in points:
+                    cx, cy = cell_from_raw(point[0], point[1])
+                    if 0 <= cx < width and 0 <= cy < height:
+                        cells[cy][cx].set(char="■", fg=color)
+
+            # Selected edge drawn last on top with heavy strokes
+            if selected_path:
+                directed = selected_path.get("directed_path", [])
+                points: list[tuple[int, int]] = []
+                for p in directed:
+                    pt = (p["x"], p["y"])
+                    if not points or points[-1] != pt:
+                        points.append(pt)
+                for point in points:
+                    cx, cy = cell_from_raw(point[0], point[1])
+                    if 0 <= cx < width and 0 <= cy < height:
+                        cells[cy][cx].set(char="■", fg="#facc15")
+
+        if draw_endpoints:
+            for path_entry in iteration.all_paths:
+                directed = path_entry.get("directed_path", [])
+                if not directed:
+                    continue
+                start = directed[0]
+                end = directed[-1]
+                sx, sy = cell_from_raw(start["x"], start["y"])
+                ex, ey = cell_from_raw(end["x"], end["y"])
+                if 0 <= sx < width and 0 <= sy < height:
+                    cells[sy][sx].set(char="*", fg="#f59e0b")
+                if 0 <= ex < width and 0 <= ey < height:
+                    cells[ey][ex].set(char="+", fg="#22d3ee")
 
         # Nodes last so they stay intact over paths/heatmaps
         if self.show_nodes:

@@ -840,12 +840,36 @@ impl<'a> MaskedGrid<'a> {
             let tl = node.top_left();
             let br = node.bottom_right();
 
-            let min_grid_x = grid.x_lines.binary_search(&tl.x).unwrap_or_else(|x| x);
-            let max_grid_x = grid.x_lines.binary_search(&br.x).unwrap_or_else(|x| x);
-            let min_grid_y = grid.y_lines.binary_search(&tl.y).unwrap_or_else(|y| y);
-            let max_grid_y = grid.y_lines.binary_search(&br.y).unwrap_or_else(|y| y);
+            // Inclusive grid ranges that stay on/inside the node bounds.
+            let min_grid_x = grid
+                .x_lines
+                .binary_search(&tl.x)
+                .unwrap_or_else(|idx| idx)
+                .min(grid.width.saturating_sub(1));
+            let max_grid_x = grid
+                .x_lines
+                .binary_search(&br.x)
+                .map(|idx| idx)
+                .unwrap_or_else(|idx| idx.saturating_sub(1))
+                .min(grid.width.saturating_sub(1));
+            let min_grid_y = grid
+                .y_lines
+                .binary_search(&tl.y)
+                .unwrap_or_else(|idx| idx)
+                .min(grid.height.saturating_sub(1));
+            let max_grid_y = grid
+                .y_lines
+                .binary_search(&br.y)
+                .map(|idx| idx)
+                .unwrap_or_else(|idx| idx.saturating_sub(1))
+                .min(grid.height.saturating_sub(1));
 
-            if !(min_grid_x == max_grid_x || min_grid_y == max_grid_y) {
+            // If the node lies strictly between two grid lines, ensure we still mask the nearest inside line.
+            let min_grid_x = min_grid_x.min(max_grid_x);
+            let min_grid_y = min_grid_y.min(max_grid_y);
+
+            // Mask all grid points that lie within the inclusive ranges (also if only a single grid line fits).
+            if min_grid_x <= max_grid_x && min_grid_y <= max_grid_y {
                 for grid_y in min_grid_y..=max_grid_y {
                     for grid_x in min_grid_x..=max_grid_x {
                         if let Some(grid_point) = grid.grid_coords_to_grid_point(grid_x, grid_y) {
@@ -872,7 +896,8 @@ impl<'a> MaskedGrid<'a> {
 
             if let Ok(grid_x) = min_extruded_grid_x {
                 // Remove the segments along the y grid coordinates with this grid_x.
-                for grid_y in max(0, min_grid_y - 1)..=min(grid.height - 2, max_grid_y) {
+                let start_y = min_grid_y.saturating_sub(1);
+                for grid_y in start_y..=min(grid.height - 2, max_grid_y) {
                     let segment_index =
                         grid.grid_coords_to_segment_index((grid_x, grid_y), (grid_x, grid_y + 1));
                     visibility_segment_mask[segment_index] = false;
@@ -881,7 +906,8 @@ impl<'a> MaskedGrid<'a> {
 
             if let Ok(grid_x) = max_extruded_grid_x {
                 // Remove the segments along the y grid coordinates with this grid_x.
-                for grid_y in max(0, min_grid_y - 1)..=min(grid.height - 2, max_grid_y) {
+                let start_y = min_grid_y.saturating_sub(1);
+                for grid_y in start_y..=min(grid.height - 2, max_grid_y) {
                     let segment_index =
                         grid.grid_coords_to_segment_index((grid_x, grid_y), (grid_x, grid_y + 1));
                     visibility_segment_mask[segment_index] = false;
@@ -890,7 +916,8 @@ impl<'a> MaskedGrid<'a> {
 
             if let Ok(grid_y) = min_extruded_grid_y {
                 // Remove the segments along the x grid coordinates with this grid_y.
-                for grid_x in max(0, min_grid_x - 1)..=min(grid.width - 2, max_grid_x) {
+                let start_x = min_grid_x.saturating_sub(1);
+                for grid_x in start_x..=min(grid.width - 2, max_grid_x) {
                     let segment_index =
                         grid.grid_coords_to_segment_index((grid_x, grid_y), (grid_x + 1, grid_y));
                     visibility_segment_mask[segment_index] = false;
@@ -899,7 +926,8 @@ impl<'a> MaskedGrid<'a> {
 
             if let Ok(grid_y) = max_extruded_grid_y {
                 // Remove the segments along the x grid coordinates with this grid_y.
-                for grid_x in max(0, min_grid_x - 1)..=min(grid.width - 2, max_grid_x) {
+                let start_x = min_grid_x.saturating_sub(1);
+                for grid_x in start_x..=min(grid.width - 2, max_grid_x) {
                     let segment_index =
                         grid.grid_coords_to_segment_index((grid_x, grid_y), (grid_x + 1, grid_y));
                     visibility_segment_mask[segment_index] = false;
@@ -1127,12 +1155,48 @@ impl EdgeRouter {
             MaskedGrid::from_nodes(&grid, &placed_nodes_vector, &start_end_grid_points_vector);
 
         if trace_enabled {
+            // Track which grid points touch a masked segment to visualize masked edges.
+            let mut masked_adjacent: Vec<bool> = vec![false; grid.size];
+
+            // Horizontal segments
+            for y in 0..grid.height {
+                for x in 0..(grid.width - 1) {
+                    let seg_idx = y * (grid.width - 1) + x;
+                    if !masked_grid.segment_mask[seg_idx] {
+                        if let Some(gp_a) = grid.grid_coords_to_grid_point(x, y) {
+                            masked_adjacent[gp_a.0 as usize] = true;
+                        }
+                        if let Some(gp_b) = grid.grid_coords_to_grid_point(x + 1, y) {
+                            masked_adjacent[gp_b.0 as usize] = true;
+                        }
+                    }
+                }
+            }
+            // Vertical segments
+            let vertical_offset = (grid.width - 1) * grid.height;
+            for x in 0..grid.width {
+                for y in 0..(grid.height - 1) {
+                    let seg_idx = vertical_offset + x * (grid.height - 1) + y;
+                    if !masked_grid.segment_mask[seg_idx] {
+                        if let Some(gp_a) = grid.grid_coords_to_grid_point(x, y) {
+                            masked_adjacent[gp_a.0 as usize] = true;
+                        }
+                        if let Some(gp_b) = grid.grid_coords_to_grid_point(x, y + 1) {
+                            masked_adjacent[gp_b.0 as usize] = true;
+                        }
+                    }
+                }
+            }
+
             for idx in 0..grid.size {
                 let gp = GridPoint(idx as u32);
                 if let Some((gx, gy)) = grid.grid_point_to_raw_coords(gp) {
+                    let blocked = !masked_grid.point_mask[gp];
                     grid_points_trace.push(json!({
                         "index": idx,
-                        "raw": { "x": gx, "y": gy }
+                        "raw": { "x": gx, "y": gy },
+                        "blocked": blocked,
+                        "masked_adjacent": masked_adjacent[idx]
                     }));
                 }
             }
