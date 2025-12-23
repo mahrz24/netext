@@ -3,19 +3,25 @@ use rstar::RTreeObject;
 use std::cmp::max;
 use std::cmp::min;
 use std::cmp::Reverse;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::BinaryHeap;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
 use std::hash::Hash;
+use std::hash::Hasher;
 use std::marker::PhantomData;
 use std::ops::Index;
 use std::ops::IndexMut;
 use std::result;
 
+use rand::rngs::StdRng;
+use rand::Rng;
+use rand::SeedableRng;
 use serde_json::json;
 
 use pyo3::prelude::*;
+use rand::seq::SliceRandom;
 
 use crate::geometry::Orientation;
 use crate::geometry::PointLike;
@@ -1017,6 +1023,36 @@ impl<'a> MaskedGrid<'a> {
     }
 }
 
+fn routing_seed(
+    edges: &Vec<(
+        Bound<'_, PyAny>,
+        Bound<'_, PyAny>,
+        DirectedPoint,
+        DirectedPoint,
+        RoutingConfig,
+    )>,
+    nodes: &Vec<PlacedRectangularNode>,
+) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    edges.len().hash(&mut hasher);
+    for (_, _, start, end, _) in edges {
+        start.x.hash(&mut hasher);
+        start.y.hash(&mut hasher);
+        start.direction.hash(&mut hasher);
+        end.x.hash(&mut hasher);
+        end.y.hash(&mut hasher);
+        end.direction.hash(&mut hasher);
+    }
+    nodes.len().hash(&mut hasher);
+    for node in nodes {
+        node.center.x.hash(&mut hasher);
+        node.center.y.hash(&mut hasher);
+        node.node.size.width.hash(&mut hasher);
+        node.node.size.height.hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
 impl Direction {
     fn to_orientation(&self) -> Orientation {
         match self {
@@ -1112,7 +1148,7 @@ impl EdgeRouter {
             RoutingConfig,
         )>,
     ) -> PyResult<EdgeRoutingsResult> {
-        let max_iterations = 10;
+        let max_iterations = 20;
         let trace_path = std::env::var("NETEXT_ROUTING_TRACE_JSON").ok();
         let trace_enabled = trace_path.is_some();
         let mut iteration_logs = Vec::new();
@@ -1150,6 +1186,9 @@ impl EdgeRouter {
         let placed_nodes_vector = self.placed_nodes.values().cloned().collect();
         let start_end_grid_points_vector: Vec<GridPoint> =
             start_end_grid_points.iter().cloned().collect();
+
+        let seed = routing_seed(&edges, &placed_nodes_vector);
+        let mut rng: StdRng = StdRng::seed_from_u64(seed);
 
         let masked_grid =
             MaskedGrid::from_nodes(&grid, &placed_nodes_vector, &start_end_grid_points_vector);
@@ -1269,32 +1308,41 @@ impl EdgeRouter {
             // We want to route all edges, starting with the most difficult ones.
             // Difficulty is the span (Manhattan distance) between start and end point
             // plus the obstacle density in the bounding box of start and end point
-            let mut sorted_edges = op_edges.clone();
-            sorted_edges.sort_by_key(|(_, _, start, end, _)| {
+            let mut edges_with_score: Vec<(i32, (Bound<'_, PyAny>, Bound<'_, PyAny>, DirectedPoint, DirectedPoint, RoutingConfig))> =
+                Vec::new();
+            for (u, v, start, end, config) in op_edges.clone() {
                 // TODO We could cache this value per edge to avoid recomputing it every iteration.
                 // TODO We could also use a spatial index to quickly find obstacles in the bounding box.
-                let span = (start.as_point().x - end.as_point().x).abs()
-                    + (start.as_point().y - end.as_point().y).abs();
-                let min_x = min(start.as_point().x, end.as_point().x);
-                let max_x = max(start.as_point().x, end.as_point().x);
-                let min_y = min(start.as_point().y, end.as_point().y);
-                let max_y = max(start.as_point().y, end.as_point().y);
-                let mut obstacle_area = 0;
-                let total_area = (max_x - min_x) * (max_y - min_y);
-                for node in &placed_nodes_vector {
-                    let node_tl = node.top_left();
-                    let node_br = node.bottom_right();
-                    if node_tl.x <= max_x
-                        && node_br.x >= min_x
-                        && node_tl.y <= max_y
-                        && node_br.y >= min_y
-                    {
-                        obstacle_area += (min(node_br.x, max_x) - max(node_tl.x, min_x)).max(0)
-                            * (min(node_br.y, max_y) - max(node_tl.y, min_y)).max(0);
+                let difficulty = |start: &DirectedPoint, end: &DirectedPoint| -> i32 {
+                    let span = (start.as_point().x - end.as_point().x).abs()
+                        + (start.as_point().y - end.as_point().y).abs();
+                    let min_x = min(start.as_point().x, end.as_point().x);
+                    let max_x = max(start.as_point().x, end.as_point().x);
+                    let min_y = min(start.as_point().y, end.as_point().y);
+                    let max_y = max(start.as_point().y, end.as_point().y);
+                    let mut obstacle_area = 0;
+                    let total_area = (max_x - min_x) * (max_y - min_y);
+                    for node in &placed_nodes_vector {
+                        let node_tl = node.top_left();
+                        let node_br = node.bottom_right();
+                        if node_tl.x <= max_x
+                            && node_br.x >= min_x
+                            && node_tl.y <= max_y
+                            && node_br.y >= min_y
+                        {
+                            obstacle_area += (min(node_br.x, max_x) - max(node_tl.x, min_x)).max(0)
+                                * (min(node_br.y, max_y) - max(node_tl.y, min_y)).max(0);
+                        }
                     }
-                }
-                -(span + ((200.0 * obstacle_area as f32 / (total_area as f32)).round()) as i32)
-            });
+                    -(span + ((200.0 * obstacle_area as f32 / (total_area as f32)).round()) as i32)
+                };
+                // Add small reproducible noise to avoid fully deterministic ordering for similar edges.
+                let noise: i32 = rng.gen_range(0..=10);
+                let score = difficulty(&start, &end) + noise;
+                edges_with_score.push((score, (u, v, start, end, config)));
+            }
+            edges_with_score.sort_by_key(|(score, _)| *score);
+            let mut sorted_edges: Vec<_> = edges_with_score.into_iter().map(|(_, edge)| edge).collect();
 
             // 3) For each net in order, find the cheapest path using A* or Dijkstra
 
@@ -1336,6 +1384,7 @@ impl EdgeRouter {
                     end_grid_point,
                     start_orientation,
                     end_orientation,
+                    &mut rng,
                     |from_idx, to_idx, from_orientation, to_orientation| {
                         // Cost function
                         let from_point = grid.grid_point_to_point(from_idx).unwrap();
@@ -1464,9 +1513,6 @@ impl EdgeRouter {
             let mut edge_overflow = 0;
             let mut corner_overflow = 0;
 
-            let horiz_count = (raw_area.width() as usize - 1) * raw_area.height() as usize;
-            let width = raw_area.width() as usize;
-
             for i in 0..raw_num_segments as usize {
                 let usage = raw_usage[i];
                 if usage > capacity {
@@ -1514,6 +1560,10 @@ impl EdgeRouter {
                 op_edges.clear();
 
                 // For simplicity, we rip up all edges that have any overflow on their paths.
+                // Random tie-breaks in routing order already added above; selection here is based on current usage.
+                let mut to_rip: Vec<(Bound<'_, PyAny>, Bound<'_, PyAny>, DirectedPoint, DirectedPoint, RoutingConfig)> =
+                    Vec::new();
+
                 for (u, v, start, end, config) in &sorted_edges {
                     let start_raw_point = raw_area.point_to_raw_point(&start.as_point()).unwrap();
                     let end_raw_point = raw_area.point_to_raw_point(&end.as_point()).unwrap();
@@ -1541,17 +1591,23 @@ impl EdgeRouter {
                         if trace_enabled {
                             overflow_map.insert((start_raw_point, end_raw_point), true);
                         }
-                        // Remove usage of this path by adding to the usage_diff
-                        if let Some(routed_path) = result_paths.get(&(start_raw_point, end_raw_point)) {
-                            for segment_index in routed_path.segments(&raw_area) {
-                                raw_usage[segment_index as usize] -= 1;
-                            }
-                            for corner_index in routed_path.corners(&raw_area) {
-                                raw_corner_usage[corner_index] -= 1;
-                            }
-                        }
-                        op_edges.push((u.clone(), v.clone(), *start, *end, config.clone()));
+                        to_rip.push((u.clone(), v.clone(), *start, *end, config.clone()));
                     }
+                }
+
+                // Now remove usage for all edges marked for rip-up and queue them for the next iteration.
+                for (u, v, start, end, config) in to_rip.iter() {
+                    let start_raw_point = raw_area.point_to_raw_point(&start.as_point()).unwrap();
+                    let end_raw_point = raw_area.point_to_raw_point(&end.as_point()).unwrap();
+                    if let Some(routed_path) = result_paths.get(&(start_raw_point, end_raw_point)) {
+                        for segment_index in routed_path.segments(&raw_area) {
+                            raw_usage[segment_index as usize] -= 1;
+                        }
+                        for corner_index in routed_path.corners(&raw_area) {
+                            raw_corner_usage[corner_index] -= 1;
+                        }
+                    }
+                    op_edges.push((u.clone(), v.clone(), *start, *end, config.clone()));
                 }
             } else {
                 op_edges.clear();
@@ -1747,16 +1803,18 @@ struct GridState {
     orientation: Orientation,
 }
 
-fn route_visibility_astar<CostFn>(
+fn route_visibility_astar<CostFn, R>(
     masked_grid: &MaskedGrid,
     start_grid_point: GridPoint,
     end_grid_point: GridPoint,
     start_orientation: Orientation,
     end_orientation: Orientation,
+    rng: &mut R,
     mut cost_fn: CostFn,
 ) -> PyResult<Vec<(GridPoint, Orientation)>>
 where
     CostFn: FnMut(GridPoint, GridPoint, Orientation, Orientation) -> i32,
+    R: Rng + ?Sized,
 {
     if start_grid_point.0 as usize >= masked_grid.point_mask.len()
         || end_grid_point.0 as usize >= masked_grid.point_mask.len()
@@ -1830,9 +1888,9 @@ where
 
         let current_g = *g_score.get(&current_state).unwrap_or(&MAX_SCORE);
 
-        for (neighbor_index, neighbor_orientation) in
-            masked_grid.neighbors(current_state.index, current_state.orientation)
-        {
+        let mut neighbors = masked_grid.neighbors(current_state.index, current_state.orientation);
+        neighbors.shuffle(rng);
+        for (neighbor_index, neighbor_orientation) in neighbors {
             // Do not allow in-place orientation flips at the start or end grid point.
             if neighbor_index == current_state.index
                 && (current_state.index == start_grid_point || current_state.index == end_grid_point)
