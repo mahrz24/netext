@@ -40,9 +40,7 @@ pub struct RoutingConfig {
 impl RoutingConfig {
     #[new]
     fn new(neighborhood: Neighborhood) -> Self {
-        RoutingConfig {
-            neighborhood,
-        }
+        RoutingConfig { neighborhood }
     }
 }
 
@@ -1116,10 +1114,10 @@ fn build_trace_layout_data(
     (grid_points_trace, layout_nodes)
 }
 
-fn order_edges_by_difficulty<R: Rng + ?Sized>(
+fn order_edges_by_difficulty<'py, R: Rng + ?Sized>(
     edges: &Vec<(
-        Bound<'_, PyAny>,
-        Bound<'_, PyAny>,
+        Bound<'py, PyAny>,
+        Bound<'py, PyAny>,
         DirectedPoint,
         DirectedPoint,
         RoutingConfig,
@@ -1127,8 +1125,8 @@ fn order_edges_by_difficulty<R: Rng + ?Sized>(
     nodes: &Vec<PlacedRectangularNode>,
     rng: &mut R,
 ) -> Vec<(
-    Bound<'_, PyAny>,
-    Bound<'_, PyAny>,
+    Bound<'py, PyAny>,
+    Bound<'py, PyAny>,
     DirectedPoint,
     DirectedPoint,
     RoutingConfig,
@@ -1157,7 +1155,10 @@ fn order_edges_by_difficulty<R: Rng + ?Sized>(
             for node in nodes {
                 let node_tl = node.top_left();
                 let node_br = node.bottom_right();
-                if node_tl.x <= max_x && node_br.x >= min_x && node_tl.y <= max_y && node_br.y >= min_y
+                if node_tl.x <= max_x
+                    && node_br.x >= min_x
+                    && node_tl.y <= max_y
+                    && node_br.y >= min_y
                 {
                     obstacle_area += (min(node_br.x, max_x) - max(node_tl.x, min_x)).max(0)
                         * (min(node_br.y, max_y) - max(node_tl.y, min_y)).max(0);
@@ -1171,10 +1172,7 @@ fn order_edges_by_difficulty<R: Rng + ?Sized>(
         edges_with_score.push((score, (u.clone(), v.clone(), *start, *end, config.clone())));
     }
     edges_with_score.sort_by_key(|(score, _)| *score);
-    edges_with_score
-        .into_iter()
-        .map(|(_, edge)| edge)
-        .collect()
+    edges_with_score.into_iter().map(|(_, edge)| edge).collect()
 }
 
 fn compute_overflow(
@@ -1337,62 +1335,10 @@ impl EdgeRouter {
             MaskedGrid::from_nodes(&grid, &placed_nodes_vector, &start_end_grid_points_vector);
 
         if trace_enabled {
-            // Track which grid points touch a masked segment to visualize masked edges.
-            let mut masked_adjacent: Vec<bool> = vec![false; grid.size];
-
-            // Horizontal segments
-            for y in 0..grid.height {
-                for x in 0..(grid.width - 1) {
-                    let seg_idx = y * (grid.width - 1) + x;
-                    if !masked_grid.segment_mask[seg_idx] {
-                        if let Some(gp_a) = grid.grid_coords_to_grid_point(x, y) {
-                            masked_adjacent[gp_a.0 as usize] = true;
-                        }
-                        if let Some(gp_b) = grid.grid_coords_to_grid_point(x + 1, y) {
-                            masked_adjacent[gp_b.0 as usize] = true;
-                        }
-                    }
-                }
-            }
-            // Vertical segments
-            let vertical_offset = (grid.width - 1) * grid.height;
-            for x in 0..grid.width {
-                for y in 0..(grid.height - 1) {
-                    let seg_idx = vertical_offset + x * (grid.height - 1) + y;
-                    if !masked_grid.segment_mask[seg_idx] {
-                        if let Some(gp_a) = grid.grid_coords_to_grid_point(x, y) {
-                            masked_adjacent[gp_a.0 as usize] = true;
-                        }
-                        if let Some(gp_b) = grid.grid_coords_to_grid_point(x, y + 1) {
-                            masked_adjacent[gp_b.0 as usize] = true;
-                        }
-                    }
-                }
-            }
-
-            for idx in 0..grid.size {
-                let gp = GridPoint(idx as u32);
-                if let Some((gx, gy)) = grid.grid_point_to_raw_coords(gp) {
-                    let blocked = !masked_grid.point_mask[gp];
-                    grid_points_trace.push(json!({
-                        "index": idx,
-                        "raw": { "x": gx, "y": gy },
-                        "blocked": blocked,
-                        "masked_adjacent": masked_adjacent[idx]
-                    }));
-                }
-            }
-            for (id, node) in &self.placed_nodes {
-                let tl = node.top_left();
-                let br = node.bottom_right();
-                layout_nodes.push(json!({
-                    "id": id,
-                    "center": { "x": node.center.x, "y": node.center.y },
-                    "size": { "width": node.node.size.width, "height": node.node.size.height },
-                    "top_left": { "x": tl.x, "y": tl.y },
-                    "bottom_right": { "x": br.x, "y": br.y },
-                }));
-            }
+            let (grid_points, nodes) =
+                build_trace_layout_data(&grid, &masked_grid, &self.placed_nodes);
+            grid_points_trace = grid_points;
+            layout_nodes = nodes;
         }
 
         // We also need to maintain usage and capacity on the raw grid, initialized with usage from
@@ -1451,47 +1397,15 @@ impl EdgeRouter {
             // We want to route all edges, starting with the most difficult ones.
             // Difficulty is the span (Manhattan distance) between start and end point
             // plus the obstacle density in the bounding box of start and end point
-            let mut edges_with_score: Vec<(i32, (Bound<'_, PyAny>, Bound<'_, PyAny>, DirectedPoint, DirectedPoint, RoutingConfig))> =
-                Vec::new();
-            for (u, v, start, end, config) in op_edges.clone() {
-                // TODO We could cache this value per edge to avoid recomputing it every iteration.
-                // TODO We could also use a spatial index to quickly find obstacles in the bounding box.
-                let difficulty = |start: &DirectedPoint, end: &DirectedPoint| -> i32 {
-                    let span = (start.as_point().x - end.as_point().x).abs()
-                        + (start.as_point().y - end.as_point().y).abs();
-                    let min_x = min(start.as_point().x, end.as_point().x);
-                    let max_x = max(start.as_point().x, end.as_point().x);
-                    let min_y = min(start.as_point().y, end.as_point().y);
-                    let max_y = max(start.as_point().y, end.as_point().y);
-                    let mut obstacle_area = 0;
-                    let total_area = (max_x - min_x) * (max_y - min_y);
-                    for node in &placed_nodes_vector {
-                        let node_tl = node.top_left();
-                        let node_br = node.bottom_right();
-                        if node_tl.x <= max_x
-                            && node_br.x >= min_x
-                            && node_tl.y <= max_y
-                            && node_br.y >= min_y
-                        {
-                            obstacle_area += (min(node_br.x, max_x) - max(node_tl.x, min_x)).max(0)
-                                * (min(node_br.y, max_y) - max(node_tl.y, min_y)).max(0);
-                        }
-                    }
-                    -(span + ((200.0 * obstacle_area as f32 / (total_area as f32)).round()) as i32)
-                };
-                // Add small reproducible noise to avoid fully deterministic ordering for similar edges.
-                let noise: i32 = rng.gen_range(0..=10);
-                let score = difficulty(&start, &end) + noise;
-                edges_with_score.push((score, (u, v, start, end, config)));
-            }
-            edges_with_score.sort_by_key(|(score, _)| *score);
-            let mut sorted_edges: Vec<_> = edges_with_score.into_iter().map(|(_, edge)| edge).collect();
+            let sorted_edges = order_edges_by_difficulty(&op_edges, &placed_nodes_vector, &mut rng);
 
             // 3) For each net in order, find the cheapest path using A* or Dijkstra
 
             // Now we route all edges once, storing their paths and updating usage.
-            let mut routed_edges_trace: Vec<((RawPoint, RawPoint), serde_json::Map<String, serde_json::Value>)> =
-                Vec::new();
+            let mut routed_edges_trace: Vec<(
+                (RawPoint, RawPoint),
+                serde_json::Map<String, serde_json::Value>,
+            )> = Vec::new();
             let mut overflow_map: HashMap<(RawPoint, RawPoint), bool> = HashMap::new();
             for (_u, _v, start, end, _) in &sorted_edges {
                 let start_raw_point = raw_area.point_to_raw_point(&start.as_point());
@@ -1559,7 +1473,8 @@ impl EdgeRouter {
                             to_point,
                         );
                         let corner_penalty = if from_orientation != to_orientation {
-                            let corner_idx = raw_area.point_to_raw_point(&from_point).unwrap().0 as usize;
+                            let corner_idx =
+                                raw_area.point_to_raw_point(&from_point).unwrap().0 as usize;
                             let usage = raw_corner_usage[corner_idx];
                             let overflow = if usage > corner_capacity {
                                 usage - corner_capacity
@@ -1572,7 +1487,8 @@ impl EdgeRouter {
                         } else {
                             0.0
                         };
-                        (turn_cost as f64 + current_cost + mu * history_cost + corner_penalty) as i32
+                        (turn_cost as f64 + current_cost + mu * history_cost + corner_penalty)
+                            as i32
                     },
                 )?;
                 // Convert grid path to actual points with directions
@@ -1604,7 +1520,8 @@ impl EdgeRouter {
                     let grid_path_trace: Vec<serde_json::Value> = grid_path
                         .iter()
                         .map(|(grid_idx, orientation)| {
-                            let (gx, gy) = grid.grid_point_to_raw_coords(*grid_idx).unwrap_or((0, 0));
+                            let (gx, gy) =
+                                grid.grid_point_to_raw_coords(*grid_idx).unwrap_or((0, 0));
                             json!({
                                 "grid_index": grid_idx.0,
                                 "raw": { "x": gx, "y": gy },
@@ -1641,37 +1558,30 @@ impl EdgeRouter {
                         "end".to_string(),
                         json!({"x": end.x, "y": end.y, "direction": format!("{:?}", end.direction)}),
                     );
-                    entry.insert("grid_path".to_string(), serde_json::Value::Array(grid_path_trace));
-                    entry.insert("raw_path".to_string(), serde_json::Value::Array(raw_path_trace));
-                    entry.insert("directed_path".to_string(), serde_json::Value::Array(directed_trace));
+                    entry.insert(
+                        "grid_path".to_string(),
+                        serde_json::Value::Array(grid_path_trace),
+                    );
+                    entry.insert(
+                        "raw_path".to_string(),
+                        serde_json::Value::Array(raw_path_trace),
+                    );
+                    entry.insert(
+                        "directed_path".to_string(),
+                        serde_json::Value::Array(directed_trace),
+                    );
                     routed_edges_trace.push(((start_raw_point, end_raw_point), entry));
-                    overflow_map.entry((start_raw_point, end_raw_point)).or_insert(false);
+                    overflow_map
+                        .entry((start_raw_point, end_raw_point))
+                        .or_insert(false);
                 }
 
                 result_paths.insert((start_raw_point, end_raw_point), path_with_endpoints);
             }
 
             // 4) Compute overflow
-            let mut total_overflow = 0;
-            let mut edge_overflow = 0;
-            let mut corner_overflow = 0;
-
-            for i in 0..raw_num_segments as usize {
-                let usage = raw_usage[i];
-                if usage > capacity {
-                    let over = usage - capacity;
-                    total_overflow += over;
-                    edge_overflow += over;
-                }
-            }
-            for i in 0..raw_area.size() {
-                let usage = raw_corner_usage[i];
-                if usage > corner_capacity {
-                    let over = usage - corner_capacity;
-                    total_overflow += over;
-                    corner_overflow += over;
-                }
-            }
+            let (total_overflow, edge_overflow, corner_overflow) =
+                compute_overflow(&raw_usage, &raw_corner_usage, capacity, corner_capacity);
             let trace_usage_snapshot = if trace_enabled {
                 Some(raw_usage.clone())
             } else {
@@ -1704,8 +1614,13 @@ impl EdgeRouter {
 
                 // For simplicity, we rip up all edges that have any overflow on their paths.
                 // Random tie-breaks in routing order already added above; selection here is based on current usage.
-                let mut to_rip: Vec<(Bound<'_, PyAny>, Bound<'_, PyAny>, DirectedPoint, DirectedPoint, RoutingConfig)> =
-                    Vec::new();
+                let mut to_rip: Vec<(
+                    Bound<'_, PyAny>,
+                    Bound<'_, PyAny>,
+                    DirectedPoint,
+                    DirectedPoint,
+                    RoutingConfig,
+                )> = Vec::new();
 
                 for (u, v, start, end, config) in &sorted_edges {
                     let start_raw_point = raw_area.point_to_raw_point(&start.as_point()).unwrap();
@@ -1849,8 +1764,7 @@ impl EdgeRouter {
             fs::write(&path, serialized).map_err(|e| {
                 PyErr::new::<pyo3::exceptions::PyIOError, _>(format!(
                     "Failed to write routing trace to {}: {}",
-                    path,
-                    e
+                    path, e
                 ))
             })?;
         }
@@ -2036,7 +1950,8 @@ where
         for (neighbor_index, neighbor_orientation) in neighbors {
             // Do not allow in-place orientation flips at the start or end grid point.
             if neighbor_index == current_state.index
-                && (current_state.index == start_grid_point || current_state.index == end_grid_point)
+                && (current_state.index == start_grid_point
+                    || current_state.index == end_grid_point)
             {
                 continue;
             }
