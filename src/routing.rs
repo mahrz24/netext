@@ -75,41 +75,20 @@ impl RTreeObject for PlacedRectangularNode {
 
 #[pyclass]
 #[derive(Clone, PartialEq, Debug)]
-pub struct RoutingTrace {}
-
-#[pymethods]
-impl RoutingTrace {
-    #[new]
-    fn new(
-        cost_map: Option<HashMap<(i32, i32), f64>>,
-        edge_cost_maps: Option<HashMap<(usize, usize), HashMap<(i32, i32), f64>>>,
-    ) -> Self {
-        RoutingTrace {}
-    }
-}
-
-#[pyclass]
-#[derive(Clone, PartialEq, Debug)]
 pub struct EdgeRoutingResult {
     pub path: Vec<DirectedPoint>,
-    pub trace: Option<RoutingTrace>,
 }
 
 #[pymethods]
 impl EdgeRoutingResult {
     #[new]
-    fn new(path: Vec<DirectedPoint>, trace: Option<RoutingTrace>) -> Self {
-        EdgeRoutingResult { path, trace }
+    fn new(path: Vec<DirectedPoint>) -> Self {
+        EdgeRoutingResult { path }
     }
 
     #[getter]
     fn get_path(&self) -> Vec<DirectedPoint> {
         self.path.clone()
-    }
-
-    #[getter]
-    fn get_trace(&self) -> Option<RoutingTrace> {
-        self.trace.clone()
     }
 }
 
@@ -117,7 +96,6 @@ impl EdgeRoutingResult {
 #[derive(Clone, PartialEq, Debug)]
 pub struct EdgeRoutingsResult {
     pub paths: Vec<Vec<DirectedPoint>>,
-    pub trace: Option<RoutingTrace>,
 }
 
 /// Wrapper around a routed path of grid points that provides helper iteration methods.
@@ -387,18 +365,13 @@ impl<'a> Iterator for PathCorners<'a> {
 #[pymethods]
 impl EdgeRoutingsResult {
     #[new]
-    fn new(paths: Vec<Vec<DirectedPoint>>, trace: Option<RoutingTrace>) -> Self {
-        EdgeRoutingsResult { paths, trace }
+    fn new(paths: Vec<Vec<DirectedPoint>>) -> Self {
+        EdgeRoutingsResult { paths }
     }
 
     #[getter]
     fn get_paths(&self) -> Vec<Vec<DirectedPoint>> {
         self.paths.clone()
-    }
-
-    #[getter]
-    fn get_trace(&self) -> Option<RoutingTrace> {
-        self.trace.clone()
     }
 }
 
@@ -1053,6 +1026,184 @@ fn routing_seed(
     hasher.finish()
 }
 
+fn start_end_grid_points(
+    grid: &Grid,
+    edges: &Vec<(
+        Bound<'_, PyAny>,
+        Bound<'_, PyAny>,
+        DirectedPoint,
+        DirectedPoint,
+        RoutingConfig,
+    )>,
+) -> HashSet<GridPoint> {
+    let mut start_end_grid_points: HashSet<GridPoint> = HashSet::new();
+    for (_, _, start, end, _) in edges {
+        if let Some(start_index) = grid.point_to_grid_point(&start.as_point()) {
+            start_end_grid_points.insert(start_index);
+        }
+        if let Some(end_index) = grid.point_to_grid_point(&end.as_point()) {
+            start_end_grid_points.insert(end_index);
+        }
+    }
+    start_end_grid_points
+}
+
+fn build_trace_layout_data(
+    grid: &Grid,
+    masked_grid: &MaskedGrid,
+    placed_nodes: &HashMap<usize, PlacedRectangularNode>,
+) -> (Vec<serde_json::Value>, Vec<serde_json::Value>) {
+    // Track which grid points touch a masked segment to visualize masked edges.
+    let mut masked_adjacent: Vec<bool> = vec![false; grid.size];
+
+    // Horizontal segments
+    for y in 0..grid.height {
+        for x in 0..(grid.width - 1) {
+            let seg_idx = y * (grid.width - 1) + x;
+            if !masked_grid.segment_mask[seg_idx] {
+                if let Some(gp_a) = grid.grid_coords_to_grid_point(x, y) {
+                    masked_adjacent[gp_a.0 as usize] = true;
+                }
+                if let Some(gp_b) = grid.grid_coords_to_grid_point(x + 1, y) {
+                    masked_adjacent[gp_b.0 as usize] = true;
+                }
+            }
+        }
+    }
+    // Vertical segments
+    let vertical_offset = (grid.width - 1) * grid.height;
+    for x in 0..grid.width {
+        for y in 0..(grid.height - 1) {
+            let seg_idx = vertical_offset + x * (grid.height - 1) + y;
+            if !masked_grid.segment_mask[seg_idx] {
+                if let Some(gp_a) = grid.grid_coords_to_grid_point(x, y) {
+                    masked_adjacent[gp_a.0 as usize] = true;
+                }
+                if let Some(gp_b) = grid.grid_coords_to_grid_point(x, y + 1) {
+                    masked_adjacent[gp_b.0 as usize] = true;
+                }
+            }
+        }
+    }
+
+    let mut grid_points_trace = Vec::new();
+    for idx in 0..grid.size {
+        let gp = GridPoint(idx as u32);
+        if let Some((gx, gy)) = grid.grid_point_to_raw_coords(gp) {
+            let blocked = !masked_grid.point_mask[gp];
+            grid_points_trace.push(json!({
+                "index": idx,
+                "raw": { "x": gx, "y": gy },
+                "blocked": blocked,
+                "masked_adjacent": masked_adjacent[idx]
+            }));
+        }
+    }
+
+    let mut layout_nodes = Vec::new();
+    for (id, node) in placed_nodes {
+        let tl = node.top_left();
+        let br = node.bottom_right();
+        layout_nodes.push(json!({
+            "id": id,
+            "center": { "x": node.center.x, "y": node.center.y },
+            "size": { "width": node.node.size.width, "height": node.node.size.height },
+            "top_left": { "x": tl.x, "y": tl.y },
+            "bottom_right": { "x": br.x, "y": br.y },
+        }));
+    }
+
+    (grid_points_trace, layout_nodes)
+}
+
+fn order_edges_by_difficulty<R: Rng + ?Sized>(
+    edges: &Vec<(
+        Bound<'_, PyAny>,
+        Bound<'_, PyAny>,
+        DirectedPoint,
+        DirectedPoint,
+        RoutingConfig,
+    )>,
+    nodes: &Vec<PlacedRectangularNode>,
+    rng: &mut R,
+) -> Vec<(
+    Bound<'_, PyAny>,
+    Bound<'_, PyAny>,
+    DirectedPoint,
+    DirectedPoint,
+    RoutingConfig,
+)> {
+    let mut edges_with_score: Vec<(
+        i32,
+        (
+            Bound<'_, PyAny>,
+            Bound<'_, PyAny>,
+            DirectedPoint,
+            DirectedPoint,
+            RoutingConfig,
+        ),
+    )> = Vec::new();
+
+    for (u, v, start, end, config) in edges {
+        let difficulty = |start: &DirectedPoint, end: &DirectedPoint| -> i32 {
+            let span = (start.as_point().x - end.as_point().x).abs()
+                + (start.as_point().y - end.as_point().y).abs();
+            let min_x = min(start.as_point().x, end.as_point().x);
+            let max_x = max(start.as_point().x, end.as_point().x);
+            let min_y = min(start.as_point().y, end.as_point().y);
+            let max_y = max(start.as_point().y, end.as_point().y);
+            let mut obstacle_area = 0;
+            let total_area = (max_x - min_x) * (max_y - min_y);
+            for node in nodes {
+                let node_tl = node.top_left();
+                let node_br = node.bottom_right();
+                if node_tl.x <= max_x && node_br.x >= min_x && node_tl.y <= max_y && node_br.y >= min_y
+                {
+                    obstacle_area += (min(node_br.x, max_x) - max(node_tl.x, min_x)).max(0)
+                        * (min(node_br.y, max_y) - max(node_tl.y, min_y)).max(0);
+                }
+            }
+            -(span + ((200.0 * obstacle_area as f32 / (total_area as f32)).round()) as i32)
+        };
+        // Add small reproducible noise to avoid fully deterministic ordering for similar edges.
+        let noise: i32 = rng.gen_range(0..=10);
+        let score = difficulty(start, end) + noise;
+        edges_with_score.push((score, (u.clone(), v.clone(), *start, *end, config.clone())));
+    }
+    edges_with_score.sort_by_key(|(score, _)| *score);
+    edges_with_score
+        .into_iter()
+        .map(|(_, edge)| edge)
+        .collect()
+}
+
+fn compute_overflow(
+    raw_usage: &[i32],
+    raw_corner_usage: &[i32],
+    capacity: i32,
+    corner_capacity: i32,
+) -> (i32, i32, i32) {
+    let mut total_overflow = 0;
+    let mut edge_overflow = 0;
+    let mut corner_overflow = 0;
+
+    for usage in raw_usage {
+        if *usage > capacity {
+            let over = *usage - capacity;
+            total_overflow += over;
+            edge_overflow += over;
+        }
+    }
+    for usage in raw_corner_usage {
+        if *usage > corner_capacity {
+            let over = *usage - corner_capacity;
+            total_overflow += over;
+            corner_overflow += over;
+        }
+    }
+    (total_overflow, edge_overflow, corner_overflow)
+}
+
 impl Direction {
     fn to_orientation(&self) -> Orientation {
         match self {
@@ -1173,15 +1324,7 @@ impl EdgeRouter {
         // We use a mask to remove these points and edges.
 
         // Convert all start and end points to grid points
-        let mut start_end_grid_points: HashSet<GridPoint> = HashSet::new();
-        for (_, _, start, end, _) in &edges {
-            if let Some(start_index) = grid.point_to_grid_point(&start.as_point()) {
-                start_end_grid_points.insert(start_index);
-            }
-            if let Some(end_index) = grid.point_to_grid_point(&end.as_point()) {
-                start_end_grid_points.insert(end_index);
-            }
-        }
+        let start_end_grid_points: HashSet<GridPoint> = start_end_grid_points(&grid, &edges);
 
         let placed_nodes_vector = self.placed_nodes.values().cloned().collect();
         let start_end_grid_points_vector: Vec<GridPoint> =
@@ -1712,7 +1855,7 @@ impl EdgeRouter {
             })?;
         }
 
-        Ok(EdgeRoutingsResult::new(directed_paths, None))
+        Ok(EdgeRoutingsResult::new(directed_paths))
     }
 
     fn route_edge(
@@ -1726,7 +1869,7 @@ impl EdgeRouter {
         config: RoutingConfig,
     ) -> PyResult<EdgeRoutingResult> {
         let result_path = Vec::new();
-        Ok(EdgeRoutingResult::new(result_path, None))
+        Ok(EdgeRoutingResult::new(result_path))
     }
 }
 
