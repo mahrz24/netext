@@ -1202,6 +1202,408 @@ fn compute_overflow(
     (total_overflow, edge_overflow, corner_overflow)
 }
 
+fn update_edge_history_cost(raw_usage: &[i32], raw_history_cost: &mut [f64], capacity: i32) {
+    for (i, usage) in raw_usage.iter().enumerate() {
+        if *usage > capacity {
+            raw_history_cost[i] += (*usage - capacity) as f64;
+        }
+    }
+}
+
+fn update_corner_history_cost(
+    raw_corner_usage: &[i32],
+    raw_corner_history: &mut [f64],
+    corner_capacity: i32,
+) {
+    for (i, usage) in raw_corner_usage.iter().enumerate() {
+        if *usage > corner_capacity {
+            raw_corner_history[i] += (*usage - corner_capacity) as f64;
+        }
+    }
+}
+
+fn route_single_edge<R: Rng + ?Sized>(
+    grid: &Grid,
+    raw_area: &RawArea,
+    masked_grid: &MaskedGrid,
+    start: DirectedPoint,
+    end: DirectedPoint,
+    rng: &mut R,
+    raw_cost_prefix_x: &[f64],
+    raw_cost_prefix_y: &[f64],
+    raw_history_cost_prefix_x: &[f64],
+    raw_history_cost_prefix_y: &[f64],
+    raw_usage: &mut [i32],
+    raw_corner_usage: &mut [i32],
+    raw_corner_history: &[f64],
+    base_cost: f64,
+    mu: f64,
+    corner_lambda: f64,
+    corner_capacity: i32,
+    trace_enabled: bool,
+) -> PyResult<(
+    (RawPoint, RawPoint),
+    PathWithEndpoints,
+    Option<(
+        (RawPoint, RawPoint),
+        serde_json::Map<String, serde_json::Value>,
+    )>,
+)> {
+    let start_raw_point = raw_area
+        .point_to_raw_point(&start.as_point())
+        .ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>("Start or end point is out of bounds")
+        })?;
+    let end_raw_point = raw_area
+        .point_to_raw_point(&end.as_point())
+        .ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>("Start or end point is out of bounds")
+        })?;
+
+    let start_grid_point: GridPoint =
+        grid.point_to_grid_point(&start.as_point()).ok_or_else(|| {
+            PyErr::new::<pyo3::exceptions::PyValueError, _>("Start point is not on a grid point")
+        })?;
+    let end_grid_point: GridPoint = grid.point_to_grid_point(&end.as_point()).ok_or_else(|| {
+        PyErr::new::<pyo3::exceptions::PyValueError, _>("End point is not on a grid point")
+    })?;
+
+    let start_orientation: Orientation = start.direction.to_orientation();
+    let end_orientation: Orientation = end.direction.to_orientation();
+
+    let grid_path = route_visibility_astar(
+        masked_grid,
+        start_grid_point,
+        end_grid_point,
+        start_orientation,
+        end_orientation,
+        rng,
+        |from_idx, to_idx, from_orientation, to_orientation| {
+            let from_point = grid.grid_point_to_point(from_idx).unwrap();
+            let to_point = grid.grid_point_to_point(to_idx).unwrap();
+
+            let turn_cost = if from_orientation != to_orientation {
+                1
+            } else {
+                0
+            };
+
+            let current_cost = segment_cost_from_prefix_sums(
+                grid,
+                raw_cost_prefix_x,
+                raw_cost_prefix_y,
+                from_idx,
+                to_idx,
+                from_point,
+                to_point,
+            );
+            let history_cost = segment_cost_from_prefix_sums(
+                grid,
+                raw_history_cost_prefix_x,
+                raw_history_cost_prefix_y,
+                from_idx,
+                to_idx,
+                from_point,
+                to_point,
+            );
+
+            let corner_penalty = if from_orientation != to_orientation {
+                let corner_idx = raw_area.point_to_raw_point(&from_point).unwrap().0 as usize;
+                let usage = raw_corner_usage[corner_idx];
+                let overflow = if usage > corner_capacity {
+                    usage - corner_capacity
+                } else {
+                    0
+                };
+                let history = raw_corner_history[corner_idx];
+                let reuse_penalty = if usage > 0 { base_cost } else { 0.0 };
+                reuse_penalty + corner_lambda * (overflow as f64) + mu * history
+            } else {
+                0.0
+            };
+
+            (turn_cost as f64 + current_cost + mu * history_cost + corner_penalty) as i32
+        },
+    )?;
+
+    let grid_points: Vec<Point> = grid_path
+        .iter()
+        .map(|(grid_index, _)| {
+            let (grid_x, grid_y) = grid.grid_point_to_raw_coords(*grid_index).unwrap();
+            Point {
+                x: grid_x,
+                y: grid_y,
+            }
+        })
+        .collect();
+
+    let path = Path::new(grid_points);
+    let path_with_endpoints = PathWithEndpoints::new(path, start, end);
+
+    for segment_index in path_with_endpoints.segments(raw_area) {
+        raw_usage[segment_index] += 1;
+    }
+    for corner_index in path_with_endpoints.corners(raw_area) {
+        raw_corner_usage[corner_index] += 1;
+    }
+
+    let trace_entry = if trace_enabled {
+        let grid_path_trace: Vec<serde_json::Value> = grid_path
+            .iter()
+            .map(|(grid_idx, orientation)| {
+                let (gx, gy) = grid.grid_point_to_raw_coords(*grid_idx).unwrap_or((0, 0));
+                json!({
+                    "grid_index": grid_idx.0,
+                    "raw": { "x": gx, "y": gy },
+                    "orientation": format!("{:?}", orientation)
+                })
+            })
+            .collect();
+
+        let raw_path_trace: Vec<serde_json::Value> = path_with_endpoints
+            .path
+            .points
+            .iter()
+            .map(|p| json!({ "x": p.x, "y": p.y }))
+            .collect();
+
+        let directed_trace: Vec<serde_json::Value> = path_with_endpoints
+            .to_directed_points()
+            .into_iter()
+            .map(|dp| {
+                json!({
+                    "x": dp.x,
+                    "y": dp.y,
+                    "direction": format!("{:?}", dp.direction)
+                })
+            })
+            .collect();
+
+        let mut entry = serde_json::Map::new();
+        entry.insert(
+            "start".to_string(),
+            json!({"x": start.x, "y": start.y, "direction": format!("{:?}", start.direction)}),
+        );
+        entry.insert(
+            "end".to_string(),
+            json!({"x": end.x, "y": end.y, "direction": format!("{:?}", end.direction)}),
+        );
+        entry.insert(
+            "grid_path".to_string(),
+            serde_json::Value::Array(grid_path_trace),
+        );
+        entry.insert(
+            "raw_path".to_string(),
+            serde_json::Value::Array(raw_path_trace),
+        );
+        entry.insert(
+            "directed_path".to_string(),
+            serde_json::Value::Array(directed_trace),
+        );
+        Some(((start_raw_point, end_raw_point), entry))
+    } else {
+        None
+    };
+
+    Ok((
+        (start_raw_point, end_raw_point),
+        path_with_endpoints,
+        trace_entry,
+    ))
+}
+
+fn edge_path_has_overflow(
+    path: &PathWithEndpoints,
+    raw_area: &RawArea,
+    raw_usage: &[i32],
+    raw_corner_usage: &[i32],
+    capacity: i32,
+    corner_capacity: i32,
+) -> bool {
+    for segment_index in path.segments(raw_area) {
+        if raw_usage[segment_index] > capacity {
+            return true;
+        }
+    }
+    for corner_index in path.corners(raw_area) {
+        if raw_corner_usage[corner_index] > corner_capacity {
+            return true;
+        }
+    }
+    false
+}
+
+fn select_edges_to_rip<'py>(
+    sorted_edges: &Vec<(
+        Bound<'py, PyAny>,
+        Bound<'py, PyAny>,
+        DirectedPoint,
+        DirectedPoint,
+        RoutingConfig,
+    )>,
+    result_paths: &HashMap<(RawPoint, RawPoint), PathWithEndpoints>,
+    raw_area: &RawArea,
+    raw_usage: &[i32],
+    raw_corner_usage: &[i32],
+    capacity: i32,
+    corner_capacity: i32,
+    trace_enabled: bool,
+    overflow_map: &mut HashMap<(RawPoint, RawPoint), bool>,
+) -> Vec<(
+    Bound<'py, PyAny>,
+    Bound<'py, PyAny>,
+    DirectedPoint,
+    DirectedPoint,
+    RoutingConfig,
+)> {
+    let mut to_rip = Vec::new();
+
+    for (u, v, start, end, config) in sorted_edges {
+        let start_raw_point = raw_area.point_to_raw_point(&start.as_point()).unwrap();
+        let end_raw_point = raw_area.point_to_raw_point(&end.as_point()).unwrap();
+
+        let key = (start_raw_point, end_raw_point);
+        let Some(routed_path) = result_paths.get(&key) else {
+            continue;
+        };
+
+        if edge_path_has_overflow(
+            routed_path,
+            raw_area,
+            raw_usage,
+            raw_corner_usage,
+            capacity,
+            corner_capacity,
+        ) {
+            if trace_enabled {
+                overflow_map.insert(key, true);
+            }
+            to_rip.push((u.clone(), v.clone(), *start, *end, config.clone()));
+        }
+    }
+
+    to_rip
+}
+
+fn rip_up_and_queue<'py>(
+    to_rip: &Vec<(
+        Bound<'py, PyAny>,
+        Bound<'py, PyAny>,
+        DirectedPoint,
+        DirectedPoint,
+        RoutingConfig,
+    )>,
+    result_paths: &HashMap<(RawPoint, RawPoint), PathWithEndpoints>,
+    raw_area: &RawArea,
+    raw_usage: &mut [i32],
+    raw_corner_usage: &mut [i32],
+) -> Vec<(
+    Bound<'py, PyAny>,
+    Bound<'py, PyAny>,
+    DirectedPoint,
+    DirectedPoint,
+    RoutingConfig,
+)> {
+    let mut op_edges = Vec::new();
+
+    for (u, v, start, end, config) in to_rip {
+        let start_raw_point = raw_area.point_to_raw_point(&start.as_point()).unwrap();
+        let end_raw_point = raw_area.point_to_raw_point(&end.as_point()).unwrap();
+        if let Some(routed_path) = result_paths.get(&(start_raw_point, end_raw_point)) {
+            for segment_index in routed_path.segments(raw_area) {
+                raw_usage[segment_index] -= 1;
+            }
+            for corner_index in routed_path.corners(raw_area) {
+                raw_corner_usage[corner_index] -= 1;
+            }
+        }
+        op_edges.push((u.clone(), v.clone(), *start, *end, config.clone()));
+    }
+
+    op_edges
+}
+
+fn record_iteration_trace<'py>(
+    iteration_logs: &mut Vec<serde_json::Value>,
+    iteration: usize,
+    routed_edges_trace: Vec<(
+        (RawPoint, RawPoint),
+        serde_json::Map<String, serde_json::Value>,
+    )>,
+    overflow_map: &HashMap<(RawPoint, RawPoint), bool>,
+    result_paths: &HashMap<(RawPoint, RawPoint), PathWithEndpoints>,
+    op_edges: &Vec<(
+        Bound<'py, PyAny>,
+        Bound<'py, PyAny>,
+        DirectedPoint,
+        DirectedPoint,
+        RoutingConfig,
+    )>,
+    raw_area: &RawArea,
+    raw_usage: &[i32],
+    raw_corner_usage: &[i32],
+    total_overflow: i32,
+    edge_overflow: i32,
+    corner_overflow: i32,
+) {
+    let mut routed_edges_output: Vec<serde_json::Value> = Vec::new();
+    for (key, mut entry) in routed_edges_trace.into_iter() {
+        let overflow = *overflow_map.get(&key).unwrap_or(&false);
+        entry.insert("overflow".to_string(), json!(overflow));
+        routed_edges_output.push(serde_json::Value::Object(entry));
+    }
+
+    let all_paths_snapshot: Vec<serde_json::Value> = result_paths
+        .iter()
+        .map(|(key, path_with_endpoints)| {
+            let start_point = raw_area.raw_index_to_point(key.0 .0 as usize);
+            let end_point = raw_area.raw_index_to_point(key.1 .0 as usize);
+            let directed_trace: Vec<serde_json::Value> = path_with_endpoints
+                .to_directed_points()
+                .into_iter()
+                .map(|dp| {
+                    json!({
+                        "x": dp.x,
+                        "y": dp.y,
+                        "direction": format!("{:?}", dp.direction)
+                    })
+                })
+                .collect();
+            json!({
+                "start_raw_index": key.0 .0,
+                "end_raw_index": key.1 .0,
+                "start_raw_point": { "x": start_point.x, "y": start_point.y },
+                "end_raw_point": { "x": end_point.x, "y": end_point.y },
+                "directed_path": directed_trace
+            })
+        })
+        .collect();
+
+    let ripped_up_next: Vec<serde_json::Value> = op_edges
+        .iter()
+        .map(|(_, _, start, end, _)| {
+            json!({
+                "start": { "x": start.x, "y": start.y, "direction": format!("{:?}", start.direction) },
+                "end": { "x": end.x, "y": end.y, "direction": format!("{:?}", end.direction) }
+            })
+        })
+        .collect();
+
+    iteration_logs.push(json!({
+        "iteration": iteration,
+        "routed_edges": routed_edges_output,
+        "all_paths": all_paths_snapshot,
+        "ripped_up_next": ripped_up_next,
+        "raw_usage": raw_usage.to_vec(),
+        "raw_corner_usage": raw_corner_usage.to_vec(),
+        "overflow": {
+            "total": total_overflow,
+            "edges": edge_overflow,
+            "corners": corner_overflow
+        }
+    }));
+}
+
 impl Direction {
     fn to_orientation(&self) -> Orientation {
         match self {
@@ -1408,326 +1810,91 @@ impl EdgeRouter {
             )> = Vec::new();
             let mut overflow_map: HashMap<(RawPoint, RawPoint), bool> = HashMap::new();
             for (_u, _v, start, end, _) in &sorted_edges {
-                let start_raw_point = raw_area.point_to_raw_point(&start.as_point());
-                let end_raw_point = raw_area.point_to_raw_point(&end.as_point());
-
-                if start_raw_point.is_none() || end_raw_point.is_none() {
-                    return Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                        "Start or end point is out of bounds",
-                    ));
-                }
-                let start_raw_point = start_raw_point.unwrap();
-                let end_raw_point = end_raw_point.unwrap();
-
-                let start_orientation: Orientation = start.direction.to_orientation();
-                let end_orientation: Orientation = end.direction.to_orientation();
-
-                let start_grid_point: GridPoint =
-                    grid.point_to_grid_point(&start.as_point()).ok_or_else(|| {
-                        PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                            "Start point is not on a grid point",
-                        )
-                    })?;
-                let end_grid_point: GridPoint =
-                    grid.point_to_grid_point(&end.as_point()).ok_or_else(|| {
-                        PyErr::new::<pyo3::exceptions::PyValueError, _>(
-                            "End point is not on a grid point",
-                        )
-                    })?;
-
-                let grid_path = route_visibility_astar(
+                let (key, path_with_endpoints, trace_entry) = route_single_edge(
+                    &grid,
+                    &raw_area,
                     &masked_grid,
-                    start_grid_point,
-                    end_grid_point,
-                    start_orientation,
-                    end_orientation,
+                    *start,
+                    *end,
                     &mut rng,
-                    |from_idx, to_idx, from_orientation, to_orientation| {
-                        // Cost function
-                        let from_point = grid.grid_point_to_point(from_idx).unwrap();
-                        let to_point = grid.grid_point_to_point(to_idx).unwrap();
-
-                        let turn_cost = if from_orientation != to_orientation {
-                            1
-                        } else {
-                            0
-                        };
-
-                        // The current cost can be computed using the prefix sums on the raw grid.
-                        let current_cost = segment_cost_from_prefix_sums(
-                            &grid,
-                            &raw_cost_prefix_x,
-                            &raw_cost_prefix_y,
-                            from_idx,
-                            to_idx,
-                            from_point,
-                            to_point,
-                        );
-                        let history_cost = segment_cost_from_prefix_sums(
-                            &grid,
-                            &raw_history_cost_prefix_x,
-                            &raw_history_cost_prefix_y,
-                            from_idx,
-                            to_idx,
-                            from_point,
-                            to_point,
-                        );
-                        let corner_penalty = if from_orientation != to_orientation {
-                            let corner_idx =
-                                raw_area.point_to_raw_point(&from_point).unwrap().0 as usize;
-                            let usage = raw_corner_usage[corner_idx];
-                            let overflow = if usage > corner_capacity {
-                                usage - corner_capacity
-                            } else {
-                                0
-                            };
-                            let history = raw_corner_history[corner_idx];
-                            let reuse_penalty = if usage > 0 { base_cost } else { 0.0 };
-                            reuse_penalty + corner_lambda * (overflow as f64) + mu * history
-                        } else {
-                            0.0
-                        };
-                        (turn_cost as f64 + current_cost + mu * history_cost + corner_penalty)
-                            as i32
-                    },
+                    &raw_cost_prefix_x,
+                    &raw_cost_prefix_y,
+                    &raw_history_cost_prefix_x,
+                    &raw_history_cost_prefix_y,
+                    &mut raw_usage,
+                    &mut raw_corner_usage,
+                    &raw_corner_history,
+                    base_cost,
+                    mu,
+                    corner_lambda,
+                    corner_capacity,
+                    trace_enabled,
                 )?;
-                // Convert grid path to actual points with directions
 
-                // First convert the grid path to actual grid points (only corner points).
-                let grid_points: Vec<Point> = grid_path
-                    .iter()
-                    .map(|(grid_index, _)| {
-                        let (grid_x, grid_y) = grid.grid_point_to_raw_coords(*grid_index).unwrap();
-                        Point {
-                            x: grid_x,
-                            y: grid_y,
-                        }
-                    })
-                    .collect();
-
-                let path = Path::new(grid_points);
-                let path_with_endpoints = PathWithEndpoints::new(path, *start, *end);
-
-                // Update usage based on routed paths
-                for segment_index in path_with_endpoints.segments(&raw_area) {
-                    raw_usage[segment_index as usize] += 1;
+                result_paths.insert(key, path_with_endpoints);
+                if let Some((trace_key, entry)) = trace_entry {
+                    routed_edges_trace.push((trace_key, entry));
+                    overflow_map.entry(trace_key).or_insert(false);
                 }
-                for corner_index in path_with_endpoints.corners(&raw_area) {
-                    raw_corner_usage[corner_index] += 1;
-                }
-
-                if trace_enabled {
-                    let grid_path_trace: Vec<serde_json::Value> = grid_path
-                        .iter()
-                        .map(|(grid_idx, orientation)| {
-                            let (gx, gy) =
-                                grid.grid_point_to_raw_coords(*grid_idx).unwrap_or((0, 0));
-                            json!({
-                                "grid_index": grid_idx.0,
-                                "raw": { "x": gx, "y": gy },
-                                "orientation": format!("{:?}", orientation)
-                            })
-                        })
-                        .collect();
-
-                    let raw_path_trace: Vec<serde_json::Value> = path_with_endpoints
-                        .path
-                        .points
-                        .iter()
-                        .map(|p| json!({ "x": p.x, "y": p.y }))
-                        .collect();
-
-                    let directed_trace: Vec<serde_json::Value> = path_with_endpoints
-                        .to_directed_points()
-                        .into_iter()
-                        .map(|dp| {
-                            json!({
-                                "x": dp.x,
-                                "y": dp.y,
-                                "direction": format!("{:?}", dp.direction)
-                            })
-                        })
-                        .collect();
-
-                    let mut entry = serde_json::Map::new();
-                    entry.insert(
-                        "start".to_string(),
-                        json!({"x": start.x, "y": start.y, "direction": format!("{:?}", start.direction)}),
-                    );
-                    entry.insert(
-                        "end".to_string(),
-                        json!({"x": end.x, "y": end.y, "direction": format!("{:?}", end.direction)}),
-                    );
-                    entry.insert(
-                        "grid_path".to_string(),
-                        serde_json::Value::Array(grid_path_trace),
-                    );
-                    entry.insert(
-                        "raw_path".to_string(),
-                        serde_json::Value::Array(raw_path_trace),
-                    );
-                    entry.insert(
-                        "directed_path".to_string(),
-                        serde_json::Value::Array(directed_trace),
-                    );
-                    routed_edges_trace.push(((start_raw_point, end_raw_point), entry));
-                    overflow_map
-                        .entry((start_raw_point, end_raw_point))
-                        .or_insert(false);
-                }
-
-                result_paths.insert((start_raw_point, end_raw_point), path_with_endpoints);
             }
 
             // 4) Compute overflow
             let (total_overflow, edge_overflow, corner_overflow) =
                 compute_overflow(&raw_usage, &raw_corner_usage, capacity, corner_capacity);
-            let trace_usage_snapshot = if trace_enabled {
-                Some(raw_usage.clone())
-            } else {
-                None
-            };
-            let trace_corner_snapshot = if trace_enabled {
-                Some(raw_corner_usage.clone())
-            } else {
-                None
-            };
             let finished = total_overflow == 0;
 
             if !finished {
                 // 5) Update history cost based on overflow
-                for i in 0..raw_num_segments as usize {
-                    let usage = raw_usage[i];
-                    if usage > capacity {
-                        raw_history_cost[i] += (usage - capacity) as f64;
-                    }
-                }
-                for i in 0..raw_area.size() {
-                    let usage = raw_corner_usage[i];
-                    if usage > corner_capacity {
-                        raw_corner_history[i] += (usage - corner_capacity) as f64;
-                    }
-                }
+                update_edge_history_cost(&raw_usage, &mut raw_history_cost, capacity);
+                update_corner_history_cost(
+                    &raw_corner_usage,
+                    &mut raw_corner_history,
+                    corner_capacity,
+                );
 
                 // 6) Select edges to rip up based on some criteria
                 op_edges.clear();
 
                 // For simplicity, we rip up all edges that have any overflow on their paths.
                 // Random tie-breaks in routing order already added above; selection here is based on current usage.
-                let mut to_rip: Vec<(
-                    Bound<'_, PyAny>,
-                    Bound<'_, PyAny>,
-                    DirectedPoint,
-                    DirectedPoint,
-                    RoutingConfig,
-                )> = Vec::new();
+                let to_rip = select_edges_to_rip(
+                    &sorted_edges,
+                    &result_paths,
+                    &raw_area,
+                    &raw_usage,
+                    &raw_corner_usage,
+                    capacity,
+                    corner_capacity,
+                    trace_enabled,
+                    &mut overflow_map,
+                );
 
-                for (u, v, start, end, config) in &sorted_edges {
-                    let start_raw_point = raw_area.point_to_raw_point(&start.as_point()).unwrap();
-                    let end_raw_point = raw_area.point_to_raw_point(&end.as_point()).unwrap();
-
-                    let mut has_overflow = false;
-                    if let Some(routed_path) = result_paths.get(&(start_raw_point, end_raw_point)) {
-                        for segment_index in routed_path.segments(&raw_area) {
-                            let usage = raw_usage[segment_index as usize];
-                            if usage > capacity {
-                                has_overflow = true;
-                                break;
-                            }
-                        }
-                        if !has_overflow {
-                            for corner_index in routed_path.corners(&raw_area) {
-                                let usage = raw_corner_usage[corner_index];
-                                if usage > corner_capacity {
-                                    has_overflow = true;
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    if has_overflow {
-                        if trace_enabled {
-                            overflow_map.insert((start_raw_point, end_raw_point), true);
-                        }
-                        to_rip.push((u.clone(), v.clone(), *start, *end, config.clone()));
-                    }
-                }
-
-                // Now remove usage for all edges marked for rip-up and queue them for the next iteration.
-                for (u, v, start, end, config) in to_rip.iter() {
-                    let start_raw_point = raw_area.point_to_raw_point(&start.as_point()).unwrap();
-                    let end_raw_point = raw_area.point_to_raw_point(&end.as_point()).unwrap();
-                    if let Some(routed_path) = result_paths.get(&(start_raw_point, end_raw_point)) {
-                        for segment_index in routed_path.segments(&raw_area) {
-                            raw_usage[segment_index as usize] -= 1;
-                        }
-                        for corner_index in routed_path.corners(&raw_area) {
-                            raw_corner_usage[corner_index] -= 1;
-                        }
-                    }
-                    op_edges.push((u.clone(), v.clone(), *start, *end, config.clone()));
-                }
+                op_edges = rip_up_and_queue(
+                    &to_rip,
+                    &result_paths,
+                    &raw_area,
+                    &mut raw_usage,
+                    &mut raw_corner_usage,
+                );
             } else {
                 op_edges.clear();
             }
 
             if trace_enabled {
-                let mut routed_edges_output: Vec<serde_json::Value> = Vec::new();
-                for (key, mut entry) in routed_edges_trace.into_iter() {
-                    let overflow = *overflow_map.get(&key).unwrap_or(&false);
-                    entry.insert("overflow".to_string(), json!(overflow));
-                    routed_edges_output.push(serde_json::Value::Object(entry));
-                }
-
-                let all_paths_snapshot: Vec<serde_json::Value> = result_paths
-                    .iter()
-                    .map(|(key, path_with_endpoints)| {
-                        let start_point = raw_area.raw_index_to_point(key.0 .0 as usize);
-                        let end_point = raw_area.raw_index_to_point(key.1 .0 as usize);
-                        let directed_trace: Vec<serde_json::Value> = path_with_endpoints
-                            .to_directed_points()
-                            .into_iter()
-                            .map(|dp| {
-                                json!({
-                                    "x": dp.x,
-                                    "y": dp.y,
-                                    "direction": format!("{:?}", dp.direction)
-                                })
-                            })
-                            .collect();
-                        json!({
-                            "start_raw_index": key.0 .0,
-                            "end_raw_index": key.1 .0,
-                            "start_raw_point": { "x": start_point.x, "y": start_point.y },
-                            "end_raw_point": { "x": end_point.x, "y": end_point.y },
-                            "directed_path": directed_trace
-                        })
-                    })
-                    .collect();
-
-                let ripped_up_next: Vec<serde_json::Value> = op_edges
-                    .iter()
-                    .map(|(_, _, start, end, _)| {
-                        json!({
-                            "start": { "x": start.x, "y": start.y, "direction": format!("{:?}", start.direction) },
-                            "end": { "x": end.x, "y": end.y, "direction": format!("{:?}", end.direction) }
-                        })
-                    })
-                    .collect();
-
-                iteration_logs.push(json!({
-                    "iteration": i,
-                    "routed_edges": routed_edges_output,
-                    "all_paths": all_paths_snapshot,
-                    "ripped_up_next": ripped_up_next,
-                    "raw_usage": trace_usage_snapshot.clone().unwrap_or_else(|| raw_usage.clone()),
-                    "raw_corner_usage": trace_corner_snapshot.clone().unwrap_or_else(|| raw_corner_usage.clone()),
-                    "overflow": {
-                        "total": total_overflow,
-                        "edges": edge_overflow,
-                        "corners": corner_overflow
-                    }
-                }));
+                record_iteration_trace(
+                    &mut iteration_logs,
+                    i,
+                    routed_edges_trace,
+                    &overflow_map,
+                    &result_paths,
+                    &op_edges,
+                    &raw_area,
+                    &raw_usage,
+                    &raw_corner_usage,
+                    total_overflow,
+                    edge_overflow,
+                    corner_overflow,
+                );
             }
 
             if finished {
@@ -1789,8 +1956,8 @@ impl EdgeRouter {
 
 fn segment_cost_from_prefix_sums(
     grid: &Grid,
-    raw_cost_prefix_x: &Vec<f64>,
-    raw_cost_prefix_y: &Vec<f64>,
+    raw_cost_prefix_x: &[f64],
+    raw_cost_prefix_y: &[f64],
     from_idx: GridPoint,
     to_idx: GridPoint,
     from_point: Point,
