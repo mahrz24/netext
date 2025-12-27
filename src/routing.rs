@@ -992,16 +992,17 @@ impl<'a> MaskedGrid<'a> {
         }
     }
 
-    fn neighbors(
+    fn fill_neighbors(
         &self,
         grid_point: GridPoint,
         orientation: Orientation,
-    ) -> Vec<(GridPoint, Orientation)> {
-        let Some((x, y)) = self.grid.grid_point_to_grid_coords(grid_point) else {
-            return Vec::new();
-        };
+        neighbors: &mut Vec<(GridPoint, Orientation)>,
+    ) {
+        neighbors.clear();
 
-        let mut neighbors = Vec::new();
+        let Some((x, y)) = self.grid.grid_point_to_grid_coords(grid_point) else {
+            return;
+        };
 
         let mut maybe_push = |nx: usize, ny: usize, orientation: Orientation| {
             let Some(neighbor_index) = self.grid.grid_coords_to_grid_point(nx, ny) else {
@@ -1037,8 +1038,6 @@ impl<'a> MaskedGrid<'a> {
             Orientation::Vertical => Orientation::Horizontal,
         };
         neighbors.push((grid_point, new_orientation));
-
-        neighbors
     }
 }
 
@@ -1747,7 +1746,7 @@ impl EdgeRouter {
             RoutingConfig,
         )>,
     ) -> PyResult<EdgeRoutingsResult> {
-        let max_iterations = 20;
+        let max_iterations = 10;
         let trace_path = std::env::var("NETEXT_ROUTING_TRACE_JSON").ok();
         let trace_enabled = trace_path.is_some();
         let mut iteration_logs = Vec::new();
@@ -2145,6 +2144,8 @@ where
     open_set.push((Reverse(start_f), insert_counter, start_state));
     insert_counter += 1;
 
+    let mut neighbors_buf: Vec<(GridPoint, Orientation)> = Vec::with_capacity(3);
+
     while let Some((Reverse(_f_score), _order, current_state)) = open_set.pop() {
         if current_state == goal_state {
             let mut path = Vec::new();
@@ -2160,9 +2161,13 @@ where
 
         let current_g = *g_score.get(&current_state).unwrap_or(&MAX_SCORE);
 
-        let mut neighbors = masked_grid.neighbors(current_state.index, current_state.orientation);
-        neighbors.shuffle(rng);
-        for (neighbor_index, neighbor_orientation) in neighbors {
+        masked_grid.fill_neighbors(
+            current_state.index,
+            current_state.orientation,
+            &mut neighbors_buf,
+        );
+        neighbors_buf.shuffle(rng);
+        for (neighbor_index, neighbor_orientation) in neighbors_buf.iter().copied() {
             // Do not allow in-place orientation flips at the start or end grid point.
             if neighbor_index == current_state.index
                 && (current_state.index == start_grid_point

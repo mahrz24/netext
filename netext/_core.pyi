@@ -101,11 +101,8 @@ class RoutingConfig:
     def __init__(
         self,
         neighborhood: Neighborhood,
-        generate_trace: Optional[bool] = False,
     ) -> None: ...
 
-    def get_generate_trace(self) -> bool: ...
-    def set_generate_trace(self, value: bool) -> None: ...
 
 class Direction(Enum):
     CENTER = -1
