@@ -43,5 +43,4 @@ for source in g.nodes:
 
 layout = SugiyamaLayout(direction=LayoutDirection.LEFT_RIGHT)
 
-print(g.edges)
 print(ConsoleGraph(g, layout_engine=layout))

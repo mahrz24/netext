@@ -78,7 +78,7 @@ format = "md"
 py-modules = ["netext"]
 
 [tool.uv]
-# this ensures that `uv run` doesn't actually build the package
+# setting to false ensures that `uv run` doesn't actually build the package
 package = false
 
 [tool.uv.sources]

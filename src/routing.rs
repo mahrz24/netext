@@ -1,4 +1,3 @@
-use hashbrown::raw;
 use rstar::RTreeObject;
 use std::cmp::max;
 use std::cmp::min;
@@ -13,7 +12,6 @@ use std::hash::Hasher;
 use std::marker::PhantomData;
 use std::ops::Index;
 use std::ops::IndexMut;
-use std::result;
 
 use rand::rngs::StdRng;
 use rand::Rng;
@@ -163,64 +161,17 @@ impl PathWithEndpoints {
                 continue;
             }
 
-            if window_start.x == window_end.x {
-                // Vertical segment
-                let direction = if window_end.y < window_start.y {
-                    Direction::Up
-                } else {
-                    Direction::Down
-                };
-                let direction_offset = if direction == Direction::Up { -1 } else { 1 };
-
-                result_path.push(DirectedPoint {
-                    x: window_start.x,
-                    y: window_start.y,
-                    direction: if result_path.is_empty() {
-                        self.start.direction
+            if let Some(segment) = manhattan_segment(window_start, window_end) {
+                let first_segment = result_path.is_empty();
+                push_directed_segment(
+                    &mut result_path,
+                    segment,
+                    if first_segment {
+                        Some(self.start.direction)
                     } else {
-                        direction
+                        None
                     },
-                    debug: false,
-                });
-
-                for y in 1..=(window_end.y - window_start.y).abs() {
-                    result_path.push(DirectedPoint {
-                        x: window_start.x,
-                        y: window_start.y + y * direction_offset,
-                        direction: direction.opposite(),
-                        debug: false,
-                    });
-                }
-            } else if window_start.y == window_end.y {
-                // Horizontal segment
-                let direction = if window_end.x > window_start.x {
-                    Direction::Right
-                } else {
-                    Direction::Left
-                };
-
-                result_path.push(DirectedPoint {
-                    x: window_start.x,
-                    y: window_start.y,
-                    direction: if result_path.is_empty() {
-                        self.start.direction
-                    } else {
-                        direction
-                    },
-                    debug: false,
-                });
-
-                let direction_offset = if direction == Direction::Left { -1 } else { 1 };
-                for x in 1..=(window_end.x - window_start.x).abs() {
-                    result_path.push(DirectedPoint {
-                        x: window_start.x + x * direction_offset,
-                        y: window_start.y,
-                        direction: direction.opposite(),
-                        debug: false,
-                    });
-                }
-            } else {
-                // Diagonals should not occur.
+                );
             }
         }
 
@@ -236,6 +187,96 @@ impl PathWithEndpoints {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+struct ManhattanSegment {
+    from: Point,
+    to: Point,
+}
+
+fn manhattan_segment(from: Point, to: Point) -> Option<ManhattanSegment> {
+    if from == to {
+        return None;
+    }
+    if from.x != to.x && from.y != to.y {
+        return None;
+    }
+    Some(ManhattanSegment { from, to })
+}
+
+fn walk_manhattan_steps(mut from: Point, to: Point, mut visit: impl FnMut(Point, Point)) {
+    let Some(segment) = manhattan_segment(from, to) else {
+        return;
+    };
+    let step_x = (segment.to.x - segment.from.x).signum();
+    let step_y = (segment.to.y - segment.from.y).signum();
+    let steps = (segment.to.x - segment.from.x)
+        .abs()
+        .max((segment.to.y - segment.from.y).abs());
+
+    for _ in 0..steps {
+        let next = Point {
+            x: from.x + step_x,
+            y: from.y + step_y,
+        };
+        visit(from, next);
+        from = next;
+    }
+}
+
+fn push_directed_segment(
+    out: &mut Vec<DirectedPoint>,
+    segment: ManhattanSegment,
+    first_direction_override: Option<Direction>,
+) {
+    if segment.from.x == segment.to.x {
+        let direction = if segment.to.y < segment.from.y {
+            Direction::Up
+        } else {
+            Direction::Down
+        };
+        let direction_offset = if direction == Direction::Up { -1 } else { 1 };
+
+        out.push(DirectedPoint {
+            x: segment.from.x,
+            y: segment.from.y,
+            direction: first_direction_override.unwrap_or(direction),
+            debug: false,
+        });
+
+        for y in 1..=(segment.to.y - segment.from.y).abs() {
+            out.push(DirectedPoint {
+                x: segment.from.x,
+                y: segment.from.y + y * direction_offset,
+                direction: direction.opposite(),
+                debug: false,
+            });
+        }
+    } else if segment.from.y == segment.to.y {
+        let direction = if segment.to.x > segment.from.x {
+            Direction::Right
+        } else {
+            Direction::Left
+        };
+
+        out.push(DirectedPoint {
+            x: segment.from.x,
+            y: segment.from.y,
+            direction: first_direction_override.unwrap_or(direction),
+            debug: false,
+        });
+
+        let direction_offset = if direction == Direction::Left { -1 } else { 1 };
+        for x in 1..=(segment.to.x - segment.from.x).abs() {
+            out.push(DirectedPoint {
+                x: segment.from.x + x * direction_offset,
+                y: segment.from.y,
+                direction: direction.opposite(),
+                debug: false,
+            });
+        }
+    }
+}
+
 pub struct PathSegments<'a> {
     indices: Vec<usize>,
     position: usize,
@@ -247,37 +288,13 @@ impl<'a> PathSegments<'a> {
         let mut indices = Vec::new();
 
         for window in path.points.windows(2) {
-            let from = window[0];
-            let to = window[1];
-
-            // Skip duplicate points.
-            if (from.x, from.y) == (to.x, to.y) {
-                continue;
-            }
-
-            // Only handle Manhattan steps.
-            if from.x != to.x && from.y != to.y {
-                continue;
-            }
-
-            let step_x = (to.x - from.x).signum();
-            let step_y = (to.y - from.y).signum();
-            let steps = (to.x - from.x).abs().max((to.y - from.y).abs());
-
-            let mut current = from;
-            for _ in 0..steps {
-                let next = Point {
-                    x: current.x + step_x,
-                    y: current.y + step_y,
-                };
-
-                if let Some(idx) = raw_area.segment_index_between(&current, &next) {
+            walk_manhattan_steps(window[0], window[1], |from, to| {
+                if let Some(idx) = raw_area.segment_index_between(&from, &to) {
                     if indices.last().copied() != Some(idx) {
                         indices.push(idx);
                     }
                 }
-                current = next;
-            }
+            });
         }
 
         PathSegments {
@@ -461,7 +478,6 @@ impl RawArea {
     {
         let width = self.width() as usize;
         let height = self.height() as usize;
-        let num_edges = self.num_segments();
 
         assert!(prefix_x.len() == (width * height) as usize);
         assert!(prefix_y.len() == (width * height) as usize);
@@ -552,6 +568,49 @@ impl Grid {
         }
     }
 
+    fn build_lines_from_coords(mut coords: Vec<i32>) -> Vec<i32> {
+        coords.sort_unstable();
+        coords.dedup();
+
+        let mut lines = Vec::new();
+        let mut last: Option<i32> = None;
+
+        for value in coords {
+            if let Some(last_value) = last {
+                if last_value < value - 5 {
+                    lines.push(last_value + 2);
+                }
+                if last_value < value - 1 {
+                    lines.push((last_value + value) / 2);
+                }
+                if last_value < value - 5 {
+                    lines.push(value - 2);
+                }
+            }
+            lines.push(value);
+            last = Some(value);
+        }
+
+        lines
+    }
+
+    fn ensure_min_max(lines: &mut Vec<i32>, min_value: i32, max_value: i32) {
+        if lines.is_empty() {
+            lines.push(min_value);
+            if max_value != min_value {
+                lines.push(max_value);
+            }
+            return;
+        }
+
+        if lines.binary_search(&min_value).is_err() {
+            lines.insert(0, min_value);
+        }
+        if lines.binary_search(&max_value).is_err() {
+            lines.push(max_value);
+        }
+    }
+
     pub fn from_edges_and_nodes(
         edges: &Vec<(Point, Point)>,
         nodes: &Vec<PlacedRectangularNode>,
@@ -570,54 +629,8 @@ impl Grid {
             y_set.insert(end.y);
         }
 
-        // Replace the original binary heaps with ones built from unique values.
-        let mut x_coords: Vec<i32> = x_set.into_iter().collect();
-        let mut y_coords: Vec<i32> = y_set.into_iter().collect();
-
-        // Sort the coordinates
-        // TODO we could do this more rust idiomatically
-        x_coords.sort_unstable();
-        y_coords.sort_unstable();
-        x_coords.reverse();
-        y_coords.reverse();
-
-        // For each pair of consecutive coordinates, we add their midpoint.
-        let mut x_lines = Vec::new();
-        let mut y_lines = Vec::new();
-
-        let mut last_x = None;
-
-        while let Some(x) = x_coords.pop() {
-            if let Some(last_x) = last_x {
-                if last_x < x - 5 {
-                    x_lines.push(last_x + 2);
-                }
-                if last_x < x - 1 {
-                    x_lines.push((last_x + x) / 2);
-                }
-                if last_x < x - 5 {
-                    x_lines.push(x - 2);
-                }
-            }
-            x_lines.push(x);
-            last_x = Some(x);
-        }
-        let mut last_y = None;
-        while let Some(y) = y_coords.pop() {
-            if let Some(last_y) = last_y {
-                if last_y < y - 5 {
-                    y_lines.push(last_y + 2);
-                }
-                if last_y < y - 1 {
-                    y_lines.push((last_y + y) / 2);
-                }
-                if last_y < y - 5 {
-                    y_lines.push(y - 2);
-                }
-            }
-            y_lines.push(y);
-            last_y = Some(y);
-        }
+        let mut x_lines = Self::build_lines_from_coords(x_set.into_iter().collect());
+        let mut y_lines = Self::build_lines_from_coords(y_set.into_iter().collect());
 
         // Get the bounding box of all nodes
         let mut min_nodes_x = i32::MAX;
@@ -642,18 +655,8 @@ impl Grid {
         let max_y = max(max_nodes_y + padding, y_lines[y_lines.len() - 1] + padding);
 
         // We add these to the grid keeping it sorted and unique.
-        if !x_lines.contains(&min_x) {
-            x_lines.insert(0, min_x);
-        }
-        if !x_lines.contains(&max_x) {
-            x_lines.push(max_x);
-        }
-        if !y_lines.contains(&min_y) {
-            y_lines.insert(0, min_y);
-        }
-        if !y_lines.contains(&max_y) {
-            y_lines.push(max_y);
-        }
+        Self::ensure_min_max(&mut x_lines, min_x, max_x);
+        Self::ensure_min_max(&mut y_lines, min_y, max_y);
 
         Grid::new(x_lines.len(), y_lines.len(), x_lines, y_lines)
     }
@@ -673,10 +676,6 @@ impl Grid {
 
     fn is_valid_point(&self, point: GridPoint) -> bool {
         point.0 < self.size as u32
-    }
-
-    fn is_valid_segment(&self, segment: GridSegment) -> bool {
-        segment.0 < self.num_segments as u32
     }
 
     fn grid_coords_to_segment_index(
@@ -763,37 +762,6 @@ impl Grid {
             x: self.x_lines[grid_x],
             y: self.y_lines[grid_y],
         })
-    }
-
-    fn raw_point_to_closest_grid_point(&self, point: RawPoint) -> Option<GridPoint> {
-        let min_x = self.min_x;
-        let min_y = self.min_y;
-        let max_x = self.max_x;
-
-        let raw_x = (point.0 % (max_x - min_x + 1) as u32) as i32 + min_x;
-        let raw_y = (point.0 / (max_x - min_x + 1) as u32) as i32 + min_y;
-
-        // Find the closest grid line for x and y
-        let grid_x = match self.x_lines.binary_search(&(raw_x as i32)) {
-            Ok(idx) => idx,
-            Err(idx) => {
-                if idx == 0 || idx >= self.width {
-                    return None;
-                }
-                idx - 1
-            }
-        };
-        let grid_y = match self.y_lines.binary_search(&(raw_y as i32)) {
-            Ok(idx) => idx,
-            Err(idx) => {
-                if idx == 0 || idx >= self.height {
-                    return None;
-                }
-                idx - 1
-            }
-        };
-
-        Some(GridPoint((grid_y * self.width + grid_x) as u32))
     }
 }
 
@@ -992,16 +960,17 @@ impl<'a> MaskedGrid<'a> {
         }
     }
 
-    fn neighbors(
+    fn fill_neighbors(
         &self,
         grid_point: GridPoint,
         orientation: Orientation,
-    ) -> Vec<(GridPoint, Orientation)> {
-        let Some((x, y)) = self.grid.grid_point_to_grid_coords(grid_point) else {
-            return Vec::new();
-        };
+        neighbors: &mut Vec<(GridPoint, Orientation)>,
+    ) {
+        neighbors.clear();
 
-        let mut neighbors = Vec::new();
+        let Some((x, y)) = self.grid.grid_point_to_grid_coords(grid_point) else {
+            return;
+        };
 
         let mut maybe_push = |nx: usize, ny: usize, orientation: Orientation| {
             let Some(neighbor_index) = self.grid.grid_coords_to_grid_point(nx, ny) else {
@@ -1037,8 +1006,6 @@ impl<'a> MaskedGrid<'a> {
             Orientation::Vertical => Orientation::Horizontal,
         };
         neighbors.push((grid_point, new_orientation));
-
-        neighbors
     }
 }
 
@@ -1191,36 +1158,41 @@ fn order_edges_by_difficulty<'py, R: Rng + ?Sized>(
     )> = Vec::new();
 
     for (u, v, start, end, config) in edges {
-        let difficulty = |start: &DirectedPoint, end: &DirectedPoint| -> i32 {
-            let span = (start.as_point().x - end.as_point().x).abs()
-                + (start.as_point().y - end.as_point().y).abs();
-            let min_x = min(start.as_point().x, end.as_point().x);
-            let max_x = max(start.as_point().x, end.as_point().x);
-            let min_y = min(start.as_point().y, end.as_point().y);
-            let max_y = max(start.as_point().y, end.as_point().y);
-            let mut obstacle_area = 0;
-            let total_area = (max_x - min_x) * (max_y - min_y);
-            for node in nodes {
-                let node_tl = node.top_left();
-                let node_br = node.bottom_right();
-                if node_tl.x <= max_x
-                    && node_br.x >= min_x
-                    && node_tl.y <= max_y
-                    && node_br.y >= min_y
-                {
-                    obstacle_area += (min(node_br.x, max_x) - max(node_tl.x, min_x)).max(0)
-                        * (min(node_br.y, max_y) - max(node_tl.y, min_y)).max(0);
-                }
-            }
-            -(span + ((200.0 * obstacle_area as f32 / (total_area as f32)).round()) as i32)
-        };
         // Add small reproducible noise to avoid fully deterministic ordering for similar edges.
         let noise: i32 = rng.gen_range(0..=10);
-        let score = difficulty(start, end) + noise;
+        let score = edge_difficulty(start, end, nodes) + noise;
         edges_with_score.push((score, (u.clone(), v.clone(), *start, *end, config.clone())));
     }
     edges_with_score.sort_by_key(|(score, _)| *score);
     edges_with_score.into_iter().map(|(_, edge)| edge).collect()
+}
+
+fn edge_difficulty(
+    start: &DirectedPoint,
+    end: &DirectedPoint,
+    nodes: &Vec<PlacedRectangularNode>,
+) -> i32 {
+    let start_point = start.as_point();
+    let end_point = end.as_point();
+
+    let span = (start_point.x - end_point.x).abs() + (start_point.y - end_point.y).abs();
+    let min_x = min(start_point.x, end_point.x);
+    let max_x = max(start_point.x, end_point.x);
+    let min_y = min(start_point.y, end_point.y);
+    let max_y = max(start_point.y, end_point.y);
+
+    let mut obstacle_area = 0;
+    let total_area = (max_x - min_x) * (max_y - min_y);
+    for node in nodes {
+        let node_tl = node.top_left();
+        let node_br = node.bottom_right();
+        if node_tl.x <= max_x && node_br.x >= min_x && node_tl.y <= max_y && node_br.y >= min_y {
+            obstacle_area += (min(node_br.x, max_x) - max(node_tl.x, min_x)).max(0)
+                * (min(node_br.y, max_y) - max(node_tl.y, min_y)).max(0);
+        }
+    }
+
+    -(span + ((200.0 * obstacle_area as f32 / (total_area as f32)).round()) as i32)
 }
 
 fn compute_overflow(
@@ -1747,7 +1719,7 @@ impl EdgeRouter {
             RoutingConfig,
         )>,
     ) -> PyResult<EdgeRoutingsResult> {
-        let max_iterations = 20;
+        let max_iterations = 10;
         let trace_path = std::env::var("NETEXT_ROUTING_TRACE_JSON").ok();
         let trace_enabled = trace_path.is_some();
         let mut iteration_logs = Vec::new();
@@ -2053,22 +2025,6 @@ fn segment_cost_from_prefix_sums(
     current_cost
 }
 
-fn closest_node_name(nodes: &Vec<PlacedRectangularNode>, point: Point) -> Option<(i32, Point)> {
-    nodes
-        .iter()
-        .map(|n| {
-            let tl = n.top_left();
-            let br = n.bottom_right();
-            let center = Point {
-                x: (tl.x + br.x) / 2,
-                y: (tl.y + br.y) / 2,
-            };
-            let dist = (center.x - point.x).abs() + (center.y - point.y).abs();
-            (dist, center)
-        })
-        .min_by_key(|(d, _)| *d)
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 struct GridState {
     index: GridPoint,
@@ -2145,6 +2101,8 @@ where
     open_set.push((Reverse(start_f), insert_counter, start_state));
     insert_counter += 1;
 
+    let mut neighbors_buf: Vec<(GridPoint, Orientation)> = Vec::with_capacity(3);
+
     while let Some((Reverse(_f_score), _order, current_state)) = open_set.pop() {
         if current_state == goal_state {
             let mut path = Vec::new();
@@ -2160,9 +2118,13 @@ where
 
         let current_g = *g_score.get(&current_state).unwrap_or(&MAX_SCORE);
 
-        let mut neighbors = masked_grid.neighbors(current_state.index, current_state.orientation);
-        neighbors.shuffle(rng);
-        for (neighbor_index, neighbor_orientation) in neighbors {
+        masked_grid.fill_neighbors(
+            current_state.index,
+            current_state.orientation,
+            &mut neighbors_buf,
+        );
+        neighbors_buf.shuffle(rng);
+        for (neighbor_index, neighbor_orientation) in neighbors_buf.iter().copied() {
             // Do not allow in-place orientation flips at the start or end grid point.
             if neighbor_index == current_state.index
                 && (current_state.index == start_grid_point
