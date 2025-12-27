@@ -1,4 +1,3 @@
-use hashbrown::raw;
 use rstar::RTreeObject;
 use std::cmp::max;
 use std::cmp::min;
@@ -13,7 +12,6 @@ use std::hash::Hasher;
 use std::marker::PhantomData;
 use std::ops::Index;
 use std::ops::IndexMut;
-use std::result;
 
 use rand::rngs::StdRng;
 use rand::Rng;
@@ -480,7 +478,6 @@ impl RawArea {
     {
         let width = self.width() as usize;
         let height = self.height() as usize;
-        let num_edges = self.num_segments();
 
         assert!(prefix_x.len() == (width * height) as usize);
         assert!(prefix_y.len() == (width * height) as usize);
@@ -681,10 +678,6 @@ impl Grid {
         point.0 < self.size as u32
     }
 
-    fn is_valid_segment(&self, segment: GridSegment) -> bool {
-        segment.0 < self.num_segments as u32
-    }
-
     fn grid_coords_to_segment_index(
         &self,
         grid_a: (usize, usize),
@@ -769,37 +762,6 @@ impl Grid {
             x: self.x_lines[grid_x],
             y: self.y_lines[grid_y],
         })
-    }
-
-    fn raw_point_to_closest_grid_point(&self, point: RawPoint) -> Option<GridPoint> {
-        let min_x = self.min_x;
-        let min_y = self.min_y;
-        let max_x = self.max_x;
-
-        let raw_x = (point.0 % (max_x - min_x + 1) as u32) as i32 + min_x;
-        let raw_y = (point.0 / (max_x - min_x + 1) as u32) as i32 + min_y;
-
-        // Find the closest grid line for x and y
-        let grid_x = match self.x_lines.binary_search(&(raw_x as i32)) {
-            Ok(idx) => idx,
-            Err(idx) => {
-                if idx == 0 || idx >= self.width {
-                    return None;
-                }
-                idx - 1
-            }
-        };
-        let grid_y = match self.y_lines.binary_search(&(raw_y as i32)) {
-            Ok(idx) => idx,
-            Err(idx) => {
-                if idx == 0 || idx >= self.height {
-                    return None;
-                }
-                idx - 1
-            }
-        };
-
-        Some(GridPoint((grid_y * self.width + grid_x) as u32))
     }
 }
 
@@ -2061,22 +2023,6 @@ fn segment_cost_from_prefix_sums(
         }
     };
     current_cost
-}
-
-fn closest_node_name(nodes: &Vec<PlacedRectangularNode>, point: Point) -> Option<(i32, Point)> {
-    nodes
-        .iter()
-        .map(|n| {
-            let tl = n.top_left();
-            let br = n.bottom_right();
-            let center = Point {
-                x: (tl.x + br.x) / 2,
-                y: (tl.y + br.y) / 2,
-            };
-            let dist = (center.x - point.x).abs() + (center.y - point.y).abs();
-            (dist, center)
-        })
-        .min_by_key(|(d, _)| *d)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
