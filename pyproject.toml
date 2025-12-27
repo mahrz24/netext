@@ -12,6 +12,9 @@ dependencies = ["rich>=13", "networkx~=3.0", "cachetools>=5.3.0", "typing-extens
 [project.optional-dependencies]
 textual = ["textual>=1"]
 
+[project.scripts]
+netext-debug = "netext.cli.routing_debugger:main"
+
 [project.urls]
 "Source code" = "https://github.com/mahrz24/netext"
 Documentation = "https://mahrz24.github.io/netext/"

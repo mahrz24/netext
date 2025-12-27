@@ -1,13 +1,13 @@
 from collections.abc import Hashable
 from enum import Enum
-from typing import Any, Iterable, Iterator
+from typing import Any, Iterable, Iterator, Optional
 
 class CoreGraph:
     @classmethod
     def from_edges(cls, edges: list[tuple[Hashable, Hashable]]) -> CoreGraph: ...
     def contains_node(self, node: Hashable) -> bool: ...
     def contains_edge(self, u: Hashable, v: Hashable) -> bool: ...
-    def add_node(self, node: Hashable, data: dict[str, Any]) -> None: ...
+    def add_node(self, node: Hashable, data: dict[str, Any], size: Size) -> None: ...
     def add_edge(self, u: Hashable, v: Hashable, data: dict[str, Any]) -> None: ...
     def update_node_data(self, node: Hashable, data: dict[str, Any]) -> None: ...
     def all_edges(self) -> Iterable[tuple[Hashable, Hashable]]: ...
@@ -27,6 +27,7 @@ class DirectedPoint:
     x: int
     y: int
     direction: Direction
+    debug: bool
     point: Point
 
     def __iter__(self) -> Iterator: ...
@@ -56,19 +57,41 @@ class RectangularNode:
 class PlacedRectangularNode:
     def __init__(self, center: Point, node: RectangularNode) -> None: ...
 
+class RoutingTrace:
+    def __init__(
+        self,
+    ) -> None: ...
+
+
+class EdgeRoutingResult:
+    path: list[DirectedPoint]
+    trace: Optional[RoutingTrace]
+
+    def __init__(self, path: list[DirectedPoint], trace: Optional[RoutingTrace]) -> None: ...
+
+class EdgeRoutingsResult:
+    paths: list[list[DirectedPoint]]
+    trace: Optional[RoutingTrace]
+
+    def __init__(self, paths: list[list[DirectedPoint]], trace: Optional[RoutingTrace]) -> None: ...
+
 class EdgeRouter:
     def add_node(self, node: Hashable, placed_node: PlacedRectangularNode) -> None: ...
     def remove_node(self, node: Hashable) -> None: ...
     def remove_edge(self, u: Hashable, v: Hashable) -> None: ...
     def route_edge(
         self,
+        u: Hashable,
+        v: Hashable,
         start: DirectedPoint,
         end: DirectedPoint,
+        global_start: DirectedPoint,
+        global_end: DirectedPoint,
         config: RoutingConfig,
-    ) -> list[DirectedPoint]: ...
+    ) -> EdgeRoutingResult: ...
     def route_edges(
         self, edge_anchors: list[tuple[Hashable, Hashable, DirectedPoint, DirectedPoint, RoutingConfig]]
-    ) -> list[list[DirectedPoint]]: ...
+    ) -> EdgeRoutingsResult: ...
 
 class Neighborhood(Enum):
     ORTHOGONAL = 0
@@ -78,12 +101,11 @@ class RoutingConfig:
     def __init__(
         self,
         neighborhood: Neighborhood,
-        corner_cost: int,
-        diagonal_cost: int,
-        line_cost: int,
-        shape_cost: int,
-        direction_change_margin: int,
+        generate_trace: Optional[bool] = False,
     ) -> None: ...
+
+    def get_generate_trace(self) -> bool: ...
+    def set_generate_trace(self, value: bool) -> None: ...
 
 class Direction(Enum):
     CENTER = -1
@@ -104,7 +126,10 @@ class LayoutDirection(Enum):
     LEFT_RIGHT = 1
 
 class LayoutEngine:
+    layout_direction: LayoutDirection
+
     def layout(self, graph: CoreGraph) -> Iterable[tuple[Hashable, Point]]: ...
+
 
 class SugiyamaLayout(LayoutEngine):
     def __init__(self, direction: LayoutDirection) -> None: ...

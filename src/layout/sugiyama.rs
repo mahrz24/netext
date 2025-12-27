@@ -6,22 +6,12 @@ use petgraph::graphmap::DiGraphMap;
 use petgraph::unionfind::UnionFind;
 use petgraph::visit::IntoEdgeReferences;
 use petgraph::visit::{NodeIndexable, Topo};
-
 use pyo3::prelude::*;
 
 use crate::geometry::Size;
 use crate::{geometry::Point, graph::CoreGraph};
 
-use super::LayoutEngine;
-
-#[pyclass]
-#[derive(Clone, Copy, Eq, PartialEq, Hash, Debug)]
-pub enum LayoutDirection {
-    #[pyo3(name = "TOP_DOWN")]
-    TopDown = 0,
-    #[pyo3(name = "LEFT_RIGHT")]
-    LeftRight = 1,
-}
+use super::{LayoutDirection, LayoutEngine};
 
 #[pyclass(extends=LayoutEngine, subclass)]
 pub struct SugiyamaLayout {
@@ -38,6 +28,11 @@ impl SugiyamaLayout {
             },
             LayoutEngine {},
         )
+    }
+
+    #[getter]
+    fn get_layout_direction(&self) -> Option<LayoutDirection> {
+        Some(self.direction)
     }
 
     fn layout(&self, py: Python<'_>, graph: &CoreGraph) -> PyResult<Vec<(PyObject, Point)>> {
@@ -72,9 +67,6 @@ impl SugiyamaLayout {
         // In case of left right layout, we need to rotate the coordinates
         let final_coordinates: HashMap<usize, Point> =
             if self.direction == LayoutDirection::LeftRight {
-                let max_y = coordinates.values().map(|p| p.y).max().unwrap_or(0);
-                let max_x = coordinates.values().map(|p| p.x).max().unwrap_or(0);
-
                 coordinates
                     .into_iter()
                     .map(|(node, point)| {
@@ -132,10 +124,13 @@ impl SugiyamaLayout {
                 .collect();
 
             let layer_height = node_sizes.iter().fold(0, |acc, size| {
-                acc.max(height_in_direction(self.direction, size.unwrap_or(&Size::new(0, 0))))
+                acc.max(height_in_direction(
+                    self.direction,
+                    size.unwrap_or(&Size::new(0, 0)),
+                ))
             });
 
-            let y = layer_index as f32 * layer_height as f32;
+            let y = layer_index as f32 * (layer_height as f32 + 1.0);
             let mut x = 0.0;
 
             for (&node, size) in layer.into_iter().zip(node_sizes) {

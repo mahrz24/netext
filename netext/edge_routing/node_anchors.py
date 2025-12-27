@@ -16,4 +16,4 @@ class NodeAnchors:
     all_positions: dict[str | Hashable, DirectedPoint] = field(default_factory=dict)
 
     ports_per_side: dict[ShapeSide, list[str]] = field(default_factory=lambda: defaultdict(list))
-    edges_per_side: dict[ShapeSide, list[Hashable]] = field(default_factory=lambda: defaultdict(list))
+    edges_per_side: dict[ShapeSide, list[tuple[float, Hashable]]] = field(default_factory=lambda: defaultdict(list))

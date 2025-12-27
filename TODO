@@ -1,3 +1,12 @@
+# Routing Improvements
+- [ ] Add a cost term for distance to node
+- [ ] Add a cost term for distance to edge
+- [ ] Add a cost term for crossing corners
+- [ ] Multiple intermediate points based on directions
+- [ ] When using the same line style, connect to the closest point on existing edge
+- [ ] T-junctions when renderin line buffers with different styles
+- [ ] Reduce costs on very dense graph automatically
+
 # Past release
 
 - [ ] Add benchmarks
@@ -5,8 +14,6 @@
 - [ ] Strict typechecking
 - [ ] Add benchmark comparison to PRs
 - [ ] Sugiyama better alignment of nodes
-- [ ] Waypoints for even faster A*
-- [ ] Better default choice of magnets / slots for connections
 - [ ] Open up the routing config to the user if they want to
 - [ ] Other shapes
 - [ ] Overlay edges in rendering

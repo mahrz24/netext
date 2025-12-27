@@ -1,9 +1,12 @@
 use petgraph::graph::NodeIndex;
 use std::{cmp, collections::HashMap};
 
-use pyo3::{prelude::*};
+use pyo3::prelude::*;
 
-use crate::{geometry::{Point, Size}, graph::CoreGraph};
+use crate::{
+    geometry::{Point, Size},
+    graph::CoreGraph,
+};
 
 use super::LayoutEngine;
 
@@ -20,13 +23,16 @@ pub struct ForceDirectedLayout {
 impl ForceDirectedLayout {
     #[new]
     fn new() -> (Self, LayoutEngine) {
-        (ForceDirectedLayout {
-            width: 120,
-            height: 40,
-            iterations: 50,
-            optimal_distance: 3,
-            force_constant: 0.005,
-        }, LayoutEngine {})
+        (
+            ForceDirectedLayout {
+                width: 120,
+                height: 40,
+                iterations: 50,
+                optimal_distance: 3,
+                force_constant: 0.005,
+            },
+            LayoutEngine {},
+        )
     }
 
     fn layout(&self, py: Python<'_>, graph: &CoreGraph) -> PyResult<Vec<(PyObject, Point)>> {
@@ -59,11 +65,14 @@ impl ForceDirectedLayout {
                         let size_u = graph.size_map.get(&u).unwrap_or(&origin);
                         let size_v = graph.size_map.get(&v).unwrap_or(&origin);
 
-                        let min_distance = cmp::max(size_u.height + size_v.height, size_u.width + size_v.width);
+                        let min_distance =
+                            cmp::max(size_u.height + size_v.height, size_u.width + size_v.width);
 
                         if distance > 0.0 {
-                            let repulsive_force = (self.optimal_distance.pow(2) as f64) / (distance as f64);
-                            let adjustment = delta * (repulsive_force / distance * self.force_constant);
+                            let repulsive_force =
+                                (self.optimal_distance.pow(2) as f64) / (distance as f64);
+                            let adjustment =
+                                delta * (repulsive_force / distance * self.force_constant);
                             let adjustment_min = delta * (repulsive_force / distance);
                             if distance < min_distance as f64 {
                                 displacements.get_mut(&u).unwrap().x += adjustment_min.x;
@@ -81,7 +90,8 @@ impl ForceDirectedLayout {
                 let delta = positions[&u] - positions[&v];
                 let distance = delta.distance(&Point { x: 0, y: 0 });
                 if distance > 0.0 {
-                    let attractive_force = ((distance.powi(2)) as f64) / (self.optimal_distance as f64);
+                    let attractive_force =
+                        ((distance.powi(2)) as f64) / (self.optimal_distance as f64);
                     let adjustment = delta * (attractive_force / distance * self.force_constant);
                     displacements.get_mut(&u).unwrap().x -= adjustment.x;
                     displacements.get_mut(&u).unwrap().y -= adjustment.y;
@@ -105,9 +115,7 @@ impl ForceDirectedLayout {
         Ok(positions
             .into_iter()
             .filter_map(|(node, point)| {
-                let object = graph
-                    .object_map
-                    .get_index(node.index());
+                let object = graph.object_map.get_index(node.index());
                 object.map(|object| (object.clone_ref(py), point))
             })
             .collect())

@@ -26,6 +26,7 @@ from netext.edge_rasterizer import EdgeRoutingRequest, rasterize_edge, rasterize
 from netext.node_rasterizer import NodeBuffer, rasterize_node
 
 from rich.traceback import install
+import statistics
 
 install(show_locals=False)
 
@@ -151,7 +152,7 @@ class ConsoleGraph:
 
         for node, data in graph.nodes(data=True):
             if not self._core_graph.contains_node(node):
-                self._core_graph.add_node(node, data)
+                self._core_graph.add_node(node, data, core.Size(0, 0))
             else:
                 self._core_graph.update_node_data(node, data)
         for u, v, data in graph.edges(data=True):
@@ -267,11 +268,10 @@ class ConsoleGraph:
             data = dict()
 
         properties = NodeProperties.from_data_dict(data)
-        self._core_graph.add_node(node, dict(data, **{"$properties": properties}))
 
         # Add to node buffers for layout
         node_buffer = rasterize_node(self.console, node, cast(dict[str, Any], data))
-        node_buffer.determine_edge_sides()
+        node_buffer.determine_edge_sides(layout_direction=self._layout_engine.layout_direction)
 
         self.node_buffers_for_layout[node] = node_buffer
 
@@ -285,6 +285,10 @@ class ConsoleGraph:
             node_anchors=node_buffer.node_anchors,
         )
         node_buffer.determine_edge_positions()
+
+        self._core_graph.add_node(
+            node, dict(data, **{"$properties": properties}), core.Size(node_buffer.width, node_buffer.height)
+        )
 
         self.node_buffers[node] = node_buffer
 
@@ -362,6 +366,7 @@ class ConsoleGraph:
             properties,
             edge_lod,
             edge_index=len(self.edge_buffers),
+            layout_direction=self._layout_engine.layout_direction,
         )
         if result is not None:
             edge_buffer, label_nodes = result
@@ -469,7 +474,7 @@ class ConsoleGraph:
             node_buffer = rasterize_node(self.console, node, data=cast(dict[str, Any], new_data), lod=lod)
             self.node_buffers_for_layout[node] = node_buffer
 
-            node_buffer.determine_edge_sides()
+            node_buffer.determine_edge_sides(layout_direction=self._layout_engine.layout_direction)
 
             # Update port side assignment
             new_node_buffer = rasterize_node(
@@ -643,6 +648,7 @@ class ConsoleGraph:
             properties,
             edge_lod,
             edge_index=int(old_z_index),
+            layout_direction=self._layout_engine.layout_direction,
         )
         self._render_port_buffer_for_node(u)
         self._render_port_buffer_for_node(v)
@@ -685,8 +691,8 @@ class ConsoleGraph:
         self.offset: FloatPoint = FloatPoint(0, 0)
 
         if self.node_positions:
-            x_positions = [pos.x for _, pos in self.node_positions.items()]
-            y_positions = [pos.y for _, pos in self.node_positions.items()]
+            x_positions = [pos.x for pos in self.node_positions.values()]
+            y_positions = [pos.y for pos in self.node_positions.values()]
             # Center node positions around the midpoint of all nodes
             min_x = min(x_positions)
             max_x = max(x_positions)
@@ -700,8 +706,53 @@ class ConsoleGraph:
 
             self.node_positions = {node: pos + self.offset for node, pos in self.node_positions.items()}
 
-        for node, position in self.node_positions.items():
-            self.node_buffers_for_layout[node].center = Point(x=round(position.x), y=round(position.y))
+            # Computer the median (not mean) position of all node and then determine the offset
+            # to in the layout direction to the median.
+            # Compute the median x and y positions
+            median_x = statistics.median(x_positions)
+            median_y = statistics.median(y_positions)
+
+            for node, position in self.node_positions.items():
+                self.node_buffers_for_layout[node].center = Point(x=round(position.x), y=round(position.y))
+                self.node_buffers_for_layout[node].routing_hints.relative_offset_in_layout_direction = (
+                    (position.x - median_x) / (max_x - min_x)
+                    if self._layout_engine.layout_direction == core.LayoutDirection.LEFT_RIGHT
+                    else (position.y - median_y) / (max_y - min_y)
+                )
+
+            # Compute the density of the graph in the layout direction
+            # i.e. for each node find how many nodes are in the same row/column
+            # depending on the layout direction. A row / column is defined by
+            # the width / height of the node buffer and the layout direction.
+            # Intersecting nodes with this row are counted.
+
+            for node, node_buffer in self.node_buffers_for_layout.items():
+                if self._layout_engine.layout_direction == core.LayoutDirection.LEFT_RIGHT:
+                    # Define the vertical range of the row.
+                    row_min = node_buffer.center.y - node_buffer.layout_height / 2
+                    row_max = node_buffer.center.y + node_buffer.layout_height / 2
+                    density = sum(
+                        1
+                        for other in self.node_buffers_for_layout.values()
+                        if (
+                            other.center.y + other.layout_height / 2 >= row_min
+                            and other.center.y - other.layout_height / 2 <= row_max
+                        )
+                    )
+                else:
+                    # Define the horizontal range of the column.
+                    col_min = node_buffer.center.x - node_buffer.layout_width / 2
+                    col_max = node_buffer.center.x + node_buffer.layout_width / 2
+                    density = sum(
+                        1
+                        for other in self.node_buffers_for_layout.values()
+                        if (
+                            other.center.x + other.layout_width / 2 >= col_min
+                            and other.center.x - other.layout_width / 2 <= col_max
+                        )
+                    )
+                # Store the computed density in the node buffer (for later use or debugging)
+                node_buffer.routing_hints.density_in_layout_direction = density
 
         # Compute the port sides for each node
         for node, node_buffer in self.node_buffers_for_layout.items():
@@ -720,7 +771,11 @@ class ConsoleGraph:
                 for other in self._core_graph.neighbors_incoming(node)
             ]
 
-            node_buffer.determine_edge_sides(out_neighbors=out_neighbors, in_neighbors=in_neighbors)
+            node_buffer.determine_edge_sides(
+                out_neighbors=out_neighbors,
+                in_neighbors=in_neighbors,
+                layout_direction=self._layout_engine.layout_direction,
+            )
 
     def _transition_compute_zoomed_positions(self) -> None:
         # Reset the edge router, a change of zoom factor requires a new routing
@@ -832,7 +887,12 @@ class ConsoleGraph:
                 )
             )
 
-        edge_buffers, label_buffers = rasterize_edges(self.console, self._edge_router, edge_routing_requests)
+        edge_buffers, label_buffers = rasterize_edges(
+            self.console,
+            self._edge_router,
+            edge_routing_requests,
+            layout_direction=self._layout_engine.layout_direction,
+        )
 
         for (u, v), edge_buffer in edge_buffers.items():
             self.edge_buffers[(u, v)] = edge_buffer

@@ -134,15 +134,24 @@ def rasterize_edge_path(
 
     pen_down = True
     offset = next(pattern)
+    debug = False
 
     for directed_point in path.directed_points:
         if directed_point.point == current_point:
             directions.append(directed_point.direction)
+            if directed_point.debug:
+                debug = True
         else:
             if pen_down:
                 segment = rasterize_point(directions, style, edge_segment_drawing_mode)
             else:
                 segment = Spacer(width=1)
+
+            if debug:
+                if isinstance(segment, Spacer):
+                    segment = Segment(" ", style=Style(bgcolor="red"))
+                else:
+                    [segment] = Segment.apply_style([segment], Style(bgcolor="red"))
             offset -= 1
             character_path.append((current_point, segment))
 
@@ -151,6 +160,7 @@ def rasterize_edge_path(
                 offset = next(pattern)
 
             current_point = directed_point.point
+            debug = directed_point.debug
             directions = [directed_point.direction]
 
     character_path.append((current_point, rasterize_point(directions, style, edge_segment_drawing_mode)))
