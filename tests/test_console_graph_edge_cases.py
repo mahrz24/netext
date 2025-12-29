@@ -10,10 +10,9 @@ def console():
     return Console()
 
 
-def test_line_remove_of_non_existing_nodes():
+def test_remove_nonexistent_node_raises_keyerror():
     graph = DiGraph()
     cg = ConsoleGraph(graph)
-    # Force internal requirement check by calling remove_node
     with pytest.raises(KeyError):
         cg.remove_node("non_existent")
 
@@ -33,7 +32,6 @@ def test_zoom_fig():
 
 
 def test_zoom_factor_is_recomputed(console):
-    """Covers another state transition (lines 307-309)."""
     graph = DiGraph()
     graph.add_node(1)
     graph.add_node(2)
@@ -53,8 +51,7 @@ def test_zoom_factor_is_recomputed(console):
     assert cg._zoom_factor != old_zoom_factor
 
 
-def test_line_319(console):
-    """Covers code around line 319, likely requiring transitions to EDGES_RENDERED."""
+def test_add_node_after_render_resets_layout_state(console):
     graph = DiGraph()
     graph.add_node(1)
     cg = ConsoleGraph(graph)
@@ -66,18 +63,18 @@ def test_line_319(console):
     assert cg._render_state == RenderState.NODE_BUFFERS_RENDERED_FOR_LAYOUT
 
 
-def test_line_447():
-    """Covers code around line 447, possibly removing a node after edges are rendered."""
+def test_remove_nonexistent_node_after_render_raises_keyerror(console):
     graph = DiGraph()
     graph.add_nodes_from([1, 2])
     graph.add_edge(1, 2)
     cg = ConsoleGraph(graph)
+    with console.capture():
+        console.print(cg)
     with pytest.raises(KeyError):
         cg.remove_node("does_not_exist")
 
 
-def test_line_456():
-    """Covers code for removing an edge near line 456."""
+def test_remove_edge_removes_from_core_graph():
     graph = DiGraph()
     graph.add_nodes_from([1, 2])
     graph.add_edge(1, 2)
@@ -86,8 +83,7 @@ def test_line_456():
     assert (1, 2) not in cg._core_graph.all_edges()
 
 
-def test_line_459():
-    """Covers code verifying internal references after removing edges (line 459)."""
+def test_remove_edge_clears_rendered_edge_buffers():
     graph = DiGraph()
     graph.add_nodes_from([1, 2])
     graph.add_edge(1, 2)
@@ -98,8 +94,7 @@ def test_line_459():
         _ = cg.edge_buffers[(1, 2)]
 
 
-def test_line_501_502():
-    """Covers code around lines 501-502 (updating node data)."""
+def test_update_node_data_sets_properties():
     graph = DiGraph()
     graph.add_node(1)
     cg = ConsoleGraph(graph)

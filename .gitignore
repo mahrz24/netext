@@ -106,6 +106,8 @@ celerybeat.pid
 .codspeed
 .env
 .venv
+.pixi
+.pixi/
 env/
 venv/
 ENV/

@@ -60,8 +60,8 @@ features = ["pyo3/extension-module"]
 executionEnvironments = [{ root = "netext"}]
 typeCheckingMode = "standard"
 useLibraryCodeForTypes = true
-venvPath = "."
-venv = ".venv"
+venvPath = ".pixi/envs"
+venv = "linting"
 pythonVersion = "3.10"
 
 [tool.black]
@@ -76,10 +76,3 @@ format = "md"
 
 [tool.setuptools]
 py-modules = ["netext"]
-
-[tool.uv]
-# setting to false ensures that `uv run` doesn't actually build the package
-package = false
-
-[tool.uv.sources]
-netext = { workspace = true }

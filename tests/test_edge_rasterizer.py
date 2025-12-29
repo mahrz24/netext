@@ -33,5 +33,5 @@ def test_trivial_edge(console: Console) -> None:
     assert result is not None
     edge, _ = result
 
-    assert edge.width == 6
-    assert edge.height == 7
+    assert edge.width == 3
+    assert edge.height == 9

@@ -19,10 +19,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: set up python
-        uses: actions/setup-python@v5
+      - name: set up pixi
+        uses: prefix-dev/setup-pixi@v0.8.1
         with:
-          python-version: '3.13'
+          cache: true
 
       - name: install rust nightly
         uses: dtolnay/rust-toolchain@nightly
@@ -36,25 +36,22 @@ jobs:
 
       - run: rustup component add llvm-tools-preview
 
-      - name: install uv
-        uses: astral-sh/setup-uv@v5
-
       - name: install deps
-        run: uv sync --group testing --group benchmark --all-extras
+        run: pixi install -e py313-benchmark
 
       - run: rustc --version --verbose
 
       - run: |
           rm -f netext/*.so
-          uv run maturin develop --uv
+          pixi run -e py313-benchmark maturin develop
         env:
           RUST_BACKTRACE: 1
           RUSTFLAGS: '-C instrument-coverage'
 
-      - run: uv pip freeze
+      - run: pixi run -e py313-benchmark python -m pip freeze
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v3
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
-          run: uv run pytest tests --codspeed --codspeed-mode=instrumentation
+          run: pixi run -e py313-benchmark pytest tests --codspeed --codspeed-mode=instrumentation

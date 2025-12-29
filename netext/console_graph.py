@@ -712,12 +712,15 @@ class ConsoleGraph:
             median_x = statistics.median(x_positions)
             median_y = statistics.median(y_positions)
 
+            x_span = max_x - min_x
+            y_span = max_y - min_y
+
             for node, position in self.node_positions.items():
                 self.node_buffers_for_layout[node].center = Point(x=round(position.x), y=round(position.y))
                 self.node_buffers_for_layout[node].routing_hints.relative_offset_in_layout_direction = (
-                    (position.x - median_x) / (max_x - min_x)
+                    ((position.x - median_x) / x_span if x_span else 0.0)
                     if self._layout_engine.layout_direction == core.LayoutDirection.LEFT_RIGHT
-                    else (position.y - median_y) / (max_y - min_y)
+                    else ((position.y - median_y) / y_span if y_span else 0.0)
                 )
 
             # Compute the density of the graph in the layout direction

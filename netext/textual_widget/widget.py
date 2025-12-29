@@ -103,7 +103,9 @@ class GraphView(ScrollView):
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
 
         self.zoom = zoom
-        self._timer = self.set_timer(0, self._resized)
+
+    def on_mount(self) -> None:
+        self.call_next(self._resized)
 
     def _reset_console_graph(self):
         if self.size.width != 0 and self.size.height != 0:

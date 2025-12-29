@@ -22,48 +22,51 @@ git remote add upstream https://github.com/[your-username]/[your-project-name].g
 
 ## Setting Up Your Development Environment
 
-This project uses Poetry, a dependency management and packaging tool, for managing project dependencies. You'll need to have Poetry installed on your machine. You can find the installation instructions [here](https://python-poetry.org/docs/#installation) .
+This project uses [pixi](https://pixi.sh) to manage development environments.
 
 To set up the development environment, follow these steps:
-1. Install project dependencies using Poetry:
+1. Install pixi (see pixi docs).
 
 ```sh
-poetry install
+pixi install -e testing
 ```
 
 
-1. Activate the virtual environment created by Poetry:
+1. Run tests:
 
 ```sh
-poetry shell
+pixi run -e testing pytest
 ```
 
 
-1. Install pre-commit hooks:
+1. Run formatting/linting:
 
 ```sh
-pre-commit install
+pixi install -e linting
+pixi run -e linting ruff format .
+pixi run -e linting ruff check --fix .
+pixi run -e linting pyright
 ```
 
 
 ## Coding Style and Conventions
 
 We use the following tools to maintain a consistent coding style and conventions:
-- [Black](https://black.readthedocs.io/en/stable/) : An uncompromising code formatter.
-- [isort](https://pycqa.github.io/isort/) : A Python utility to sort imports.
+- [ruff](https://docs.astral.sh/ruff/) : Formatting + linting.
+- [pyright](https://github.com/microsoft/pyright) : Type checking.
 
-The pre-commit hooks ensure that these tools are run automatically before each commit. You can also run them manually using the following commands:
-- Format code with Black:
+You can run these tools manually using the following commands:
+- Format code with ruff:
 
 ```sh
-black .
+pixi run -e linting ruff format .
 ```
 
 
-- Sort imports with isort:
+- Lint and apply auto-fixes:
 
 ```sh
-isort .
+pixi run -e linting ruff check --fix .
 ```
 
 

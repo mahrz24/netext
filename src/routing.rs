@@ -836,6 +836,7 @@ impl<'a> MaskedGrid<'a> {
     fn mask_vertical_segments_at_x(
         grid: &Grid,
         segment_mask: &mut [bool],
+        unremovable: &HashSet<GridPoint>,
         grid_x: usize,
         min_grid_y: usize,
         max_grid_y: usize,
@@ -846,6 +847,14 @@ impl<'a> MaskedGrid<'a> {
         let start_y = min_grid_y.saturating_sub(1);
         let end_y = min(grid.height - 2, max_grid_y);
         for grid_y in start_y..=end_y {
+            if let (Some(a), Some(b)) = (
+                grid.grid_coords_to_grid_point(grid_x, grid_y),
+                grid.grid_coords_to_grid_point(grid_x, grid_y + 1),
+            ) {
+                if unremovable.contains(&a) || unremovable.contains(&b) {
+                    continue;
+                }
+            }
             let segment_index =
                 grid.grid_coords_to_segment_index((grid_x, grid_y), (grid_x, grid_y + 1));
             segment_mask[segment_index] = false;
@@ -855,6 +864,7 @@ impl<'a> MaskedGrid<'a> {
     fn mask_horizontal_segments_at_y(
         grid: &Grid,
         segment_mask: &mut [bool],
+        unremovable: &HashSet<GridPoint>,
         grid_y: usize,
         min_grid_x: usize,
         max_grid_x: usize,
@@ -865,6 +875,14 @@ impl<'a> MaskedGrid<'a> {
         let start_x = min_grid_x.saturating_sub(1);
         let end_x = min(grid.width - 2, max_grid_x);
         for grid_x in start_x..=end_x {
+            if let (Some(a), Some(b)) = (
+                grid.grid_coords_to_grid_point(grid_x, grid_y),
+                grid.grid_coords_to_grid_point(grid_x + 1, grid_y),
+            ) {
+                if unremovable.contains(&a) || unremovable.contains(&b) {
+                    continue;
+                }
+            }
             let segment_index =
                 grid.grid_coords_to_segment_index((grid_x, grid_y), (grid_x + 1, grid_y));
             segment_mask[segment_index] = false;
@@ -914,6 +932,7 @@ impl<'a> MaskedGrid<'a> {
                 Self::mask_vertical_segments_at_x(
                     grid,
                     &mut visibility_segment_mask,
+                    &unremovable,
                     grid_x,
                     min_grid_y,
                     max_grid_y,
@@ -925,6 +944,7 @@ impl<'a> MaskedGrid<'a> {
                 Self::mask_vertical_segments_at_x(
                     grid,
                     &mut visibility_segment_mask,
+                    &unremovable,
                     grid_x,
                     min_grid_y,
                     max_grid_y,
@@ -936,6 +956,7 @@ impl<'a> MaskedGrid<'a> {
                 Self::mask_horizontal_segments_at_y(
                     grid,
                     &mut visibility_segment_mask,
+                    &unremovable,
                     grid_y,
                     min_grid_x,
                     max_grid_x,
@@ -947,6 +968,7 @@ impl<'a> MaskedGrid<'a> {
                 Self::mask_horizontal_segments_at_y(
                     grid,
                     &mut visibility_segment_mask,
+                    &unremovable,
                     grid_y,
                     min_grid_x,
                     max_grid_x,
@@ -1021,20 +1043,47 @@ fn routing_seed(
 ) -> u64 {
     let mut hasher = DefaultHasher::new();
     edges.len().hash(&mut hasher);
-    for (_, _, start, end, _) in edges {
-        start.x.hash(&mut hasher);
-        start.y.hash(&mut hasher);
-        start.direction.hash(&mut hasher);
-        end.x.hash(&mut hasher);
-        end.y.hash(&mut hasher);
-        end.direction.hash(&mut hasher);
+    let mut edge_keys: Vec<(i32, i32, i32, i32, i32, i32)> = edges
+        .iter()
+        .map(|(_, _, start, end, _)| {
+            (
+                start.x,
+                start.y,
+                start.direction as i32,
+                end.x,
+                end.y,
+                end.direction as i32,
+            )
+        })
+        .collect();
+    edge_keys.sort();
+    for (sx, sy, sd, ex, ey, ed) in edge_keys {
+        sx.hash(&mut hasher);
+        sy.hash(&mut hasher);
+        sd.hash(&mut hasher);
+        ex.hash(&mut hasher);
+        ey.hash(&mut hasher);
+        ed.hash(&mut hasher);
     }
+
     nodes.len().hash(&mut hasher);
-    for node in nodes {
-        node.center.x.hash(&mut hasher);
-        node.center.y.hash(&mut hasher);
-        node.node.size.width.hash(&mut hasher);
-        node.node.size.height.hash(&mut hasher);
+    let mut node_keys: Vec<(i32, i32, i32, i32)> = nodes
+        .iter()
+        .map(|node| {
+            (
+                node.center.x,
+                node.center.y,
+                node.node.size.width,
+                node.node.size.height,
+            )
+        })
+        .collect();
+    node_keys.sort();
+    for (cx, cy, w, h) in node_keys {
+        cx.hash(&mut hasher);
+        cy.hash(&mut hasher);
+        w.hash(&mut hasher);
+        h.hash(&mut hasher);
     }
     hasher.finish()
 }
@@ -1291,7 +1340,7 @@ fn route_single_edge<R: Rng + ?Sized>(
     let start_orientation: Orientation = start.direction.to_orientation();
     let end_orientation: Orientation = end.direction.to_orientation();
 
-    let grid_path = route_visibility_astar(
+    let grid_path = match route_visibility_astar(
         masked_grid,
         start_grid_point,
         end_grid_point,
@@ -1302,11 +1351,7 @@ fn route_single_edge<R: Rng + ?Sized>(
             let from_point = grid.grid_point_to_point(from_idx).unwrap();
             let to_point = grid.grid_point_to_point(to_idx).unwrap();
 
-            let turn_cost = if from_orientation != to_orientation {
-                1
-            } else {
-                0
-            };
+            let turn_cost = if from_orientation != to_orientation { 1 } else { 0 };
 
             let current_cost = segment_cost_from_prefix_sums(
                 grid,
@@ -1344,7 +1389,82 @@ fn route_single_edge<R: Rng + ?Sized>(
 
             (turn_cost as f64 + current_cost + mu * history_cost + corner_penalty) as i32
         },
-    )?;
+    ) {
+        Ok(path) => path,
+        Err(_) => {
+            // Fallback: build a simple L-shaped Manhattan path. This keeps rendering stable
+            // in cases where the visibility graph is fully disconnected due to masking.
+            let (sx, sy) = grid
+                .grid_point_to_grid_coords(start_grid_point)
+                .unwrap_or((0, 0));
+            let (ex, ey) = grid
+                .grid_point_to_grid_coords(end_grid_point)
+                .unwrap_or((0, 0));
+
+            let mut build = |mid_x: usize, mid_y: usize, first: Orientation, second: Orientation| {
+                let mut out: Vec<(GridPoint, Orientation)> = Vec::new();
+                out.push((start_grid_point, first));
+                if let Some(mid) = grid.grid_coords_to_grid_point(mid_x, mid_y) {
+                    if mid != start_grid_point {
+                        out.push((mid, second));
+                    }
+                }
+                if end_grid_point != start_grid_point {
+                    out.push((end_grid_point, end_orientation));
+                }
+                out
+            };
+
+            let mut segment_clear = |mut ax: usize,
+                                     mut ay: usize,
+                                     bx: usize,
+                                     by: usize|
+             -> bool {
+                if ax == bx && ay == by {
+                    return true;
+                }
+                if ax != bx && ay != by {
+                    return false;
+                }
+                if ax != bx {
+                    let step = if bx > ax { 1isize } else { -1isize };
+                    while ax != bx {
+                        let next_x = (ax as isize + step) as usize;
+                        let seg_idx =
+                            grid.grid_coords_to_segment_index((ax, ay), (next_x, ay));
+                        if !masked_grid.segment_mask[seg_idx] {
+                            return false;
+                        }
+                        ax = next_x;
+                    }
+                } else {
+                    let step = if by > ay { 1isize } else { -1isize };
+                    while ay != by {
+                        let next_y = (ay as isize + step) as usize;
+                        let seg_idx =
+                            grid.grid_coords_to_segment_index((ax, ay), (ax, next_y));
+                        if !masked_grid.segment_mask[seg_idx] {
+                            return false;
+                        }
+                        ay = next_y;
+                    }
+                }
+                true
+            };
+
+            // Prefer the L-shape that stays within unmasked visibility segments (if possible).
+            let horizontal_then_vertical_ok =
+                segment_clear(sx, sy, ex, sy) && segment_clear(ex, sy, ex, ey);
+            let vertical_then_horizontal_ok =
+                segment_clear(sx, sy, sx, ey) && segment_clear(sx, ey, ex, ey);
+
+            if horizontal_then_vertical_ok || !vertical_then_horizontal_ok {
+                build(ex, sy, Orientation::Horizontal, Orientation::Vertical)
+            } else {
+                build(sx, ey, Orientation::Vertical, Orientation::Horizontal)
+            }
+        }
+    };
 
     let grid_points: Vec<Point> = grid_path
         .iter()
@@ -1685,8 +1805,9 @@ impl EdgeRouter {
     fn remove_node(&mut self, node: &Bound<PyAny>) -> PyResult<()> {
         let index = self.object_map.get_full(node)?.map(|(index, _)| index);
         if let Some(index) = index {
-            self.placed_nodes.remove(&index);
-            self.placed_node_tree.remove(&self.placed_nodes[&index]);
+            if let Some(placed_node) = self.placed_nodes.remove(&index) {
+                self.placed_node_tree.remove(&placed_node);
+            }
         }
         // TODO: Needs some cleanup of the object map at some point.
         Ok(())
@@ -1701,9 +1822,7 @@ impl EdgeRouter {
         let start_index = self.object_map.insert_full(start)?.0;
         let end_index = self.object_map.insert_full(end)?.0;
 
-        if let Some(line) = self.existing_edges.get(&(start_index, end_index)) {
-            self.existing_edges.remove(&(start_index, end_index));
-        }
+        self.existing_edges.remove(&(start_index, end_index));
 
         // TODO: Needs some cleanup of the object map at some point.
         Ok(())
@@ -1719,6 +1838,10 @@ impl EdgeRouter {
             RoutingConfig,
         )>,
     ) -> PyResult<EdgeRoutingsResult> {
+        if edges.is_empty() {
+            return Ok(EdgeRoutingsResult::new(Vec::new()));
+        }
+
         let max_iterations = 10;
         let trace_path = std::env::var("NETEXT_ROUTING_TRACE_JSON").ok();
         let trace_enabled = trace_path.is_some();
@@ -1922,8 +2045,21 @@ impl EdgeRouter {
             }
         }
 
-        let mut directed_paths: Vec<Vec<DirectedPoint>> = Vec::new();
-        for (_, path_with_endpoints) in result_paths.iter() {
+        let mut directed_paths: Vec<Vec<DirectedPoint>> = Vec::with_capacity(edges.len());
+        for (_u, _v, start, end, _config) in edges.iter() {
+            let Some(start_raw_point) = raw_area.point_to_raw_point(&start.as_point()) else {
+                directed_paths.push(Vec::new());
+                continue;
+            };
+            let Some(end_raw_point) = raw_area.point_to_raw_point(&end.as_point()) else {
+                directed_paths.push(Vec::new());
+                continue;
+            };
+            let key = (start_raw_point, end_raw_point);
+            let Some(path_with_endpoints) = result_paths.get(&key) else {
+                directed_paths.push(Vec::new());
+                continue;
+            };
             directed_paths.push(path_with_endpoints.to_directed_points());
         }
 
@@ -1960,7 +2096,7 @@ impl EdgeRouter {
     }
 
     fn route_edge(
-        &self,
+        &mut self,
         u: &Bound<'_, PyAny>,
         v: &Bound<'_, PyAny>,
         start: DirectedPoint,
@@ -1969,7 +2105,10 @@ impl EdgeRouter {
         global_end: DirectedPoint,
         config: RoutingConfig,
     ) -> PyResult<EdgeRoutingResult> {
-        let result_path = Vec::new();
+        // Call route edges with a single edge
+        let edges = vec![(u.clone(), v.clone(), start, end, config)];
+        let routed = self.route_edges(edges)?;
+        let result_path = routed.paths.into_iter().next().unwrap_or_default();
         Ok(EdgeRoutingResult::new(result_path))
     }
 }
