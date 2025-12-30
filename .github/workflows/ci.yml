@@ -49,7 +49,7 @@ jobs:
           RUST_BACKTRACE: 1
           RUSTFLAGS: '-C instrument-coverage'
 
-      - run: pixi run -e py313-testing python -m pip freeze
+      - run: pixi t -e py313-testing
 
       - run: pixi run -e py313-testing coverage run -m pytest
 
@@ -98,7 +98,7 @@ jobs:
       - name: install deps
         run: pixi install -e ${{ matrix.pixi-env }}
 
-      - run: pixi run -e ${{ matrix.pixi-env }} python -m pip freeze
+      - run: pixi t -e ${{ matrix.pixi-env }}
 
       - run: pixi run -e ${{ matrix.pixi-env }} pytest tests
 
@@ -135,7 +135,7 @@ jobs:
       - name: install deps
         run: pixi install -e py313-testing
 
-      - run: pixi run -e py313-testing python -m pip freeze
+      - run: pixi t -e py313-testing
 
       - run: pixi run -e py313-testing pytest
         if: matrix.os != 'windows'
@@ -185,7 +185,7 @@ jobs:
           pixi run -e py313-testing maturin develop
 
 
-      - run: pixi run -e py313-testing python -m pip freeze
+      - run: pixi t -e py313-testing
       - run: pixi run -e py313-testing pytest
 
   lint:
@@ -212,7 +212,7 @@ jobs:
           pixi install -e linting
           rm -f netext/*.so
           pixi run -e linting maturin develop
-          pixi run -e linting python -m pip freeze
+          pitrun -e linting
 
       - run: pixi run -e linting ruff check
       - run: pixi run -e linting ruff format --check
