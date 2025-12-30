@@ -62,3 +62,8 @@ py311-testing = { features = ["py311", "testing"] }
 py312-testing = { features = ["py312", "testing"] }
 py313-testing = { features = ["py313", "testing"] }
 py313-benchmark = { features = ["py313", "testing", "benchmark"] }
+
+[tasks]
+# Runs Rust tests with the active Pixi env's Python, and sets loader paths so
+# macOS can resolve `libpythonX.Y.dylib` when PyO3 links the test binary.
+cargo-test = { cmd = "bash cargo-test.sh" }
