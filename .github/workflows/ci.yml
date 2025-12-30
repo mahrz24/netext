@@ -323,7 +323,7 @@ jobs:
       - name: set up python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: '3.10'
           architecture: ${{ matrix.python-architecture || 'x64' }}
 
       - run: pip install -U twine 'ruff==0.9.1' typing_extensions
@@ -333,7 +333,7 @@ jobs:
         with:
           target: ${{ matrix.target }}
           manylinux: ${{ matrix.manylinux }}
-          args: --release --out dist --interpreter ${{ matrix.interpreter || '3.10 3.11 3.12 3.13' }}
+          args: --release --out dist --interpreter ${{ matrix.os == 'windows' && 'python' || (matrix.interpreter || '3.10 3.11 3.12 3.13') }}
           rust-toolchain: stable
           docker-options: -e CI
 
@@ -387,7 +387,7 @@ jobs:
       fail-fast: false
       matrix:
         target: [aarch64, armv7, s390x, ppc64le]
-        distro: ['ubuntu22.04']
+        distro: ['ubuntu24.04']
         include:
           - target: aarch64
             distro: alpine_latest
