@@ -1,0 +1,67 @@
+[project]
+name = "netext"
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64", "osx-64", "win-64"]
+
+[dependencies]
+python = ">=3.10"
+
+[build-dependencies]
+maturin = ">=1,<2"
+
+[host-dependencies]
+pip = "*"
+
+[pypi-dependencies]
+netext = { path = ".", editable = true }
+
+[feature.testing.pypi-dependencies]
+pytest = ">=8.0.0"
+syrupy = ">=4.0.1"
+jinja2 = ">=3.1.2"
+"pytest-cov" = ">=3.0.0"
+coverage = { version = ">=6.4.2", extras = ["toml"] }
+pyright = ">=1.1.391"
+"pytest-asyncio" = ">=0.21.1"
+"importlib-metadata" = ">=8.5.0"
+"pytest-benchmark" = ">=3.4.1"
+textual = ">=1"
+
+[feature.benchmark.pypi-dependencies]
+"pytest-codspeed" = ">=2"
+
+[feature.docs.pypi-dependencies]
+mkdocs = ">=1.6.1"
+mkdocstrings = { version = ">=0.20.0", extras = ["python"] }
+mkdocs-material = ">=9.0.5"
+ruff = ">=0.9.1"
+
+[feature.linting.pypi-dependencies]
+pyright = ">=1.1.391"
+ruff = ">=0.9.1"
+maturin = ">=1,<2"
+
+[feature.py310.dependencies]
+python = "3.10.*"
+
+[feature.py311.dependencies]
+python = "3.11.*"
+
+[feature.py312.dependencies]
+python = "3.12.*"
+
+[feature.py313.dependencies]
+python = "3.13.*"
+
+[environments]
+default = { features = ["py310"] }
+testing = { features = ["py310", "testing"] }
+docs = { features = ["py310", "docs"] }
+linting = { features = ["py310", "linting"] }
+benchmark = { features = ["py310", "testing", "benchmark"] }
+
+py310-testing = { features = ["py310", "testing"] }
+py311-testing = { features = ["py311", "testing"] }
+py312-testing = { features = ["py312", "testing"] }
+py313-testing = { features = ["py313", "testing"] }
+py313-benchmark = { features = ["py313", "testing", "benchmark"] }

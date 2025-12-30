@@ -19,34 +19,6 @@ netext-debug = "netext.cli.routing_debugger:main"
 "Source code" = "https://github.com/mahrz24/netext"
 Documentation = "https://mahrz24.github.io/netext/"
 
-[dependency-groups]
-testing = [
-    "maturin>=1,<2",
-    "pytest>=8.0.0",
-    "syrupy>=4.0.1",
-    "jinja2>=3.1.2",
-    "pytest-cov>=3.0.0",
-    "coverage[toml]>=6.4.2",
-    "pyright>=1.1.391",
-    "pytest-asyncio>=0.21.1",
-    "importlib-metadata>=8.5.0",
-    "pytest-benchmark>=3.4.1",
-]
-benchmark = [
-    "pytest-codspeed>=2",
-]
-docs = [
-    "mkdocs>=1.6.1",
-    "mkdocstrings[python]>=0.20.0",
-    "mkdocs-material>=9.0.5",
-    "ruff>=0.9.1",
-]
-linting = [
-    "pyright>=1.1.391",
-    "ruff>=0.9.1",
-    "maturin>=1,<2",
-]
-
 [build-system]
 requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"

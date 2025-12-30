@@ -26,10 +26,6 @@ pub(crate) struct RawPoint(pub u32);
 
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
-pub(crate) struct RawSegment(pub u32);
-
-#[repr(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Debug)]
 pub(crate) struct GridPoint(pub u32);
 
 impl<T> Index<GridPoint> for Vec<T> {
