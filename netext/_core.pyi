@@ -62,7 +62,6 @@ class RoutingTrace:
         self,
     ) -> None: ...
 
-
 class EdgeRoutingResult:
     path: list[DirectedPoint]
     trace: Optional[RoutingTrace]
@@ -103,7 +102,6 @@ class RoutingConfig:
         neighborhood: Neighborhood,
     ) -> None: ...
 
-
 class Direction(Enum):
     CENTER = -1
     UP = 0
@@ -126,7 +124,6 @@ class LayoutEngine:
     layout_direction: LayoutDirection
 
     def layout(self, graph: CoreGraph) -> Iterable[tuple[Hashable, Point]]: ...
-
 
 class SugiyamaLayout(LayoutEngine):
     def __init__(self, direction: LayoutDirection) -> None: ...

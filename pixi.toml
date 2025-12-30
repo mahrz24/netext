@@ -31,6 +31,7 @@ mkdocs = ">=1.6.1"
 mkdocstrings = { version = ">=0.20.0", extras = ["python"] }
 mkdocs-material = ">=9.0.5"
 ruff = ">=0.9.1"
+textual = ">=1"
 
 [feature.linting.pypi-dependencies]
 pyright = ">=1.1.391"

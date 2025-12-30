@@ -24,7 +24,7 @@ edge_colors = []
 for i in range(num_edges):
     hue = i / num_edges
     r, g, b = colorsys.hsv_to_rgb(hue, 1, 1)
-    edge_colors.append(f"#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}")
+    edge_colors.append(f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}")
 
 for idx, (u, v) in enumerate(G.edges()):
     G[u][v]["$style"] = Style(color=edge_colors[idx])

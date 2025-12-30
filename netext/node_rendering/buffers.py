@@ -234,22 +234,20 @@ class NodeBuffer(ShapeBuffer):
                     # Also should be moved to the shape
 
                     edges_to_distribute = ports_on_side + edges_on_side
-                    slot_fraction = float(ports_on_side + edge_index) / (edges_to_distribute-1)
+                    slot_fraction = float(ports_on_side + edge_index) / (edges_to_distribute - 1)
 
                     if side == ShapeSide.TOP or side == ShapeSide.BOTTOM:
                         available_width = self.width - 2
                         remainder = available_width % edges_to_distribute
                         remaining_width = available_width - remainder - 1
-                        edge_offset = math.floor(
-                            (slot_fraction * remaining_width)) - (remaining_width // 2)
+                        edge_offset = math.floor((slot_fraction * remaining_width)) - (remaining_width // 2)
                         if side == ShapeSide.TOP:
                             edge_offset -= 1
                     else:
                         available_height = self.height - 2
                         remainder = available_height % edges_to_distribute
                         remaining_height = available_height - remainder - 1
-                        edge_offset = math.floor(
-                            (slot_fraction * remaining_height)) - (remaining_height // 2)
+                        edge_offset = math.floor((slot_fraction * remaining_height)) - (remaining_height // 2)
                         if side == ShapeSide.LEFT:
                             edge_offset -= 1
 

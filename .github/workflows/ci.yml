@@ -15,7 +15,7 @@ env:
 
 jobs:
   coverage:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -143,7 +143,7 @@ jobs:
       - run: pixi run -e py313-testing pytest --ignore=tests/snapshot_tests
         if: matrix.os == 'windows'
 
-      - run: cargo test
+      - run: pixi run -e py313-testing cargo test
 
       - uses: actions/upload-artifact@v4
         if: failure()
@@ -212,7 +212,6 @@ jobs:
           pixi install -e linting
           rm -f netext/*.so
           pixi run -e linting maturin develop
-          pitrun -e linting
 
       - run: pixi run -e linting ruff check
       - run: pixi run -e linting ruff format --check

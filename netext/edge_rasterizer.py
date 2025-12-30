@@ -139,7 +139,6 @@ def rasterize_edge(
         console, u_buffer, v_buffer, properties, edge_input, edge_path
     )
 
-
     if boundary_1 == boundary_2:
         return None
 

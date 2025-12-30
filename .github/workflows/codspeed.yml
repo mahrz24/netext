@@ -48,7 +48,7 @@ jobs:
           RUST_BACKTRACE: 1
           RUSTFLAGS: '-C instrument-coverage'
 
-      - run: pixi run -e py313-benchmark python -m pip freeze
+      - run: pixi t -e py313-benchmark
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v3
