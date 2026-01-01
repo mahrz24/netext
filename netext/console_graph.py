@@ -318,6 +318,8 @@ class ConsoleGraph:
             )
             self.node_buffers[node].center = position_view_space
 
+            self._register_node_with_router(node, self.node_buffers[node])
+
             self._render_port_buffer_for_node(node)
         else:
             self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_FOR_LAYOUT)
@@ -539,14 +541,7 @@ class ConsoleGraph:
         self.node_buffers[node].center = position_view_space
         self._core_graph.update_node_data(node, dict(data, **{"$properties": properties}))
 
-        node_buffer = self.node_buffers[node]
-        placed_node = core.PlacedRectangularNode(
-            center=core.Point(node_buffer.center.x, node_buffer.center.y),
-            node=core.RectangularNode(
-                size=core.Size(node_buffer.width, node_buffer.height),
-            ),
-        )
-        self._edge_router.add_node(node, placed_node)
+        self._register_node_with_router(node, self.node_buffers[node])
 
         for v in self._core_graph.neighbors(node):
             if (node, v) in self.edge_buffers:
@@ -657,6 +652,7 @@ class ConsoleGraph:
             edge_buffer, label_nodes = result
         if edge_buffer is not None:
             self.edge_buffers[(u, v)] = edge_buffer
+            self._register_edge_with_router(u, v, edge_buffer)
         if label_nodes is not None:
             self.edge_label_buffers[(u, v)] = label_nodes
 
@@ -852,14 +848,7 @@ class ConsoleGraph:
             node_buffer.center = position_view_space
             self.node_buffers[node] = node_buffer
 
-            # Pass on the exact node positions to the edge router
-            placed_node = core.PlacedRectangularNode(
-                center=core.Point(node_buffer.center.x, node_buffer.center.y),
-                node=core.RectangularNode(
-                    size=core.Size(node_buffer.width, node_buffer.height),
-                ),
-            )
-            self._edge_router.add_node(node, placed_node)
+            self._register_node_with_router(node, node_buffer)
 
             node_buffer.determine_edge_positions()
 
@@ -899,6 +888,7 @@ class ConsoleGraph:
 
         for (u, v), edge_buffer in edge_buffers.items():
             self.edge_buffers[(u, v)] = edge_buffer
+            self._register_edge_with_router(u, v, edge_buffer)
 
         for (u, v), label_nodes in label_buffers.items():
             self.edge_label_buffers[(u, v)] = label_nodes
@@ -920,6 +910,21 @@ class ConsoleGraph:
         self.port_buffers[node] = node_buffer.get_port_buffers(
             self.console,
         )
+
+    def _register_node_with_router(self, node: Hashable, node_buffer: NodeBuffer) -> None:
+        placed_node = core.PlacedRectangularNode(
+            center=core.Point(node_buffer.center.x, node_buffer.center.y),
+            node=core.RectangularNode(
+                size=core.Size(node_buffer.width, node_buffer.height),
+            ),
+        )
+        self._edge_router.add_node(node, placed_node)
+
+    def _register_edge_with_router(self, u: Hashable, v: Hashable, edge_buffer: EdgeBuffer) -> None:
+        if edge_buffer.path is None:
+            return
+        line = [directed_point.point for directed_point in edge_buffer.path.directed_points]
+        self._edge_router.add_edge(u, v, line)
 
     def _all_buffers(self) -> Iterable[StripBuffer]:
         self._require(RenderState.EDGES_RENDERED)
