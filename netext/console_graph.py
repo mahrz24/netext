@@ -375,6 +375,7 @@ class ConsoleGraph:
 
         if edge_buffer is not None:
             self.edge_buffers[(u, v)] = edge_buffer
+            self._register_edge_with_router(u, v, edge_buffer)
         if label_nodes is not None:
             self.edge_label_buffers[(u, v)] = label_nodes
 

@@ -19,7 +19,7 @@ use super::ripup::{
 };
 use super::route_single::route_single_edge;
 use super::trace::{build_trace_layout_data, record_iteration_trace};
-use super::types::{EdgeRoutingResult, EdgeRoutingsResult, RoutingConfig};
+use super::types::{EdgeRoutingResult, EdgeRoutingsResult, Path, RoutingConfig};
 
 impl RTreeObject for PlacedRectangularNode {
     type Envelope = rstar::AABB<Point>;
@@ -166,6 +166,17 @@ impl EdgeRouter {
 
         let mut raw_history_cost_prefix_x = vec![0.0; ((raw_area.width()) * raw_area.height()) as usize];
         let mut raw_history_cost_prefix_y = vec![0.0; (raw_area.width() * (raw_area.height())) as usize];
+
+        // Initialize usage with any edges that are already registered with the router.
+        for path in self.existing_edges.values() {
+            let path = Path::new(path.clone());
+            for segment_index in path.segments(&raw_area) {
+                raw_usage[segment_index] += 1;
+            }
+            for corner_index in path.corners(&raw_area) {
+                raw_corner_usage[corner_index] += 1;
+            }
+        }
 
         let mut result_paths: HashMap<(RawPoint, RawPoint), super::types::PathWithEndpoints> = HashMap::new();
 
