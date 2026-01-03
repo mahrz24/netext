@@ -111,9 +111,17 @@ impl SugiyamaLayout {
         layers: &Vec<Vec<usize>>,
         graph: &CoreGraph,
     ) -> HashMap<usize, Point> {
+        let layer_index_map = Self::layer_index_map(layers);
+        let layer_edge_loads =
+            Self::layer_edge_loads(&graph.graph, &layer_index_map, layers.len());
+        let node_edge_loads = Self::node_edge_loads(&graph.graph, &layer_index_map);
+        let global_edge_factor = (graph.graph.edge_count() as f32 + 1.0).ln();
+
         let mut positions = HashMap::new();
         let mut max_width = 0.0;
         let mut layer_widths = HashMap::new();
+
+        let mut current_y = 0.0;
 
         for (layer_index, layer) in layers.iter().enumerate() {
             let node_sizes: Vec<Option<&Size>> = layer
@@ -128,21 +136,51 @@ impl SugiyamaLayout {
                     self.direction,
                     size.unwrap_or(&Size::new(0, 0)),
                 ))
-            });
+            }) as f32;
 
-            let y = layer_index as f32 * (layer_height as f32 + 1.0);
+            let y = current_y;
             let mut x = 0.0;
+            let mut layer_end = 0.0;
 
-            for (&node, size) in layer.into_iter().zip(node_sizes) {
+            for (idx, (&node, size)) in layer.into_iter().zip(node_sizes).enumerate() {
                 positions.insert(node, (x, y));
-                x += width_in_direction(self.direction, size.unwrap_or(&Size::new(0, 0))) as f32;
+                let width = width_in_direction(self.direction, size.unwrap_or(&Size::new(0, 0)))
+                    as f32;
+                let x_end = x + width;
+                layer_end = x_end;
+
+                let next_gap = if idx + 1 < layer.len() {
+                    let next_node = layer[idx + 1];
+                    let load = (node_edge_loads.get(&node).cloned().unwrap_or(0.0)
+                        + node_edge_loads.get(&next_node).cloned().unwrap_or(0.0))
+                        / 2.0;
+
+                    1.0 + global_edge_factor * (load.sqrt()
+                        / (layer.len() as f32 + 1.0))
+                } else {
+                    0.0
+                };
+
+                x = x_end + next_gap;
             }
 
-            if x > max_width {
-                max_width = x;
+            if layer_end > max_width {
+                max_width = layer_end;
             }
 
-            layer_widths.insert(layer_index, x);
+            layer_widths.insert(layer_index, layer_end);
+
+            if layer_index + 1 < layers.len() {
+                let adjacent_load = layer_edge_loads
+                    .get(layer_index)
+                    .copied()
+                    .unwrap_or_default();
+                let normalization = (layer.len()
+                    + layers.get(layer_index + 1).map(|l| l.len()).unwrap_or(1)) as f32;
+                let vertical_spacing = 1.0 + global_edge_factor * (adjacent_load.sqrt() / normalization);
+
+                current_y += layer_height + vertical_spacing;
+            }
         }
 
         // Adjust nodes to center layers (TODO we should make sure to align the nodes to some kind of grid, not just center them)
@@ -162,6 +200,68 @@ impl SugiyamaLayout {
             .into_iter()
             .map(|(node, (x, y))| (node, Point::new(x as i32, y as i32)))
             .collect()
+    }
+
+    fn layer_index_map(layers: &Vec<Vec<usize>>) -> HashMap<usize, usize> {
+        layers
+            .iter()
+            .enumerate()
+            .flat_map(|(idx, layer)| layer.iter().map(move |node| (*node, idx)))
+            .collect()
+    }
+
+    fn layer_edge_loads(
+        graph: &DiGraphMap<NodeIndex, ()>,
+        layer_index_map: &HashMap<usize, usize>,
+        layer_count: usize,
+    ) -> Vec<f32> {
+        let mut loads = vec![0.0; layer_count.saturating_sub(1)];
+
+        for edge in graph.edge_references() {
+            let source = graph.to_index(edge.0);
+            let target = graph.to_index(edge.1);
+
+            if let (Some(&source_layer), Some(&target_layer)) =
+                (layer_index_map.get(&source), layer_index_map.get(&target))
+            {
+                let lower = source_layer.min(target_layer);
+                let upper = source_layer.max(target_layer);
+
+                if upper > lower && upper - lower == 1 {
+                    if let Some(value) = loads.get_mut(lower) {
+                        *value += 1.0;
+                    }
+                }
+            }
+        }
+
+        loads
+    }
+
+    fn node_edge_loads(
+        graph: &DiGraphMap<NodeIndex, ()>,
+        layer_index_map: &HashMap<usize, usize>,
+    ) -> HashMap<usize, f32> {
+        let mut loads = HashMap::new();
+
+        for edge in graph.edge_references() {
+            let source = graph.to_index(edge.0);
+            let target = graph.to_index(edge.1);
+
+            if let (Some(&source_layer), Some(&target_layer)) =
+                (layer_index_map.get(&source), layer_index_map.get(&target))
+            {
+                let lower = source_layer.min(target_layer);
+                let upper = source_layer.max(target_layer);
+
+                if upper > lower && upper - lower == 1 {
+                    *loads.entry(source).or_insert(0.0) += 1.0;
+                    *loads.entry(target).or_insert(0.0) += 1.0;
+                }
+            }
+        }
+
+        loads
     }
 
     fn barycenter_ordering(
