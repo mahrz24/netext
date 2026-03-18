@@ -69,6 +69,8 @@ cargo-test = { cmd = "bash cargo-test.sh" }
 
 [feature.testing.tasks]
 pytest = { cmd = "pytest tests/ -x" }
+test-snapshots = { cmd = "pytest tests/snapshot_tests" }
+update-snapshots = { cmd = "pytest tests/snapshot_tests --snapshot-update"}
 test = { depends-on = ["cargo-test", "pytest"] }
 typecheck = { cmd = "pyright" }
 lint = { cmd = "pyright && pytest tests/ -x" }
