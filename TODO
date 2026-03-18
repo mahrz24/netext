@@ -16,7 +16,7 @@
 
 # Architecture
 
-- [ ] Decompose `ConsoleGraph` (~977 lines, console_graph.py)
+- [X] Decompose `ConsoleGraph` (~977 lines, console_graph.py)
       This class is a god object handling: graph management, layout orchestration, zoom
       computation, edge routing coordination, buffer management, incremental updates,
       coordinate transforms, and Rich rendering. Should be split into focused components.
