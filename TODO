@@ -79,6 +79,69 @@
 - [ ] Add benchmark comparison to PRs
 - [ ] Strict typechecking
 
+# Performance
+
+## Rust
+
+- [ ] Force-directed layout: O(N²) repulsive force without spatial indexing (force_directed.rs:53-87)
+      Nested loop over all node pairs per iteration. For 1000 nodes × 50 iterations = ~50M
+      force calculations. Use quadtree/Barnes-Hut to reduce to O(N log N). Also, displacements
+      HashMap is reallocated every iteration (line 54) instead of being cleared and reused.
+
+- [ ] Sugiyama: linear search in barycenter ordering (sugiyama.rs:185)
+      `layers[i-1].iter().position(|&x| x == ...)` scans the previous layer for every neighbor
+      of every node. Build a position lookup HashMap before the inner loop for O(1) lookups.
+
+- [ ] Edge router: excessive cloning in routing loops (edge_router.rs:131-190)
+      `self.placed_nodes.values().cloned().collect()` clones all placed nodes into a new Vec
+      multiple times. `edges.clone()` at line 190 copies full edge list each rip-up iteration.
+      Pass references where possible.
+
+- [ ] Sugiyama: full DiGraphMap clone (sugiyama.rs:39)
+      `graph.graph.clone()` clones entire graph. Could borrow instead.
+
+- [ ] A* routing: no HashMap pre-allocation (astar.rs:74-76)
+      `g_score` and `came_from` HashMaps created without `with_capacity()`.
+
+- [ ] Geometry: `.pow(2)` instead of `x * x` in hot path (geometry.rs:285-305)
+
+- [ ] Routing types: getter clones full Vec on every access (types.rs:45-46, 64-66)
+
+## Python
+
+- [ ] Buffer renderer: sort on every insertion (buffer_renderer.py:34)
+      `sorted(buffers_by_row[...] + [buffer])` re-sorts on every buffer added.
+      Use `bisect.insort` or collect-then-sort.
+
+- [ ] Node density: O(N²) in Python (console_graph.py:729-755)
+      For each node, iterates through all other nodes. Push to Rust or use spatial bucketing.
+
+- [ ] Four passes for min/max positions (console_graph.py:791-794)
+      Four separate iterations over `node_positions.values()` for min/max x/y.
+      Compute all four in a single pass.
+
+- [ ] Path rasterizer: O(N) list membership check (edge_rendering/path_rasterizer.py:177)
+      `if point.x not in y_to_x[point.y]` where `y_to_x[y]` is a list. Use a set.
+
+- [ ] Port padding: repeated port filtering (node_rasterizer.py:41-116)
+      Four nearly-identical list comprehensions each with nested filters over ports by magnet
+      side. Pre-group ports by side once.
+
+- [ ] EdgeProperties recreation in layout loop (console_graph.py:758-772)
+      `EdgeProperties.from_data_dict()` called for every edge during layout but properties
+      are stable. Cache them.
+
+- [ ] Missing `@cached_property` on edge bounds (edge_routing/edge.py:43-49)
+      `min_bound` and `max_bound` iterate `distinct_points` every access. Should be cached
+      like `distinct_points` already is.
+
+- [ ] Width recomputation from segments (node_rendering/buffers.py:43,95; shapes/box.py:44)
+      `sum(segment.cell_length ...)` recomputed per strip in multiple places. Compute once
+      during strip creation.
+
+- [ ] Sorted ports called twice (node_rendering/buffers.py:212,229)
+      Same `sorted()` on ports collection in sequential methods. Sort once and reuse.
+
 # Other
 
 - [ ] Remove hard-coded magic numbers

@@ -14,6 +14,7 @@ def console() -> Console:
     return Console()
 
 
+@pytest.mark.exact_rendering
 def test_trivial_edge(console: Console) -> None:
     node_buffer_u = rasterize_node(console, node="A", data=dict())
     node_buffer_v = rasterize_node(console, node="B", data=dict())

@@ -1,6 +1,10 @@
 from pathlib import Path
 
+import pytest
+
 EXAMPLES_DIR = Path("../../examples")
+
+pytestmark = pytest.mark.exact_rendering
 
 
 def test_minimal_example(snap_compare):
