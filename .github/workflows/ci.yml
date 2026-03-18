@@ -240,23 +240,6 @@ jobs:
         target: [x86_64, aarch64]
         manylinux: [auto]
         include:
-          # manylinux for various platforms
-          - os: linux
-            manylinux: auto
-            target: i686
-          - os: linux
-            manylinux: auto
-            target: aarch64
-          - os: linux
-            manylinux: auto
-            target: armv7
-          - os: linux
-            manylinux: auto
-            target: ppc64le
-          - os: linux
-            manylinux: auto
-            target: s390x
-
           # musllinux
           - os: linux
             manylinux: musllinux_1_1
@@ -264,24 +247,8 @@ jobs:
           - os: linux
             manylinux: musllinux_1_1
             target: aarch64
-          - os: linux
-            manylinux: musllinux_1_1
-            target: armv7
-
-          # macos
-          - os: macos
-            target: x86_64
-          - os: macos
-            target: aarch64
-
-          - os: windows
-            target: x86_64
-          - os: windows
-            target: i686
-            python-architecture: x86
 
         exclude:
-          # See above; disabled for now.
           - os: windows
             target: aarch64
 
@@ -296,9 +263,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-          architecture: ${{ matrix.python-architecture || 'x64' }}
-
-      - run: pip install -U 'ruff==0.9.1' typing_extensions
 
       - name: build wheels
         uses: PyO3/maturin-action@v1
@@ -356,7 +320,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [aarch64, armv7, s390x, ppc64le]
+        target: [aarch64]
         distro: ['ubuntu24.04']
         include:
           - target: aarch64
