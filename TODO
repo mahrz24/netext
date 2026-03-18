@@ -21,7 +21,7 @@
       computation, edge routing coordination, buffer management, incremental updates,
       coordinate transforms, and Rich rendering. Should be split into focused components.
 
-- [ ] Eliminate duplicated graph representation
+- [X] Eliminate duplicated graph representation
       Graph data is triple-bookkept: NetworkX → CoreGraph → EdgeRouter. The CoreGraph
       wraps DiGraphMap<NodeIndex, ()> with data in separate HashMaps, and EdgeRouter
       tracks edges again in existing_edges. This is fragile during mutations.
