@@ -29,4 +29,4 @@ for i in range(num_edges):
 for idx, (u, v) in enumerate(G.edges()):
     G[u][v]["$style"] = Style(color=edge_colors[idx])
 
-print(ConsoleGraph(G))
+print(ConsoleGraph.from_networkx(G))

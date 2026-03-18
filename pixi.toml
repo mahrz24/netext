@@ -21,6 +21,7 @@ coverage = { version = ">=6.4.2", extras = ["toml"] }
 "importlib-metadata" = ">=8.5.0"
 "pytest-benchmark" = ">=3.4.1"
 textual = ">=1"
+networkx = ">=3.0"
 
 [feature.benchmark.pypi-dependencies]
 "pytest-codspeed" = ">=2"

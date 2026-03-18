@@ -127,4 +127,4 @@ for routing, drawing in [
         },
     )
 
-    print(ConsoleGraph(g, layout_engine=StaticLayout()))
+    print(ConsoleGraph.from_networkx(g, layout_engine=StaticLayout()))

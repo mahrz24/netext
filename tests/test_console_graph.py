@@ -1,6 +1,5 @@
 import pytest
 from networkx import binomial_tree
-from networkx import DiGraph
 from rich.console import Console
 
 from netext import ConsoleGraph
@@ -19,7 +18,7 @@ def console():
 def test_render_binomial_tree(console):
     """Test rendering a binomial tree. Simple smoke test that no exceptions are raised."""
     graph = binomial_tree(4)
-    console_graph = ConsoleGraph(graph)
+    console_graph = ConsoleGraph.from_networkx(graph)
 
     with console.capture():
         console.print(console_graph)
@@ -28,8 +27,8 @@ def test_render_binomial_tree(console):
 @pytest.mark.parametrize("zoom", [AutoZoom.FIT, AutoZoom.FIT_PROPORTIONAL, 2, (2, 3)])
 def test_zoom(console, zoom: AutoZoom | float | tuple[float, float]):
     graph = binomial_tree(4)
-    expected_console_graph = ConsoleGraph(graph, zoom=zoom)
-    console_graph = ConsoleGraph(graph)
+    expected_console_graph = ConsoleGraph.from_networkx(graph, zoom=zoom)
+    console_graph = ConsoleGraph.from_networkx(graph)
     console_graph.zoom = zoom
 
     with console.capture() as capture:
@@ -46,7 +45,7 @@ def test_zoom(console, zoom: AutoZoom | float | tuple[float, float]):
 def test_get_viewport_when_set_previously():
     # Set up
     graph = binomial_tree(4)
-    console_graph = ConsoleGraph(graph)
+    console_graph = ConsoleGraph.from_networkx(graph)
     console_graph._viewport = Region(x=0, y=0, width=100, height=100)
 
     # Exercise
@@ -59,8 +58,8 @@ def test_get_viewport_when_set_previously():
 @pytest.mark.parametrize("viewport", [Region(x=0, y=0, width=100, height=100)])
 def test_viewport_renders_the_same_when_set_or_initialized(console, viewport: Region):
     graph = binomial_tree(4)
-    expected_console_graph = ConsoleGraph(graph, viewport=viewport)
-    console_graph = ConsoleGraph(graph)
+    expected_console_graph = ConsoleGraph.from_networkx(graph, viewport=viewport)
+    console_graph = ConsoleGraph.from_networkx(graph)
     console_graph.viewport = viewport
 
     with console.capture() as capture:
@@ -75,12 +74,13 @@ def test_viewport_renders_the_same_when_set_or_initialized(console, viewport: Re
 
 
 def test_render_graph_with_mutations_remove_and_add(console):
-    graph = DiGraph()
-    graph.add_node(1, **{"$x": 1, "$y": 1})
-    graph.add_node(2, **{"$x": 10, "$y": 1})
-    graph.add_edge(1, 2)
+    nodes = {
+        1: {"$x": 1, "$y": 1},
+        2: {"$x": 10, "$y": 1},
+    }
+    edges = [(1, 2)]
 
-    console_graph = ConsoleGraph(graph, layout_engine=StaticLayout())
+    console_graph = ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout())
 
     with console.capture() as capture:
         console.print(console_graph)
@@ -99,12 +99,13 @@ def test_render_graph_with_mutations_remove_and_add(console):
 
 
 def test_render_graph_with_mutations_update_positions(console):
-    graph = DiGraph()
-    graph.add_node(1, **{"$x": 1, "$y": 1})
-    graph.add_node(2, **{"$x": 10, "$y": 1})
-    graph.add_edge(1, 2)
+    nodes = {
+        1: {"$x": 1, "$y": 1},
+        2: {"$x": 10, "$y": 1},
+    }
+    edges = [(1, 2)]
 
-    console_graph = ConsoleGraph(graph, layout_engine=StaticLayout())
+    console_graph = ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout())
 
     with console.capture() as capture:
         console.print(console_graph)
@@ -116,12 +117,13 @@ def test_render_graph_with_mutations_update_positions(console):
         console.print(console_graph)
     mutated = capture.get()
 
-    graph = DiGraph()
-    graph.add_node(1, **{"$x": 1, "$y": 2})
-    graph.add_node(2, **{"$x": 10, "$y": 1})
-    graph.add_edge(1, 2)
+    expected_nodes = {
+        1: {"$x": 1, "$y": 2},
+        2: {"$x": 10, "$y": 1},
+    }
+    expected_edges = [(1, 2)]
 
-    expected_console_graph = ConsoleGraph(graph, layout_engine=StaticLayout())
+    expected_console_graph = ConsoleGraph(nodes=expected_nodes, edges=expected_edges, layout_engine=StaticLayout())
 
     with console.capture() as capture:
         console.print(expected_console_graph)
@@ -133,12 +135,13 @@ def test_render_graph_with_mutations_update_positions(console):
 
 @pytest.mark.parametrize("zoom", [AutoZoom.FIT, AutoZoom.FIT_PROPORTIONAL])
 def test_render_graph_with_mutations_update_positions_and_zoom(console, zoom: AutoZoom):
-    graph = DiGraph()
-    graph.add_node(1, **{"$x": 1, "$y": 1})
-    graph.add_node(2, **{"$x": 10, "$y": 1})
-    graph.add_edge(1, 2)
+    nodes = {
+        1: {"$x": 1, "$y": 1},
+        2: {"$x": 10, "$y": 1},
+    }
+    edges = [(1, 2)]
 
-    console_graph = ConsoleGraph(graph, layout_engine=StaticLayout(), zoom=zoom)
+    console_graph = ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout(), zoom=zoom)
 
     with console.capture() as capture:
         console.print(console_graph)
@@ -155,29 +158,23 @@ def test_render_graph_with_mutations_update_positions_and_zoom(console, zoom: Au
 
 
 def test_render_graph_with_mutations_update_positions_and_data(console):
-    graph = DiGraph()
-    graph.add_node(
-        1,
-        **{
+    nodes = {
+        1: {
             "$x": 1,
             "$y": 1,
             "label": "foo",
             "$content-renderer": lambda _, d, __: d["label"],
         },
-    )
-    graph.add_node(
-        2,
-        **{
+        2: {
             "$x": 10,
             "$y": 1,
             "label": "bar",
             "$content-renderer": lambda _, d, __: d["label"],
         },
-    )
+    }
+    edges = [(1, 2)]
 
-    graph.add_edge(1, 2)
-
-    console_graph = ConsoleGraph(graph, layout_engine=StaticLayout())
+    console_graph = ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout())
 
     with console.capture() as capture:
         console.print(console_graph)
@@ -189,28 +186,23 @@ def test_render_graph_with_mutations_update_positions_and_data(console):
         console.print(console_graph)
     mutated = capture.get()
 
-    graph = DiGraph()
-    graph.add_node(
-        1,
-        **{
+    expected_nodes = {
+        1: {
             "$x": 1,
             "$y": 2,
             "label": "bar",
             "$content-renderer": lambda _, d, __: d["label"],
         },
-    )
-    graph.add_node(
-        2,
-        **{
+        2: {
             "$x": 10,
             "$y": 1,
             "label": "bar",
             "$content-renderer": lambda _, d, __: d["label"],
         },
-    )
-    graph.add_edge(1, 2)
+    }
+    expected_edges = [(1, 2)]
 
-    expected_console_graph = ConsoleGraph(graph, layout_engine=StaticLayout())
+    expected_console_graph = ConsoleGraph(nodes=expected_nodes, edges=expected_edges, layout_engine=StaticLayout())
 
     with console.capture() as capture:
         console.print(expected_console_graph)

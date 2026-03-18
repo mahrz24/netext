@@ -22,5 +22,5 @@ def test_graph_performance_small_binomial_tree(n, benchmark):
 
     @benchmark
     def _benchmark():
-        cg = ConsoleGraph(graph)
+        cg = ConsoleGraph.from_networkx(graph)
         console.print(cg)

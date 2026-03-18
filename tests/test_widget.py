@@ -1,21 +1,23 @@
+from typing import Any, Hashable
 from textual.app import App, ComposeResult
 from netext.geometry.point import FloatPoint
 from netext.textual_widget.widget import GraphView
 
-import networkx as nx
 import pytest
 
 
 class DummyApp(App):
     def __init__(self, *args, **kwargs):
-        self._graph = kwargs.pop("graph")
+        self._graph_nodes: dict[Hashable, dict[str, Any]] = kwargs.pop("nodes")
+        self._graph_edges = kwargs.pop("edges")
         self._scroll_via_viewport = kwargs.pop("scroll_via_viewport", False)
         self.clicked = 0
         super().__init__(*args, **kwargs)
 
     def compose(self) -> ComposeResult:
         yield GraphView(
-            self._graph,
+            nodes=self._graph_nodes,
+            edges=self._graph_edges,
             zoom=1,
             scroll_via_viewport=self._scroll_via_viewport,
             id="graph",
@@ -27,24 +29,26 @@ class DummyApp(App):
 
 @pytest.mark.asyncio
 async def test_minimal_app():
-    graph = nx.DiGraph()
-    graph.add_node(1, **{"$x": 1, "$y": 1})
-    graph.add_node(2, **{"$x": 10, "$y": 1})
-    graph.add_edge(1, 2)
+    nodes = {
+        1: {"$x": 1, "$y": 1},
+        2: {"$x": 10, "$y": 1},
+    }
+    edges = [(1, 2)]
 
-    app = DummyApp(graph=graph)
+    app = DummyApp(nodes=nodes, edges=edges)
     async with app.run_test():
         assert True
 
 
 @pytest.mark.asyncio
 async def test_add_remove_app():
-    graph = nx.DiGraph()
-    graph.add_node(1, **{"$x": 1, "$y": 1})
-    graph.add_node(2, **{"$x": 10, "$y": 1})
-    graph.add_edge(1, 2)
+    nodes = {
+        1: {"$x": 1, "$y": 1},
+        2: {"$x": 10, "$y": 1},
+    }
+    edges = [(1, 2)]
 
-    app = DummyApp(graph=graph)
+    app = DummyApp(nodes=nodes, edges=edges)
     async with app.run_test() as _:
         app.query_one(GraphView).add_node(3, position=FloatPoint(10, 1))
         assert len(app.query_one(GraphView)._console_graph._core_graph.all_nodes()) == 3
@@ -55,12 +59,13 @@ async def test_add_remove_app():
 
 @pytest.mark.asyncio
 async def test_click_event():
-    graph = nx.DiGraph()
-    graph.add_node(1, **{"$x": 1, "$y": 1})
-    graph.add_node(2, **{"$x": 10, "$y": 1})
-    graph.add_edge(1, 2)
+    nodes = {
+        1: {"$x": 1, "$y": 1},
+        2: {"$x": 10, "$y": 1},
+    }
+    edges = [(1, 2)]
 
-    app = DummyApp(graph=graph)
+    app = DummyApp(nodes=nodes, edges=edges)
     async with app.run_test() as pilot:
         app.query_one(GraphView).add_node(3, position=FloatPoint(10, 1))
         assert len(app.query_one(GraphView)._console_graph._core_graph.all_nodes()) == 3
