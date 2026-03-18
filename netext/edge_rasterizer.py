@@ -31,7 +31,7 @@ class EdgeRoutingRequest:
 
 def rasterize_edges(
     console: Console,
-    edge_router: core.EdgeRouter,
+    core_graph: core.CoreGraph,
     edge_route_requests: list[EdgeRoutingRequest],
     layout_direction: core.LayoutDirection | None = None,
 ) -> tuple[
@@ -61,7 +61,7 @@ def rasterize_edges(
         edge_inputs.append(edge_input)
         edge_anchors.append((request.u, request.v, start, end, request.properties.routing_mode))
 
-    edge_paths = route_edges(edge_router, edge_anchors)
+    edge_paths = route_edges(core_graph, edge_anchors)
 
     edge_buffers = dict()
     label_buffers = dict()
@@ -96,7 +96,7 @@ def rasterize_edges(
 
 def rasterize_edge(
     console: Console,
-    edge_router: core.EdgeRouter,
+    core_graph: core.CoreGraph,
     u_buffer: NodeBuffer,
     v_buffer: NodeBuffer,
     properties: EdgeProperties,
@@ -128,7 +128,7 @@ def rasterize_edge(
         v_buffer.node,
         start=start,
         end=end,
-        edge_router=edge_router,
+        core_graph=core_graph,
         edge_routing_mode=properties.routing_mode,
     )
 

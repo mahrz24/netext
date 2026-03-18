@@ -217,7 +217,6 @@ def render_node_buffers_at_zoom(
     zoom_x: float,
     zoom_y: float,
     zoom_factor: float,
-    edge_router: core.EdgeRouter,
 ) -> dict[Hashable, NodeBuffer]:
     """Rasterize all nodes at the current zoom/LOD and register with edge router."""
     node_buffers: dict[Hashable, NodeBuffer] = {}
@@ -240,7 +239,7 @@ def render_node_buffers_at_zoom(
         node_buffer.center = position_view_space
         node_buffers[node] = node_buffer
 
-        register_node_with_router(edge_router, node, node_buffer)
+        register_node_with_router(core_graph, node, node_buffer)
 
         node_buffer.determine_edge_positions()
 
@@ -251,14 +250,13 @@ def render_all_edges(
     console: Console,
     core_graph: core.CoreGraph,
     node_buffers: dict[Hashable, NodeBuffer],
-    edge_router: core.EdgeRouter,
     zoom_factor: float,
     layout_direction: core.LayoutDirection,
 ) -> tuple[
     dict[tuple[Hashable, Hashable], EdgeBuffer],
     dict[tuple[Hashable, Hashable], list[StripBuffer]],
 ]:
-    """Rasterize all edges and register them with the edge router.
+    """Rasterize all edges and register them with the embedded edge router.
 
     Returns (edge_buffers, edge_label_buffers).
     """
@@ -282,7 +280,7 @@ def render_all_edges(
 
     edge_buffers_result, label_buffers_result = rasterize_edges(
         console,
-        edge_router,
+        core_graph,
         edge_routing_requests,
         layout_direction=layout_direction,
     )
@@ -292,7 +290,7 @@ def render_all_edges(
 
     for (u, v), edge_buffer in edge_buffers_result.items():
         edge_buffers[(u, v)] = edge_buffer
-        register_edge_with_router(edge_router, u, v, edge_buffer)
+        register_edge_with_router(core_graph, u, v, edge_buffer)
 
     for (u, v), label_nodes in label_buffers_result.items():
         edge_label_buffers[(u, v)] = label_nodes
@@ -301,28 +299,28 @@ def render_all_edges(
 
 
 def register_node_with_router(
-    edge_router: core.EdgeRouter,
+    core_graph: core.CoreGraph,
     node: Hashable,
     node_buffer: NodeBuffer,
 ) -> None:
-    """Register a node's bounding box with the edge router."""
+    """Register a node's bounding box with the embedded edge router."""
     placed_node = core.PlacedRectangularNode(
         center=core.Point(node_buffer.center.x, node_buffer.center.y),
         node=core.RectangularNode(
             size=core.Size(node_buffer.width, node_buffer.height),
         ),
     )
-    edge_router.add_node(node, placed_node)
+    core_graph.router_add_node(node, placed_node)
 
 
 def register_edge_with_router(
-    edge_router: core.EdgeRouter,
+    core_graph: core.CoreGraph,
     u: Hashable,
     v: Hashable,
     edge_buffer: EdgeBuffer,
 ) -> None:
-    """Register an edge's path with the edge router."""
+    """Register an edge's path with the embedded edge router."""
     if edge_buffer.path is None:
         return
     line = [directed_point.point for directed_point in edge_buffer.path.directed_points]
-    edge_router.add_edge(u, v, line)
+    core_graph.router_add_edge(u, v, line)

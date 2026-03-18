@@ -22,11 +22,12 @@ def test_trivial_edge(console: Console) -> None:
     node_buffer_u.center = Point(1, 1)
     node_buffer_v.center = Point(9, 9)
 
-    edge_router = core.EdgeRouter()
+    core_graph = core.CoreGraph()
+    core_graph.init_router()
 
     result = rasterize_edge(
         console,
-        edge_router,
+        core_graph,
         node_buffer_u,
         node_buffer_v,
         properties=EdgeProperties(),

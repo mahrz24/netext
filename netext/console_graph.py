@@ -154,7 +154,6 @@ class ConsoleGraph:
         self._max_height = max_height
 
         self._layout_engine = layout_engine
-        self._edge_router = core.EdgeRouter()
 
         edge_list: list[tuple[Hashable, Hashable]] = []
         edge_data_list: list[tuple[Hashable, Hashable, dict[str, Any]]] = []
@@ -170,6 +169,7 @@ class ConsoleGraph:
                     edge_data_list.append((item_tuple[0], item_tuple[1], {}))
 
         self._core_graph = core.CoreGraph.from_edges(edge_list)
+        self._core_graph.init_router()
 
         if nodes is not None:
             for node, data in nodes.items():
@@ -339,7 +339,7 @@ class ConsoleGraph:
                 return
 
             self.node_buffers[node].center = compute_node_view_position(node_position, self.zoom_x, self.zoom_y)
-            register_node_with_router(self._edge_router, node, self.node_buffers[node])
+            register_node_with_router(self._core_graph, node, self.node_buffers[node])
             self._render_port_buffer_for_node(node)
         else:
             self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_FOR_LAYOUT)
@@ -376,7 +376,7 @@ class ConsoleGraph:
         self._core_graph.add_edge(u, v, dict(data, **{"$properties": properties}))
 
         rasterize_and_store_edge(
-            self.console, self._edge_router, u, v,
+            self.console, self._core_graph, u, v,
             self.node_buffers, self.edge_buffers, self.edge_label_buffers,
             properties, self._zoom_factor, len(self.edge_buffers),
             self._layout_engine.layout_direction,
@@ -408,7 +408,7 @@ class ConsoleGraph:
 
         self.port_buffers.pop(node, None)
         self._core_graph.remove_node(node)
-        self._edge_router.remove_node(node)
+        self._core_graph.router_remove_node(node)
 
     def remove_edge(self, u: Hashable, v: Hashable) -> None:
         """Removes an edge from the graph.
@@ -426,7 +426,7 @@ class ConsoleGraph:
         self.node_buffers[u].disconnect(v)
 
         self._core_graph.remove_edge(u, v)
-        self._edge_router.remove_edge(u, v)
+        self._core_graph.router_remove_edge(u, v)
 
         self.edge_buffers.pop((u, v))
         self.edge_label_buffers.pop((u, v))
@@ -497,7 +497,7 @@ class ConsoleGraph:
 
         force_edge_rerender = force_edge_rerender or (position is not None) or "$ports" in data
 
-        self._edge_router.remove_node(node)
+        self._core_graph.router_remove_node(node)
 
         if position is None:
             node_position = self.node_positions[node]
@@ -524,11 +524,11 @@ class ConsoleGraph:
         self.node_buffers[node].center = compute_node_view_position(node_position, self.zoom_x, self.zoom_y)
         self._core_graph.update_node_data(node, dict(data, **{"$properties": properties}))
 
-        register_node_with_router(self._edge_router, node, self.node_buffers[node])
+        register_node_with_router(self._core_graph, node, self.node_buffers[node])
 
         if force_edge_rerender:
             rerender_connected_edges(
-                self.console, self._core_graph, self._edge_router, node,
+                self.console, self._core_graph, node,
                 self.node_buffers, self.edge_buffers, self.edge_label_buffers,
                 self._zoom_factor, self._layout_engine.layout_direction,
                 self.port_buffers, self._render_port_buffer_for_node,
@@ -601,12 +601,12 @@ class ConsoleGraph:
         self._core_graph.update_edge_data(u, v, dict(data, **{"$properties": properties}))
 
         old_z_index = remove_existing_edge_buffers(
-            self._edge_router, u, v, self.node_buffers,
+            self._core_graph, u, v, self.node_buffers,
             self.edge_buffers, self.edge_label_buffers,
         )
 
         rasterize_and_store_edge(
-            self.console, self._edge_router, u, v,
+            self.console, self._core_graph, u, v,
             self.node_buffers, self.edge_buffers, self.edge_label_buffers,
             properties, self._zoom_factor, old_z_index,
             self._layout_engine.layout_direction,
@@ -627,7 +627,7 @@ class ConsoleGraph:
         )
 
     def _transition_compute_zoomed_positions(self) -> None:
-        self._edge_router = core.EdgeRouter()
+        self._core_graph.init_router()
         zoom_x, zoom_y = self._compute_current_zoom()
         self.zoom_x = zoom_x
         self.zoom_y = zoom_y
@@ -646,7 +646,7 @@ class ConsoleGraph:
         self.node_buffers = render_node_buffers_at_zoom(
             self.console, self._core_graph, self.node_positions,
             self.node_buffers_for_layout, self.zoom_x, self.zoom_y,
-            self._zoom_factor, self._edge_router,
+            self._zoom_factor,
         )
 
     def _transition_render_edges(self) -> None:
@@ -655,7 +655,7 @@ class ConsoleGraph:
 
         self.edge_buffers, self.edge_label_buffers = render_all_edges(
             self.console, self._core_graph, self.node_buffers,
-            self._edge_router, self._zoom_factor, self._layout_engine.layout_direction,
+            self._zoom_factor, self._layout_engine.layout_direction,
         )
 
         for node in self._core_graph.all_nodes():
