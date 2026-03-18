@@ -45,6 +45,23 @@ from rich.traceback import install
 install(show_locals=False)
 
 
+def _parse_edges(
+    edges: Iterable[tuple[Hashable, Hashable]] | Iterable[tuple[Hashable, Hashable, dict[str, Any]]] | None,
+) -> tuple[list[tuple[Hashable, Hashable]], list[tuple[Hashable, Hashable, dict[str, Any]]]]:
+    edge_list: list[tuple[Hashable, Hashable]] = []
+    edge_data_list: list[tuple[Hashable, Hashable, dict[str, Any]]] = []
+    if edges is not None:
+        for item in list(edges):
+            item_tuple = tuple(item) if not isinstance(item, tuple) else item
+            if len(item_tuple) == 3:
+                edge_list.append((item_tuple[0], item_tuple[1]))
+                edge_data_list.append((item_tuple[0], item_tuple[1], item_tuple[2]))
+            else:
+                edge_list.append((item_tuple[0], item_tuple[1]))
+                edge_data_list.append((item_tuple[0], item_tuple[1], {}))
+    return edge_list, edge_data_list
+
+
 class RenderState(Enum):
     INITIAL = "initial"
     """The initial state, no rendering has happened yet."""
@@ -155,18 +172,7 @@ class ConsoleGraph:
 
         self._layout_engine = layout_engine
 
-        edge_list: list[tuple[Hashable, Hashable]] = []
-        edge_data_list: list[tuple[Hashable, Hashable, dict[str, Any]]] = []
-
-        if edges is not None:
-            for item in list(edges):
-                item_tuple = tuple(item) if not isinstance(item, tuple) else item
-                if len(item_tuple) == 3:
-                    edge_list.append((item_tuple[0], item_tuple[1]))
-                    edge_data_list.append((item_tuple[0], item_tuple[1], item_tuple[2]))
-                else:
-                    edge_list.append((item_tuple[0], item_tuple[1]))
-                    edge_data_list.append((item_tuple[0], item_tuple[1], {}))
+        edge_list, edge_data_list = _parse_edges(edges)
 
         self._core_graph = core.CoreGraph.from_edges(edge_list)
         self._core_graph.init_router()
