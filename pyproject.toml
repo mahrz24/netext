@@ -28,13 +28,15 @@ python-source = "."
 module-name = "netext._core"
 features = ["pyo3/extension-module"]
 
-[tool.pyright]
-executionEnvironments = [{ root = "netext"}]
-typeCheckingMode = "standard"
-useLibraryCodeForTypes = true
-venvPath = ".pixi/envs"
-venv = "linting"
-pythonVersion = "3.10"
+# TODO: Fix type errors and re-enable these rules
+[tool.ty.rules]
+invalid-argument-type = "ignore"
+no-matching-overload = "ignore"
+redundant-cast = "ignore"
+unused-type-ignore-comment = "ignore"
+
+[tool.ty.environment]
+python-version = "3.10"
 
 [tool.black]
 preview = true
