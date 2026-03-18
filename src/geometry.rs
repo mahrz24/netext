@@ -300,9 +300,9 @@ impl PointDistance for PlacedRectangularNode {
             if y < y1 {
                 return (y1 - y).pow(2);
             } else if y > y2 {
-                return (x2 - x).pow(2) + (y2 - y).pow(2);
+                return (y - y2).pow(2);
             } else {
-                return (x - x2).pow(2);
+                return 0;
             }
         }
     }

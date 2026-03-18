@@ -35,7 +35,10 @@ pub struct PyIndexSet {
 
 impl PyIndexSet {
     pub fn get_index(&self, index: usize) -> Option<&PyObject> {
-        self.objects.get(index).map(|slot| slot.obj())
+        self.objects.get(index).and_then(|slot| match slot {
+            SlotOrRemoved::Taken(s) => Some(&s.obj),
+            SlotOrRemoved::Removed => None,
+        })
     }
 
     pub fn get_full(&self, obj: &Bound<'_, PyAny>) -> PyResult<Option<(usize, &PyObject)>> {

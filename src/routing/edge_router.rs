@@ -94,18 +94,22 @@ impl EdgeRouter {
             if let Some(placed_node) = self.placed_nodes.remove(&index) {
                 self.placed_node_tree.remove(&placed_node);
             }
+            // Clean up any edges referencing this node
+            self.existing_edges
+                .retain(|&(a, b), _| a != index && b != index);
+            self.object_map.remove(node)?;
         }
-        // TODO: Needs some cleanup of the object map at some point.
         Ok(())
     }
 
     fn remove_edge(&mut self, _py: Python<'_>, start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>) -> PyResult<()> {
-        let start_index = self.object_map.insert_full(start)?.0;
-        let end_index = self.object_map.insert_full(end)?.0;
+        let start_index = self.object_map.get_full(start)?.map(|(i, _)| i);
+        let end_index = self.object_map.get_full(end)?.map(|(i, _)| i);
 
-        self.existing_edges.remove(&(start_index, end_index));
+        if let (Some(start_index), Some(end_index)) = (start_index, end_index) {
+            self.existing_edges.remove(&(start_index, end_index));
+        }
 
-        // TODO: Needs some cleanup of the object map at some point.
         Ok(())
     }
 
