@@ -50,10 +50,10 @@ def compute_node_layout(
     layout_engine: core.LayoutEngine,
     core_graph: core.CoreGraph,
     node_buffers_for_layout: dict[Hashable, NodeBuffer],
-) -> tuple[dict[Hashable, FloatPoint], FloatPoint]:
-    """Run the layout engine and compute centered node positions.
+) -> FloatPoint:
+    """Run the layout engine, store positions in core_graph, compute routing hints.
 
-    Returns (node_positions, offset).
+    Returns the offset used to center the layout.
     """
     node_positions = dict([(n, FloatPoint(p.x, p.y)) for (n, p) in layout_engine.layout(core_graph)])
 
@@ -78,6 +78,7 @@ def compute_node_layout(
         y_span = max_y - min_y
 
         for node, position in node_positions.items():
+            core_graph.set_node_position(node, position.x, position.y)
             node_buffers_for_layout[node].center = Point(x=round(position.x), y=round(position.y))
             node_buffers_for_layout[node].routing_hints.relative_offset_in_layout_direction = (
                 ((position.x - median_x) / x_span if x_span else 0.0)
@@ -89,7 +90,7 @@ def compute_node_layout(
 
     _compute_port_sides(layout_engine, core_graph, node_buffers_for_layout)
 
-    return node_positions, offset
+    return offset
 
 
 def _compute_layout_density(
@@ -154,7 +155,7 @@ def _compute_port_sides(
 
 def compute_zoom(
     zoom_spec: Any,  # ZoomSpec | AutoZoom
-    node_positions: dict[Hashable, FloatPoint],
+    core_graph: core.CoreGraph,
     node_buffers_for_layout: dict[Hashable, NodeBuffer],
     max_width: int | None,
     max_height: int | None,
@@ -166,11 +167,14 @@ def compute_zoom(
     """
     from netext.console_graph import AutoZoom, ZoomSpec
 
-    if node_positions:
-        max_node_x = max([pos.x for pos in node_positions.values()])
-        max_node_y = max([pos.y for pos in node_positions.values()])
-        min_node_x = min([pos.x for pos in node_positions.values()])
-        min_node_y = min([pos.y for pos in node_positions.values()])
+    all_positions = core_graph.all_node_positions()
+    if all_positions:
+        x_values = [x for _, (x, _) in all_positions]
+        y_values = [y for _, (_, y) in all_positions]
+        max_node_x = max(x_values)
+        max_node_y = max(y_values)
+        min_node_x = min(x_values)
+        min_node_y = min(y_values)
 
         max_buffer_width = max([buffer.width for buffer in node_buffers_for_layout.values()])
         max_buffer_height = max([buffer.height for buffer in node_buffers_for_layout.values()])
@@ -208,7 +212,6 @@ def compute_zoom(
 def render_node_buffers_at_zoom(
     console: Console,
     core_graph: core.CoreGraph,
-    node_positions: dict[Hashable, FloatPoint],
     node_buffers_for_layout: dict[Hashable, NodeBuffer],
     zoom_x: float,
     zoom_y: float,
@@ -221,8 +224,8 @@ def render_node_buffers_at_zoom(
         data = core_graph.node_data_or_default(node, dict())
         properties = NodeProperties.from_data_dict(data)
         lod = properties.lod_map(zoom_factor)
-        position = node_positions[node]
-        position_view_space = Point(round(position.x * zoom_x), round(position.y * zoom_y))
+        pos_x, pos_y = core_graph.get_node_position(node)
+        position_view_space = Point(round(pos_x * zoom_x), round(pos_y * zoom_y))
 
         node_buffer = rasterize_node(
             console,
@@ -299,14 +302,14 @@ def register_node_with_router(
     node: Hashable,
     node_buffer: NodeBuffer,
 ) -> None:
-    """Register a node's bounding box with the embedded edge router."""
+    """Register (or update) a node's bounding box with the embedded edge router."""
     placed_node = core.PlacedRectangularNode(
         center=core.Point(node_buffer.center.x, node_buffer.center.y),
         node=core.RectangularNode(
             size=core.Size(node_buffer.width, node_buffer.height),
         ),
     )
-    core_graph.router_add_node(node, placed_node)
+    core_graph.router_update_node(node, placed_node)
 
 
 def register_edge_with_router(
@@ -315,8 +318,8 @@ def register_edge_with_router(
     v: Hashable,
     edge_buffer: EdgeBuffer,
 ) -> None:
-    """Register an edge's path with the embedded edge router."""
+    """Register (or update) an edge's path with the embedded edge router."""
     if edge_buffer.path is None:
         return
     line = [directed_point.point for directed_point in edge_buffer.path.directed_points]
-    core_graph.router_add_edge(u, v, line)
+    core_graph.router_update_edge(u, v, line)
