@@ -298,7 +298,7 @@ jobs:
           python-version: '3.13'
           architecture: ${{ matrix.python-architecture || 'x64' }}
 
-      - run: pip install -U twine 'ruff==0.9.1' typing_extensions
+      - run: pip install -U 'ruff==0.9.1' typing_extensions
 
       - name: build wheels
         uses: PyO3/maturin-action@v1
@@ -310,8 +310,6 @@ jobs:
           docker-options: -e CI
 
       - run: ${{ (matrix.os == 'windows' && 'dir') || 'ls -lh' }} dist/
-
-      - run: twine check --strict dist/*
 
       - uses: actions/upload-artifact@v4
         with:
@@ -445,13 +443,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: set up python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
-      - run: pip install -U twine
-
       - name: get dist artifacts
         uses: actions/download-artifact@v4
         with:
@@ -459,12 +450,10 @@ jobs:
           merge-multiple: true
           path: dist
 
-      - run: twine check --strict dist/*
-
       - name: upload to pypi
-        run: twine upload dist/*
-        env:
-          TWINE_USERNAME: __token__
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
 
 
   publish-docs:

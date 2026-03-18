@@ -36,6 +36,7 @@ textual = ">=1"
 [feature.linting.pypi-dependencies]
 pyright = ">=1.1.391"
 ruff = ">=0.9.1"
+textual = ">=1"
 
 [feature.py310.dependencies]
 python = "3.10.*"
