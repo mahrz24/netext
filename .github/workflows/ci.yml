@@ -11,8 +11,6 @@ on:
 env:
   COLUMNS: 150
 
-
-
 jobs:
   coverage:
     runs-on: ubuntu-latest
@@ -33,12 +31,11 @@ jobs:
       - run: rustup component add llvm-tools-preview
 
       - name: set up pixi
-        uses: prefix-dev/setup-pixi@v0.8.1
+        uses: prefix-dev/setup-pixi@v0.9.4
         with:
+          environments: py313-testing
           cache: true
-
-      - name: install deps
-        run: pixi install -e py313-testing
+          locked: true
 
       - run: rustc --version --verbose
 
@@ -49,7 +46,7 @@ jobs:
           RUST_BACKTRACE: 1
           RUSTFLAGS: '-C instrument-coverage'
 
-      - run: pixi t -e py313-testing
+      - run: pixi run -e py313-testing pytest tests
 
       - run: pixi run -e py313-testing coverage run -m pytest
 
@@ -63,19 +60,11 @@ jobs:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   test-python:
-    name: test ${{ matrix.python-version }}
+    name: test ${{ matrix.pixi-env }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - python-version: '3.10'
-            pixi-env: py310-testing
-          - python-version: '3.11'
-            pixi-env: py311-testing
-          - python-version: '3.12'
-            pixi-env: py312-testing
-          - python-version: '3.13'
-            pixi-env: py313-testing
+        pixi-env: [py310-testing, py311-testing, py312-testing, py313-testing]
 
     runs-on: ubuntu-latest
 
@@ -91,21 +80,18 @@ jobs:
           key: test-v3
 
       - name: set up pixi
-        uses: prefix-dev/setup-pixi@v0.8.1
+        uses: prefix-dev/setup-pixi@v0.9.4
         with:
+          environments: ${{ matrix.pixi-env }}
           cache: true
-
-      - name: install deps
-        run: pixi install -e ${{ matrix.pixi-env }}
-
-      - run: pixi t -e ${{ matrix.pixi-env }}
+          locked: true
 
       - run: pixi run -e ${{ matrix.pixi-env }} pytest tests
 
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: snapshot_report
+          name: snapshot_report_${{ matrix.pixi-env }}
           path: tests/snapshot_tests/output/snapshot_report.html
 
   test-os:
@@ -121,23 +107,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: set up pixi
-        uses: prefix-dev/setup-pixi@v0.8.1
-        with:
-          cache: true
-
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
 
       - name: cache rust
         uses: Swatinem/rust-cache@v2
 
-      - name: install deps
-        run: pixi install -e py313-testing
+      - name: set up pixi
+        uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          environments: py313-testing
+          cache: true
+          locked: true
 
-      - run: pixi t -e py313-testing
-
-      - run: pixi run -e py313-testing pytest
+      - run: pixi run -e py313-testing pytest tests
         if: matrix.os != 'windows'
 
       - run: pixi run -e py313-testing pytest --ignore=tests/snapshot_tests
@@ -152,27 +135,23 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: snapshot_report
+          name: snapshot_report_${{ matrix.os }}
           path: tests/snapshot_tests/output/snapshot_report.html
 
   # test with a debug build as it picks up errors which optimised release builds do not
   test-debug:
-    name: test-debug ${{ matrix.python-version }}
+    name: test-debug
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version:
-          - '3.13'
 
     steps:
       - uses: actions/checkout@v4
 
       - name: set up pixi
-        uses: prefix-dev/setup-pixi@v0.8.1
+        uses: prefix-dev/setup-pixi@v0.9.4
         with:
+          environments: py313-testing
           cache: true
+          locked: true
 
       - name: install rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -180,17 +159,11 @@ jobs:
       - name: cache rust
         uses: Swatinem/rust-cache@v2
 
-      - name: install deps
-        run: pixi install -e py313-testing
-
       - run: |
           rm -f netext/*.so
-
           pixi run -e py313-testing maturin develop
 
-
-      - run: pixi t -e py313-testing
-      - run: pixi run -e py313-testing pytest
+      - run: pixi run -e py313-testing pytest tests
 
   lint:
     runs-on: ubuntu-latest
@@ -207,15 +180,11 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: set up pixi
-        uses: prefix-dev/setup-pixi@v0.8.1
+        uses: prefix-dev/setup-pixi@v0.9.4
         with:
+          environments: linting
           cache: true
-
-      - name: install deps
-        run: |
-          pixi install -e linting
-          rm -f netext/*.so
-          pixi run -e linting maturin develop
+          locked: true
 
       - run: pixi run -e linting ruff check
       - run: pixi run -e linting ruff format --check
@@ -237,12 +206,11 @@ jobs:
           key: test-v3
 
       - name: set up pixi
-        uses: prefix-dev/setup-pixi@v0.8.1
+        uses: prefix-dev/setup-pixi@v0.9.4
         with:
+          environments: docs
           cache: true
-
-      - name: install deps
-        run: pixi install -e docs
+          locked: true
 
       - run: pixi run -e docs mkdocs build
 
@@ -251,9 +219,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
       - uses: PyO3/maturin-action@v1
         with:
           command: sdist
@@ -324,10 +289,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # maturin-action needs a host Python for macOS/Windows wheel builds.
+      # On Linux this is ignored since builds run inside manylinux containers.
       - name: set up python
+        if: matrix.os != 'linux'
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.13'
           architecture: ${{ matrix.python-architecture || 'x64' }}
 
       - run: pip install -U twine 'ruff==0.9.1' typing_extensions
@@ -516,11 +484,10 @@ jobs:
           key: test-v3
 
       - name: set up pixi
-        uses: prefix-dev/setup-pixi@v0.8.1
+        uses: prefix-dev/setup-pixi@v0.9.4
         with:
+          environments: docs
           cache: true
-
-      - name: install deps
-        run: pixi install -e docs
+          locked: true
 
       - run: pixi run -e docs mkdocs gh-deploy --force

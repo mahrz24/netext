@@ -1,4 +1,38 @@
+# Bugs
+
+- [ ] `CoreGraph.remove_node` corrupts indices (graph.rs:99-113)
+      `object_map.remove()` shifts indices in the PyIndexSet, but petgraph's DiGraphMap
+      and the data_map/size_map still reference old NodeIndex values. Any removal of a
+      non-terminal node silently corrupts the graph.
+
+- [ ] `PointDistance` implementation for `PlacedRectangularNode` is wrong (geometry.rs:298-306)
+      When the point is inside the rectangle it returns `(x - x2).pow(2)` instead of 0.
+      The `y > y2` branch (line 303) also returns `(x2 - x).pow(2) + (y2 - y).pow(2)`
+      when x is between x1 and x2 — should be just `(y - y2).pow(2)`.
+
+- [ ] `EdgeRouter.object_map` leaks on removal (edge_router.rs:98, 108)
+      TODO comments in the code acknowledge this: the object map is never cleaned up
+      when nodes/edges are removed, growing unboundedly with mutations.
+
+# Architecture
+
+- [ ] Decompose `ConsoleGraph` (~977 lines, console_graph.py)
+      This class is a god object handling: graph management, layout orchestration, zoom
+      computation, edge routing coordination, buffer management, incremental updates,
+      coordinate transforms, and Rich rendering. Should be split into focused components.
+
+- [ ] Eliminate duplicated graph representation
+      Graph data is triple-bookkept: NetworkX → CoreGraph → EdgeRouter. The CoreGraph
+      wraps DiGraphMap<NodeIndex, ()> with data in separate HashMaps, and EdgeRouter
+      tracks edges again in existing_edges. This is fragile during mutations.
+
+- [ ] Replace `$properties` key injection with proper internal state (console_graph.py:291, 359, 469)
+      Node/edge data dicts are mutated in-place with a `$properties` key, mixing internal
+      state into user-supplied data. If a user uses this key or iterates their data, it
+      breaks silently. Use a separate internal mapping instead.
+
 # Routing Improvements
+
 - [ ] Add a cost term for distance to node
 - [ ] Add a cost term for distance to edge
 - [ ] Add a cost term for crossing corners
@@ -6,22 +40,57 @@
 - [ ] When using the same line style, connect to the closest point on existing edge
 - [ ] T-junctions when renderin line buffers with different styles
 - [ ] Reduce costs on very dense graph automatically
+- [ ] Make routing parameters configurable (edge_router.rs:120, 184-189)
+      max_iterations=10, lambda=2.0, mu=0.5, corner_lambda=5.0, capacity=1,
+      corner_capacity=1 are all hard-coded with no way for users to tune them.
+- [ ] Graceful degradation when A* fails to find a path
+      Currently raises a Python exception (astar.rs:158). Should fall back to a straight
+      line or skip the edge rather than crashing the render.
 
-# Past release
+# Layout
 
-- [ ] Add benchmarks
-- [ ] Add tests for the rust library as well
-- [ ] Strict typechecking
-- [ ] Add benchmark comparison to PRs
+- [ ] Rename or rewrite `brandes_koepf_coordinates` (sugiyama.rs:109)
+      The method doesn't implement Brandes-Köpf. It's a simple left-to-right placement
+      with center-alignment — no vertical alignment, no block/class computation.
 - [ ] Sugiyama better alignment of nodes
-- [ ] Open up the routing config to the user if they want to
-- [ ] Other shapes
-- [ ] Overlay edges in rendering
+- [ ] Barycenter ordering: add upward pass and iteration (sugiyama.rs:167)
+      Currently only does a single downward pass, limiting crossing minimization quality.
 - [ ] Tree layout
 - [ ] Git Branch layout
+
+# Rust Code Quality
+
+- [ ] Replace `unwrap()` calls with proper error propagation
+      Multiple `.unwrap()` on `into_py_any()` (graph.rs:64, 89, 243, 269) and panics in
+      rstar::Point impl (geometry.rs:207) would crash the Python process rather than
+      raising catchable exceptions.
+- [ ] Move tracing dependencies behind a feature flag (Cargo.toml:18-19)
+      tracing, tracing-flame, tracing-subscriber are non-optional dependencies adding
+      binary size and compile time even when tracing is disabled.
+- [ ] Fix direct access to `graph.size_map` from sugiyama.rs (sugiyama.rs:123)
+      Has a TODO comment acknowledging this breaks CoreGraph encapsulation.
+
+# Testing
+
+- [ ] Add unit tests for Rust routing/layout algorithms
+      A*, rip-up-and-reroute, Sugiyama layering, and barycenter ordering have no
+      targeted Rust-level tests. Only ~10 Python test files for ~8,200 LOC.
+- [ ] Add benchmarks
+- [ ] Add benchmark comparison to PRs
+- [ ] Strict typechecking
+
+# Other
+
+- [ ] Remove hard-coded magic numbers
+      console_graph.py:677 (+10 width, +5 height padding), console_graph.py:702
+      (+0.25 offset to avoid rounding collisions). These should be configurable or
+      the underlying rounding issue should be properly solved.
+- [ ] Other shapes
+- [ ] Overlay edges in rendering
 - [ ] Remove networkx dependency
 
-- [ ] Improve edge routing:
-    - Crossing corners should be avoided (cost term) (unless sharing node)
-    - Crossling lines for more then 1 unit should be avoided (additional penalty) (unless sharing node)
-    - Prefer distance to node
+# Improve edge routing (legacy notes)
+
+- Crossing corners should be avoided (cost term) (unless sharing node)
+- Crossing lines for more than 1 unit should be avoided (additional penalty) (unless sharing node)
+- Prefer distance to node
