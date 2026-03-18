@@ -22,10 +22,10 @@ def route_edge(
     v: Hashable,
     start: DirectedPoint,
     end: DirectedPoint,
-    edge_router: core.EdgeRouter,
+    core_graph: core.CoreGraph,
     edge_routing_mode: EdgeRoutingMode,
 ) -> EdgePath:
-    result = edge_router.route_edge(
+    result = core_graph.router_route_edge(
         u,
         v,
         start,
@@ -44,7 +44,7 @@ def route_edge(
 
 
 def route_edges(
-    edge_router: core.EdgeRouter,
+    core_graph: core.CoreGraph,
     edge_anchors: list[tuple[Hashable, Hashable, DirectedPoint, DirectedPoint, EdgeRoutingMode]],
 ) -> list[EdgePath]:
     core_anchors = [
@@ -57,7 +57,7 @@ def route_edges(
         )
         for u, v, start, end, edge_routing_mode in edge_anchors
     ]
-    result = edge_router.route_edges(core_anchors)
+    result = core_graph.router_route_edges(core_anchors)
 
     point_paths = result.paths
 
