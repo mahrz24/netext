@@ -71,7 +71,7 @@ impl EdgeRouter {
         }
     }
 
-    fn add_node(&mut self, node: &Bound<PyAny>, placed_node: PlacedRectangularNode) -> PyResult<()> {
+    pub(crate) fn add_node(&mut self, node: &Bound<PyAny>, placed_node: PlacedRectangularNode) -> PyResult<()> {
         // TODO check for inserting twice
         let node_index = self.object_map.insert_full(node)?.0;
         self.placed_nodes.insert(node_index, placed_node);
@@ -79,7 +79,7 @@ impl EdgeRouter {
         Ok(())
     }
 
-    fn add_edge(&mut self, start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>, line: Vec<Point>) -> PyResult<()> {
+    pub(crate) fn add_edge(&mut self, start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>, line: Vec<Point>) -> PyResult<()> {
         let start_index = self.object_map.insert_full(start)?.0;
         let end_index = self.object_map.insert_full(end)?.0;
 
@@ -88,7 +88,7 @@ impl EdgeRouter {
         Ok(())
     }
 
-    fn remove_node(&mut self, node: &Bound<PyAny>) -> PyResult<()> {
+    pub(crate) fn remove_node(&mut self, node: &Bound<PyAny>) -> PyResult<()> {
         let index = self.object_map.get_full(node)?.map(|(index, _)| index);
         if let Some(index) = index {
             if let Some(placed_node) = self.placed_nodes.remove(&index) {
@@ -102,7 +102,7 @@ impl EdgeRouter {
         Ok(())
     }
 
-    fn remove_edge(&mut self, _py: Python<'_>, start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>) -> PyResult<()> {
+    pub(crate) fn remove_edge(&mut self, _py: Python<'_>, start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>) -> PyResult<()> {
         let start_index = self.object_map.get_full(start)?.map(|(i, _)| i);
         let end_index = self.object_map.get_full(end)?.map(|(i, _)| i);
 
@@ -113,7 +113,7 @@ impl EdgeRouter {
         Ok(())
     }
 
-    fn route_edges(
+    pub fn route_edges(
         &mut self,
         edges: Vec<(Bound<'_, PyAny>, Bound<'_, PyAny>, DirectedPoint, DirectedPoint, RoutingConfig)>,
     ) -> PyResult<EdgeRoutingsResult> {
@@ -340,7 +340,7 @@ impl EdgeRouter {
         Ok(EdgeRoutingsResult::new(directed_paths))
     }
 
-    fn route_edge(
+    pub(crate) fn route_edge(
         &mut self,
         u: &Bound<'_, PyAny>,
         v: &Bound<'_, PyAny>,

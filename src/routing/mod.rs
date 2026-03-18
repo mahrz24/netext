@@ -9,4 +9,4 @@ mod trace;
 mod types;
 
 pub use edge_router::EdgeRouter;
-pub use types::RoutingConfig;
+pub use types::{EdgeRoutingResult, EdgeRoutingsResult, RoutingConfig};
