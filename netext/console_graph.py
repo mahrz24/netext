@@ -185,8 +185,6 @@ class ConsoleGraph:
         self.node_buffers: dict[Hashable, NodeBuffer] = dict()
         self.port_buffers: dict[Hashable, list[StripBuffer]] = dict()
 
-        self.node_positions: dict[Hashable, FloatPoint] = dict()
-
         self.edge_buffers: dict[tuple[Hashable, Hashable], EdgeBuffer] = dict()
         self.edge_label_buffers: dict[tuple[Hashable, Hashable], list[StripBuffer]] = dict()
 
@@ -327,7 +325,7 @@ class ConsoleGraph:
         if position is not None:
             node_position = cast(FloatPoint, position)
             node_position += self.offset
-            self.node_positions[node] = node_position
+            self._core_graph.set_node_position(node, node_position.x, node_position.y)
             display_buffer.center = compute_node_view_position(node_position, self.zoom_x, self.zoom_y)
 
             needs_recompute, zoom_factor = check_zoom_recomputation(
@@ -402,13 +400,11 @@ class ConsoleGraph:
             if u == node or v == node:
                 self.remove_edge(u, v)
 
-        self.node_positions.pop(node)
         self.node_buffers_for_layout.pop(node)
         self.node_buffers.pop(node)
 
         self.port_buffers.pop(node, None)
         self._core_graph.remove_node(node)
-        self._core_graph.router_remove_node(node)
 
     def remove_edge(self, u: Hashable, v: Hashable) -> None:
         """Removes an edge from the graph.
@@ -426,7 +422,6 @@ class ConsoleGraph:
         self.node_buffers[u].disconnect(v)
 
         self._core_graph.remove_edge(u, v)
-        self._core_graph.router_remove_edge(u, v)
 
         self.edge_buffers.pop((u, v))
         self.edge_label_buffers.pop((u, v))
@@ -497,14 +492,13 @@ class ConsoleGraph:
 
         force_edge_rerender = force_edge_rerender or (position is not None) or "$ports" in data
 
-        self._core_graph.router_remove_node(node)
-
         if position is None:
-            node_position = self.node_positions[node]
+            pos_x, pos_y = self._core_graph.get_node_position(node)
+            node_position = FloatPoint(pos_x, pos_y)
         else:
             node_position = cast(FloatPoint, position)
             node_position += self.offset
-            self.node_positions[node] = node_position
+            self._core_graph.set_node_position(node, node_position.x, node_position.y)
             self.node_buffers[node].center = compute_node_view_position(node_position, self.zoom_x, self.zoom_y)
             self.node_buffers[node].node_anchors.all_positions = dict()
 
@@ -601,7 +595,7 @@ class ConsoleGraph:
         self._core_graph.update_edge_data(u, v, dict(data, **{"$properties": properties}))
 
         old_z_index = remove_existing_edge_buffers(
-            self._core_graph, u, v, self.node_buffers,
+            u, v, self.node_buffers,
             self.edge_buffers, self.edge_label_buffers,
         )
 
@@ -622,7 +616,7 @@ class ConsoleGraph:
         self.node_buffers_for_layout = render_node_buffers_for_layout(self.console, self._core_graph)
 
     def _transition_compute_node_layout(self) -> None:
-        self.node_positions, self.offset = compute_node_layout(
+        self.offset = compute_node_layout(
             self._layout_engine, self._core_graph, self.node_buffers_for_layout
         )
 
@@ -635,7 +629,7 @@ class ConsoleGraph:
 
     def _compute_current_zoom(self) -> tuple[float, float]:
         return compute_zoom(
-            self._zoom, self.node_positions, self.node_buffers_for_layout,
+            self._zoom, self._core_graph, self.node_buffers_for_layout,
             self._max_width, self._max_height,
         )
 
@@ -644,7 +638,7 @@ class ConsoleGraph:
             raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is computed.")
 
         self.node_buffers = render_node_buffers_at_zoom(
-            self.console, self._core_graph, self.node_positions,
+            self.console, self._core_graph,
             self.node_buffers_for_layout, self.zoom_x, self.zoom_y,
             self._zoom_factor,
         )
