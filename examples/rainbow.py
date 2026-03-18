@@ -25,4 +25,4 @@ for edge, color in zip(G.edges, itertools.cycle(colors)):
     G.edges[edge]["$style"] = color
     G.edges[edge]["$edge-segment-drawing-mode"] = EdgeSegmentDrawingMode.BOX
 
-print(ConsoleGraph(G))
+print(ConsoleGraph.from_networkx(G))

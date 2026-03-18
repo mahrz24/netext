@@ -17,7 +17,7 @@ def _run_graph_benchmark(n):
         "$edge-segment-drawing-mode",
     )
     console = Console()
-    cg = ConsoleGraph(graph)
+    cg = ConsoleGraph.from_networkx(graph)
     console.print(cg)
 
 

@@ -1,5 +1,5 @@
 """
-Renders networkx graphs to the terminal.
+Renders graphs to the terminal.
 """
 
 from netext.console_graph import ConsoleGraph, AutoZoom, ZoomSpec

@@ -43,4 +43,4 @@ for source in g.nodes:
 
 layout = SugiyamaLayout(direction=LayoutDirection.LEFT_RIGHT)
 
-print(ConsoleGraph(g, layout_engine=layout))
+print(ConsoleGraph.from_networkx(g, layout_engine=layout))

@@ -2,9 +2,33 @@
 
 ## First Steps
 
-To render a graph, you first need to create a [networkx](https://networkx.org/) graph. Once it's there,
-the netext API is very simple. Just wrap it in a [netext.ConsoleGraph][] object
-and render it
+To render a graph, create a [netext.ConsoleGraph][] with nodes and edges, then print it:
+
+```python
+from netext import ConsoleGraph
+from rich import print
+
+g = ConsoleGraph(
+    nodes={"Hello": {}, "World": {}},
+    edges=[("Hello", "World")],
+)
+
+print(g)
+```
+
+```{.rich title='Hello World' }
+from netext import ConsoleGraph
+from rich import print
+
+output = ConsoleGraph(
+    nodes={"Hello": {}, "World": {}},
+    edges=[("Hello", "World")],
+)
+```
+
+### Using networkx
+
+If you already have a [networkx](https://networkx.org/) graph, use the `from_networkx` classmethod:
 
 ```python
 from netext import ConsoleGraph
@@ -17,10 +41,10 @@ g.add_node("Hello")
 g.add_node("World")
 g.add_edge("Hello", "World")
 
-print(ConsoleGraph(g))
+print(ConsoleGraph.from_networkx(g))
 ```
 
-```{.rich title='Hello World' }
+```{.rich title='Hello World (networkx)' }
 from netext import ConsoleGraph
 from rich import print
 
@@ -30,7 +54,7 @@ g.add_node("Hello")
 g.add_node("World")
 g.add_edge("Hello", "World")
 
-output = ConsoleGraph(g)
+output = ConsoleGraph.from_networkx(g)
 ```
 
 ## A Styled Graph
@@ -52,7 +76,7 @@ nx.set_node_attributes(g, box.SQUARE, "$box-type")
 
 nx.set_edge_attributes(g, Style(color="green"), "$style")
 
-print(ConsoleGraph(g))
+print(ConsoleGraph.from_networkx(g))
 ```
 
 
@@ -71,5 +95,5 @@ nx.set_node_attributes(g, box.SQUARE, "$box-type")
 
 nx.set_edge_attributes(g, Style(color="green"), "$style")
 
-output = ConsoleGraph(g)
+output = ConsoleGraph.from_networkx(g)
 ```
