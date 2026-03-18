@@ -36,9 +36,9 @@ layout.split_column(
 )
 
 layout["top"].split_row(
-    Layout(Panel(ConsoleGraph(g), style=Style(color="blue")), name="top_left", size=120),
+    Layout(Panel(ConsoleGraph.from_networkx(g), style=Style(color="blue")), name="top_left", size=120),
     Layout(
-        Panel(ConsoleGraph(g, zoom=(AutoZoom.FIT)), style=Style(color="blue")),
+        Panel(ConsoleGraph.from_networkx(g, zoom=(AutoZoom.FIT)), style=Style(color="blue")),
         name="top_right",
         size=40,
     ),
@@ -47,7 +47,7 @@ layout["top"].split_row(
 layout["bottom"].split_row(
     Layout(
         Panel(
-            ConsoleGraph(g, viewport=Region(-10, -10, 40, 15)),
+            ConsoleGraph.from_networkx(g, viewport=Region(-10, -10, 40, 15)),
             style=Style(color="blue"),
         ),
         name="bottom_1",
@@ -55,19 +55,19 @@ layout["bottom"].split_row(
     ),
     Layout(
         Panel(
-            ConsoleGraph(g, viewport=Region(-20, -20, 40, 15)),
+            ConsoleGraph.from_networkx(g, viewport=Region(-20, -20, 40, 15)),
             style=Style(color="blue"),
         ),
         name="bottom_1",
         size=40,
     ),
     Layout(
-        Panel(ConsoleGraph(g, viewport=Region(0, 0, 40, 15)), style=Style(color="blue")),
+        Panel(ConsoleGraph.from_networkx(g, viewport=Region(0, 0, 40, 15)), style=Style(color="blue")),
         name="bottom_1",
         size=40,
     ),
     Layout(
-        Panel(ConsoleGraph(g, viewport=Region(5, -10, 40, 15)), style=Style(color="blue")),
+        Panel(ConsoleGraph.from_networkx(g, viewport=Region(5, -10, 40, 15)), style=Style(color="blue")),
         name="bottom_1",
         size=40,
     ),

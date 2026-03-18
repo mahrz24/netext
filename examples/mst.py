@@ -46,4 +46,4 @@ for edge in G.edges:
     else:
         G.edges[edge]["$style"] = Style(color="blue")
 
-print(ConsoleGraph(G))
+print(ConsoleGraph.from_networkx(G))

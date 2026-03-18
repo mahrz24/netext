@@ -1,3 +1,4 @@
+from typing import Any, Hashable
 from textual.app import App, ComposeResult
 from netext.geometry.point import FloatPoint
 from netext.textual_widget.widget import GraphView
@@ -7,20 +8,21 @@ from netext.properties.arrow_tips import ArrowTip
 from netext.properties.edge import EdgeProperties
 from rich.style import Style
 
-import networkx as nx
 import pytest
 
 
 class DummyApp(App):
     def __init__(self, *args, **kwargs):
-        self._graph = kwargs.pop("graph")
+        self._graph_nodes: dict[Hashable, dict[str, Any]] = kwargs.pop("nodes")
+        self._graph_edges = kwargs.pop("edges")
         self._scroll_via_viewport = kwargs.pop("scroll_via_viewport", False)
         self.clicked = 0
         super().__init__(*args, **kwargs)
 
     def compose(self) -> ComposeResult:
         yield GraphView(
-            self._graph,
+            nodes=self._graph_nodes,
+            edges=self._graph_edges,
             zoom=1,
             scroll_via_viewport=self._scroll_via_viewport,
             id="graph",
@@ -30,35 +32,30 @@ class DummyApp(App):
         self.clicked += 1
 
 
-def _make_styled_graph():
-    graph = nx.DiGraph()
-    graph.add_node(1, **{"$x": 1, "$y": 1})
-    graph.add_node(2, **{"$x": 10, "$y": 1})
-    graph.add_edge(1, 2)
-    return graph
+def _make_graph_data():
+    nodes = {
+        1: {"$x": 1, "$y": 1},
+        2: {"$x": 10, "$y": 1},
+    }
+    edges = [(1, 2)]
+    return nodes, edges
 
 
 @pytest.mark.asyncio
 async def test_minimal_app():
-    graph = nx.DiGraph()
-    graph.add_node(1, **{"$x": 1, "$y": 1})
-    graph.add_node(2, **{"$x": 10, "$y": 1})
-    graph.add_edge(1, 2)
+    nodes, edges = _make_graph_data()
 
-    app = DummyApp(graph=graph)
-    async with app.run_test(size=(80, 24)):
+    app = DummyApp(nodes=nodes, edges=edges)
+    async with app.run_test():
         assert True
 
 
 @pytest.mark.asyncio
 async def test_add_remove_app():
-    graph = nx.DiGraph()
-    graph.add_node(1, **{"$x": 1, "$y": 1})
-    graph.add_node(2, **{"$x": 10, "$y": 1})
-    graph.add_edge(1, 2)
+    nodes, edges = _make_graph_data()
 
-    app = DummyApp(graph=graph)
-    async with app.run_test(size=(80, 24)) as _:
+    app = DummyApp(nodes=nodes, edges=edges)
+    async with app.run_test() as _:
         app.query_one(GraphView).add_node(3, position=FloatPoint(10, 1))
         assert len(app.query_one(GraphView)._console_graph._core_graph.all_nodes()) == 3
 
@@ -68,13 +65,10 @@ async def test_add_remove_app():
 
 @pytest.mark.asyncio
 async def test_click_event():
-    graph = nx.DiGraph()
-    graph.add_node(1, **{"$x": 1, "$y": 1})
-    graph.add_node(2, **{"$x": 10, "$y": 1})
-    graph.add_edge(1, 2)
+    nodes, edges = _make_graph_data()
 
-    app = DummyApp(graph=graph)
-    async with app.run_test(size=(80, 24)) as pilot:
+    app = DummyApp(nodes=nodes, edges=edges)
+    async with app.run_test() as pilot:
         app.query_one(GraphView).add_node(3, position=FloatPoint(10, 1))
         assert len(app.query_one(GraphView)._console_graph._core_graph.all_nodes()) == 3
         offset = app.query_one(GraphView).graph_to_widget_coordinates(FloatPoint(10, 1))
@@ -84,25 +78,23 @@ async def test_click_event():
 
 
 @pytest.mark.asyncio
-async def test_sync_graph_picks_up_node_styles():
-    graph = _make_styled_graph()
-    app = DummyApp(graph=graph)
-    async with app.run_test(size=(80, 24)):
+async def test_set_graph_picks_up_node_styles():
+    nodes, edges = _make_graph_data()
+    app = DummyApp(nodes=nodes, edges=edges)
+    async with app.run_test():
         gv = app.query_one(GraphView)
 
         # Before styling: default node style
         assert gv.node_properties(1).style == Style()
         assert gv.node_properties(1).content_style == Style()
 
-        # Mutate the networkx graph in-place (like the bug reporter's code)
-        nx.set_node_attributes(gv.graph, Style(color="green"), "$style")
-        nx.set_node_attributes(gv.graph, Style(color="white"), "$content-style")
+        # Update graph with styled nodes via set_graph
+        styled_nodes = {
+            1: {"$x": 1, "$y": 1, "$style": Style(color="green"), "$content-style": Style(color="white")},
+            2: {"$x": 10, "$y": 1, "$style": Style(color="green"), "$content-style": Style(color="white")},
+        }
+        gv.set_graph(nodes=styled_nodes, edges=edges)
 
-        # Without sync, styles are still default
-        assert gv.node_properties(1).style == Style()
-
-        # After sync, styles are picked up
-        gv.sync_graph()
         assert gv.node_properties(1).style == Style(color="green")
         assert gv.node_properties(1).content_style == Style(color="white")
         assert gv.node_properties(2).style == Style(color="green")
@@ -110,19 +102,20 @@ async def test_sync_graph_picks_up_node_styles():
 
 
 @pytest.mark.asyncio
-async def test_sync_graph_picks_up_edge_attributes():
-    graph = _make_styled_graph()
-    app = DummyApp(graph=graph)
-    async with app.run_test(size=(80, 24)):
+async def test_set_graph_picks_up_edge_attributes():
+    nodes, edges = _make_graph_data()
+    app = DummyApp(nodes=nodes, edges=edges)
+    async with app.run_test():
         gv = app.query_one(GraphView)
 
-        nx.set_edge_attributes(gv.graph, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
-        nx.set_edge_attributes(gv.graph, EdgeSegmentDrawingMode.BOX, "$edge-segment-drawing-mode")
-        nx.set_edge_attributes(gv.graph, ArrowTip.NONE, "$start-arrow-tip")
-        nx.set_edge_attributes(gv.graph, ArrowTip.ARROW, "$end-arrow-tip")
-        nx.set_edge_attributes(gv.graph, Style(color="blue"), "$style")
-
-        gv.sync_graph()
+        styled_edges = [(1, 2, {
+            "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
+            "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
+            "$start-arrow-tip": ArrowTip.NONE,
+            "$end-arrow-tip": ArrowTip.ARROW,
+            "$style": Style(color="blue"),
+        })]
+        gv.set_graph(nodes=nodes, edges=styled_edges)
 
         # Verify edge properties were applied by checking the core graph edge data
         edge_data = gv._console_graph._core_graph.edge_data(1, 2)
@@ -135,17 +128,17 @@ async def test_sync_graph_picks_up_edge_attributes():
 
 
 @pytest.mark.asyncio
-async def test_graph_setter_rebuilds_console_graph():
-    graph = _make_styled_graph()
-    app = DummyApp(graph=graph)
-    async with app.run_test(size=(80, 24)):
+async def test_set_graph_replaces_graph():
+    nodes, edges = _make_graph_data()
+    app = DummyApp(nodes=nodes, edges=edges)
+    async with app.run_test():
         gv = app.query_one(GraphView)
 
-        # Create a new graph with styles baked in
-        new_graph = _make_styled_graph()
-        nx.set_node_attributes(new_graph, Style(color="red"), "$style")
-
-        # Assigning via setter should rebuild the console graph
-        gv.graph = new_graph
+        # Replace with styled graph
+        new_nodes = {
+            1: {"$x": 1, "$y": 1, "$style": Style(color="red")},
+            2: {"$x": 10, "$y": 1, "$style": Style(color="red")},
+        }
+        gv.set_graph(nodes=new_nodes, edges=edges)
         assert gv.node_properties(1).style == Style(color="red")
         assert gv.node_properties(2).style == Style(color="red")
