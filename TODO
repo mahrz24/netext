@@ -1,16 +1,16 @@
 # Bugs
 
-- [ ] `CoreGraph.remove_node` corrupts indices (graph.rs:99-113)
+- [X] `CoreGraph.remove_node` corrupts indices (graph.rs:99-113)
       `object_map.remove()` shifts indices in the PyIndexSet, but petgraph's DiGraphMap
       and the data_map/size_map still reference old NodeIndex values. Any removal of a
       non-terminal node silently corrupts the graph.
 
-- [ ] `PointDistance` implementation for `PlacedRectangularNode` is wrong (geometry.rs:298-306)
+- [X] `PointDistance` implementation for `PlacedRectangularNode` is wrong (geometry.rs:298-306)
       When the point is inside the rectangle it returns `(x - x2).pow(2)` instead of 0.
       The `y > y2` branch (line 303) also returns `(x2 - x).pow(2) + (y2 - y).pow(2)`
       when x is between x1 and x2 — should be just `(y - y2).pow(2)`.
 
-- [ ] `EdgeRouter.object_map` leaks on removal (edge_router.rs:98, 108)
+- [X] `EdgeRouter.object_map` leaks on removal (edge_router.rs:98, 108)
       TODO comments in the code acknowledge this: the object map is never cleaned up
       when nodes/edges are removed, growing unboundedly with mutations.
 
