@@ -68,9 +68,15 @@ py313-benchmark = { features = ["py313", "testing", "benchmark"] }
 cargo-test = { cmd = "bash cargo-test.sh" }
 
 [feature.testing.tasks]
-pytest = { cmd = "pytest tests/ -x" }
+pytest = { cmd = "pytest tests/ -x --benchmark-skip" }
 test-snapshots = { cmd = "pytest tests/snapshot_tests" }
-update-snapshots = { cmd = "pytest tests/snapshot_tests --snapshot-update"}
+update-snapshots = { cmd = "pytest tests/snapshot_tests --snapshot-update" }
 test = { depends-on = ["cargo-test", "pytest"] }
+benchmark = { cmd = "pytest tests --benchmark-only" }
 typecheck = { cmd = "pyright" }
-lint = { cmd = "pyright && pytest tests/ -x" }
+
+[feature.docs.tasks]
+serve-docs = { cmd = "mkdocs serve" }
+
+[feature.linting.tasks]
+lint = { cmd = "ruff format && ruff check --fix" }
