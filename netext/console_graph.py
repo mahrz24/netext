@@ -286,12 +286,19 @@ class ConsoleGraph:
         properties = NodeProperties.from_data_dict(data)
 
         layout_buffer = rasterize_node_for_layout(
-            self.console, node, data, self._layout_engine.layout_direction,
+            self.console,
+            node,
+            data,
+            self._layout_engine.layout_direction,
         )
         self.node_buffers_for_layout[node] = layout_buffer
 
         display_buffer = rasterize_node_at_lod(
-            self.console, node, data, self._zoom_factor, layout_buffer.node_anchors,
+            self.console,
+            node,
+            data,
+            self._zoom_factor,
+            layout_buffer.node_anchors,
         )
         display_buffer.determine_edge_positions()
 
@@ -308,7 +315,9 @@ class ConsoleGraph:
             display_buffer.center = compute_node_view_position(node_position, self.zoom_x, self.zoom_y)
 
             needs_recompute, zoom_factor = check_zoom_recomputation(
-                self._zoom, self._zoom_factor, self._compute_current_zoom,
+                self._zoom,
+                self._zoom_factor,
+                self._compute_current_zoom,
             )
             if needs_recompute:
                 self._zoom_factor = zoom_factor
@@ -353,9 +362,16 @@ class ConsoleGraph:
         self._core_graph.add_edge(u, v, dict(data, **{"$properties": properties}))
 
         rasterize_and_store_edge(
-            self.console, self._edge_router, u, v,
-            self.node_buffers, self.edge_buffers, self.edge_label_buffers,
-            properties, self._zoom_factor, len(self.edge_buffers),
+            self.console,
+            self._edge_router,
+            u,
+            v,
+            self.node_buffers,
+            self.edge_buffers,
+            self.edge_label_buffers,
+            properties,
+            self._zoom_factor,
+            len(self.edge_buffers),
             self._layout_engine.layout_direction,
         )
 
@@ -452,12 +468,17 @@ class ConsoleGraph:
             old_position = self.node_buffers[node].center
 
             layout_buffer = rasterize_node_for_layout(
-                self.console, node, cast(dict[str, Any], new_data), self._layout_engine.layout_direction,
+                self.console,
+                node,
+                cast(dict[str, Any], new_data),
+                self._layout_engine.layout_direction,
             )
             self.node_buffers_for_layout[node] = layout_buffer
 
             new_node_buffer = rasterize_node(
-                self.console, node, new_data,
+                self.console,
+                node,
+                new_data,
                 node_anchors=layout_buffer.node_anchors,
             )
 
@@ -486,7 +507,9 @@ class ConsoleGraph:
             self.node_buffers[node].node_anchors.all_positions = dict()
 
             needs_recompute, zoom_factor = check_zoom_recomputation(
-                self._zoom, self._zoom_factor, self._compute_current_zoom,
+                self._zoom,
+                self._zoom_factor,
+                self._compute_current_zoom,
             )
             if needs_recompute:
                 self._zoom_factor = zoom_factor
@@ -505,10 +528,17 @@ class ConsoleGraph:
 
         if force_edge_rerender:
             rerender_connected_edges(
-                self.console, self._core_graph, self._edge_router, node,
-                self.node_buffers, self.edge_buffers, self.edge_label_buffers,
-                self._zoom_factor, self._layout_engine.layout_direction,
-                self.port_buffers, self._render_port_buffer_for_node,
+                self.console,
+                self._core_graph,
+                self._edge_router,
+                node,
+                self.node_buffers,
+                self.edge_buffers,
+                self.edge_label_buffers,
+                self._zoom_factor,
+                self._layout_engine.layout_direction,
+                self.port_buffers,
+                self._render_port_buffer_for_node,
             )
 
     def to_graph_coordinates(self, p: Point) -> FloatPoint:
@@ -578,14 +608,25 @@ class ConsoleGraph:
         self._core_graph.update_edge_data(u, v, dict(data, **{"$properties": properties}))
 
         old_z_index = remove_existing_edge_buffers(
-            self._edge_router, u, v, self.node_buffers,
-            self.edge_buffers, self.edge_label_buffers,
+            self._edge_router,
+            u,
+            v,
+            self.node_buffers,
+            self.edge_buffers,
+            self.edge_label_buffers,
         )
 
         rasterize_and_store_edge(
-            self.console, self._edge_router, u, v,
-            self.node_buffers, self.edge_buffers, self.edge_label_buffers,
-            properties, self._zoom_factor, old_z_index,
+            self.console,
+            self._edge_router,
+            u,
+            v,
+            self.node_buffers,
+            self.edge_buffers,
+            self.edge_label_buffers,
+            properties,
+            self._zoom_factor,
+            old_z_index,
             self._layout_engine.layout_direction,
         )
 
@@ -612,8 +653,11 @@ class ConsoleGraph:
 
     def _compute_current_zoom(self) -> tuple[float, float]:
         return compute_zoom(
-            self._zoom, self.node_positions, self.node_buffers_for_layout,
-            self._max_width, self._max_height,
+            self._zoom,
+            self.node_positions,
+            self.node_buffers_for_layout,
+            self._max_width,
+            self._max_height,
         )
 
     def _transition_render_node_buffers(self) -> None:
@@ -621,9 +665,14 @@ class ConsoleGraph:
             raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is computed.")
 
         self.node_buffers = render_node_buffers_at_zoom(
-            self.console, self._core_graph, self.node_positions,
-            self.node_buffers_for_layout, self.zoom_x, self.zoom_y,
-            self._zoom_factor, self._edge_router,
+            self.console,
+            self._core_graph,
+            self.node_positions,
+            self.node_buffers_for_layout,
+            self.zoom_x,
+            self.zoom_y,
+            self._zoom_factor,
+            self._edge_router,
         )
 
     def _transition_render_edges(self) -> None:
@@ -631,8 +680,12 @@ class ConsoleGraph:
             raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is computed.")
 
         self.edge_buffers, self.edge_label_buffers = render_all_edges(
-            self.console, self._core_graph, self.node_buffers,
-            self._edge_router, self._zoom_factor, self._layout_engine.layout_direction,
+            self.console,
+            self._core_graph,
+            self.node_buffers,
+            self._edge_router,
+            self._zoom_factor,
+            self._layout_engine.layout_direction,
         )
 
         for node in self._core_graph.all_nodes():

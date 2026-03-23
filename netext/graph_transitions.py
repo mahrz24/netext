@@ -32,9 +32,7 @@ def render_node_buffers_for_layout(
     Also updates core_graph node sizes as a side effect.
     """
     node_buffers = {
-        node: rasterize_node(
-            console, node, cast(dict[str, Any], core_graph.node_data_or_default(node, dict()))
-        )
+        node: rasterize_node(console, node, cast(dict[str, Any], core_graph.node_data_or_default(node, dict())))
         for node in core_graph.all_nodes()
     }
     for node in core_graph.all_nodes():
@@ -57,9 +55,7 @@ def compute_node_layout(
 
     Returns (node_positions, offset).
     """
-    node_positions = dict(
-        [(n, FloatPoint(p.x, p.y)) for (n, p) in layout_engine.layout(core_graph)]
-    )
+    node_positions = dict([(n, FloatPoint(p.x, p.y)) for (n, p) in layout_engine.layout(core_graph)])
 
     offset = FloatPoint(0, 0)
 

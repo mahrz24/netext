@@ -174,9 +174,16 @@ def rerender_connected_edges(
 
     for u, v in affected_edges:
         _rerender_single_edge(
-            console, core_graph, edge_router, u, v,
-            node_buffers, edge_buffers, edge_label_buffers,
-            zoom_factor, layout_direction,
+            console,
+            core_graph,
+            edge_router,
+            u,
+            v,
+            node_buffers,
+            edge_buffers,
+            edge_label_buffers,
+            zoom_factor,
+            layout_direction,
         )
         render_port_fn(u)
         render_port_fn(v)
@@ -204,11 +211,24 @@ def _rerender_single_edge(
     core_graph.update_edge_data(u, v, dict(data, **{"$properties": properties}))
 
     old_z_index = remove_existing_edge_buffers(
-        edge_router, u, v, node_buffers, edge_buffers, edge_label_buffers,
+        edge_router,
+        u,
+        v,
+        node_buffers,
+        edge_buffers,
+        edge_label_buffers,
     )
 
     rasterize_and_store_edge(
-        console, edge_router, u, v, node_buffers,
-        edge_buffers, edge_label_buffers,
-        properties, zoom_factor, old_z_index, layout_direction,
+        console,
+        edge_router,
+        u,
+        v,
+        node_buffers,
+        edge_buffers,
+        edge_label_buffers,
+        properties,
+        zoom_factor,
+        old_z_index,
+        layout_direction,
     )
