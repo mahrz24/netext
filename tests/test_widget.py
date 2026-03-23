@@ -33,7 +33,7 @@ async def test_minimal_app():
     graph.add_edge(1, 2)
 
     app = DummyApp(graph=graph)
-    async with app.run_test():
+    async with app.run_test(size=(80, 24)):
         assert True
 
 
@@ -45,7 +45,7 @@ async def test_add_remove_app():
     graph.add_edge(1, 2)
 
     app = DummyApp(graph=graph)
-    async with app.run_test() as _:
+    async with app.run_test(size=(80, 24)) as _:
         app.query_one(GraphView).add_node(3, position=FloatPoint(10, 1))
         assert len(app.query_one(GraphView)._console_graph._core_graph.all_nodes()) == 3
 
@@ -61,7 +61,7 @@ async def test_click_event():
     graph.add_edge(1, 2)
 
     app = DummyApp(graph=graph)
-    async with app.run_test() as pilot:
+    async with app.run_test(size=(80, 24)) as pilot:
         app.query_one(GraphView).add_node(3, position=FloatPoint(10, 1))
         assert len(app.query_one(GraphView)._console_graph._core_graph.all_nodes()) == 3
         offset = app.query_one(GraphView).graph_to_widget_coordinates(FloatPoint(10, 1))
