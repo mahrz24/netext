@@ -103,8 +103,13 @@ impl CoreGraph {
             Some((index, _)) => {
                 let index: NodeIndex = NodeIndex::new(index);
 
+                // Remove edges referencing this node from edge_data_map
+                self.edge_data_map
+                    .retain(|&(a, b), _| a != index && b != index);
+
                 self.graph.remove_node(index);
                 self.data_map.remove(&index);
+                self.size_map.remove(&index);
                 self.object_map.remove(obj)
             }
             None => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
