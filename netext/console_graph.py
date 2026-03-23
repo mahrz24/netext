@@ -22,11 +22,27 @@ from netext._core import Point
 from netext.rendering.segment_buffer import StripBuffer
 
 from netext.buffer_renderer import render_buffers
-from netext.edge_rasterizer import EdgeRoutingRequest, rasterize_edge, rasterize_edges
 from netext.node_rasterizer import NodeBuffer, rasterize_node
 
+from netext.graph_transitions import (
+    render_node_buffers_for_layout,
+    compute_node_layout,
+    compute_zoom,
+    render_node_buffers_at_zoom,
+    render_all_edges,
+    register_node_with_router,
+)
+from netext.graph_mutations import (
+    compute_node_view_position,
+    rasterize_node_for_layout,
+    rasterize_node_at_lod,
+    check_zoom_recomputation,
+    rasterize_and_store_edge,
+    remove_existing_edge_buffers,
+    rerender_connected_edges,
+)
+
 from rich.traceback import install
-import statistics
 
 install(show_locals=False)
 
@@ -269,57 +285,47 @@ class ConsoleGraph:
 
         properties = NodeProperties.from_data_dict(data)
 
-        # Add to node buffers for layout
-        node_buffer = rasterize_node(self.console, node, cast(dict[str, Any], data))
-        node_buffer.determine_edge_sides(layout_direction=self._layout_engine.layout_direction)
-
-        self.node_buffers_for_layout[node] = node_buffer
-
-        lod = properties.lod_map(self._zoom_factor) if self._zoom_factor is not None else 1
-
-        node_buffer = rasterize_node(
+        layout_buffer = rasterize_node_for_layout(
             self.console,
             node,
             data,
-            lod=lod,
-            node_anchors=node_buffer.node_anchors,
+            self._layout_engine.layout_direction,
         )
-        node_buffer.determine_edge_positions()
+        self.node_buffers_for_layout[node] = layout_buffer
+
+        display_buffer = rasterize_node_at_lod(
+            self.console,
+            node,
+            data,
+            self._zoom_factor,
+            layout_buffer.node_anchors,
+        )
+        display_buffer.determine_edge_positions()
 
         self._core_graph.add_node(
-            node, dict(data, **{"$properties": properties}), core.Size(node_buffer.width, node_buffer.height)
+            node, dict(data, **{"$properties": properties}), core.Size(display_buffer.width, display_buffer.height)
         )
 
-        self.node_buffers[node] = node_buffer
+        self.node_buffers[node] = display_buffer
 
         if position is not None:
             node_position = cast(FloatPoint, position)
             node_position += self.offset
             self.node_positions[node] = node_position
-            node_buffer.center = Point(
-                round(node_position.x * self.zoom_x),
-                round(node_position.y * self.zoom_y),
+            display_buffer.center = compute_node_view_position(node_position, self.zoom_x, self.zoom_y)
+
+            needs_recompute, zoom_factor = check_zoom_recomputation(
+                self._zoom,
+                self._zoom_factor,
+                self._compute_current_zoom,
             )
-
-            # Then we recompute zoom (in case we have a zoom to fit)
-            zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
-            if self._zoom is AutoZoom.FIT or self._zoom is AutoZoom.FIT_PROPORTIONAL or self._zoom_factor is None:
-                zoom_x, zoom_y = self._compute_current_zoom()
-                zoom_factor = min([zoom_x, zoom_y])
-
-            if zoom_factor != self._zoom_factor:
+            if needs_recompute:
                 self._zoom_factor = zoom_factor
                 self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
                 return
 
-            position_view_space = Point(
-                round(node_position.x * self.zoom_x),
-                round(node_position.y * self.zoom_y),
-            )
-            self.node_buffers[node].center = position_view_space
-
-            self._register_node_with_router(node, self.node_buffers[node])
-
+            self.node_buffers[node].center = compute_node_view_position(node_position, self.zoom_x, self.zoom_y)
+            register_node_with_router(self._edge_router, node, self.node_buffers[node])
             self._render_port_buffer_for_node(node)
         else:
             self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_FOR_LAYOUT)
@@ -338,9 +344,6 @@ class ConsoleGraph:
 
         self._require(RenderState.EDGES_RENDERED)
 
-        edge_buffer: EdgeBuffer | None = None
-        label_nodes: list[StripBuffer] | None = None
-
         assert self._zoom_factor is not None, (
             "You tried to add an edge without a computed zoom factor. This should never happen."
         )
@@ -358,26 +361,19 @@ class ConsoleGraph:
         properties = EdgeProperties.from_data_dict(data)
         self._core_graph.add_edge(u, v, dict(data, **{"$properties": properties}))
 
-        edge_lod = properties.lod_map(self._zoom_factor)
-
-        result = rasterize_edge(
+        rasterize_and_store_edge(
             self.console,
             self._edge_router,
-            self.node_buffers[u],
-            self.node_buffers[v],
+            u,
+            v,
+            self.node_buffers,
+            self.edge_buffers,
+            self.edge_label_buffers,
             properties,
-            edge_lod,
-            edge_index=len(self.edge_buffers),
-            layout_direction=self._layout_engine.layout_direction,
+            self._zoom_factor,
+            len(self.edge_buffers),
+            self._layout_engine.layout_direction,
         )
-        if result is not None:
-            edge_buffer, label_nodes = result
-
-        if edge_buffer is not None:
-            self.edge_buffers[(u, v)] = edge_buffer
-            self._register_edge_with_router(u, v, edge_buffer)
-        if label_nodes is not None:
-            self.edge_label_buffers[(u, v)] = label_nodes
 
         self._render_port_buffer_for_node(u)
         self._render_port_buffer_for_node(v)
@@ -458,7 +454,6 @@ class ConsoleGraph:
         connected_ports = self.node_buffers[node].connected_ports
         properties = NodeProperties.from_data_dict({})
         if data is not None:
-            # Replace or update the data of the node with the new data
             if update_data:
                 new_data = dict(self._core_graph.node_data_or_default(node, dict()), **data)
             else:
@@ -472,28 +467,25 @@ class ConsoleGraph:
             self._core_graph.update_node_data(node, new_data)
             old_position = self.node_buffers[node].center
 
-            # Update node buffers for layout
-            lod = properties.lod_map(self._zoom_factor) if self._zoom_factor is not None else 1
-            node_buffer = rasterize_node(self.console, node, data=cast(dict[str, Any], new_data), lod=lod)
-            self.node_buffers_for_layout[node] = node_buffer
+            layout_buffer = rasterize_node_for_layout(
+                self.console,
+                node,
+                cast(dict[str, Any], new_data),
+                self._layout_engine.layout_direction,
+            )
+            self.node_buffers_for_layout[node] = layout_buffer
 
-            node_buffer.determine_edge_sides(layout_direction=self._layout_engine.layout_direction)
-
-            # Update port side assignment
             new_node_buffer = rasterize_node(
                 self.console,
                 node,
                 new_data,
-                node_anchors=node_buffer.node_anchors,
+                node_anchors=layout_buffer.node_anchors,
             )
 
-            # old_node = self.node_buffers[node]
             new_node_buffer.center = old_position
             self.node_buffers[node] = new_node_buffer
 
-            # If the data change, triggered a change of the shape, we need to rerender the edges
             # TODO: Replace this by something possible without shapely
-            # if new_node_buffer.shape.polygon(new_node_buffer) != old_node.shape.polygon(old_node):
             force_edge_rerender = True
 
         node_data = cast(dict[Hashable, Any], self._core_graph.node_data_or_default(node, dict()))
@@ -503,56 +495,51 @@ class ConsoleGraph:
 
         force_edge_rerender = force_edge_rerender or (position is not None) or "$ports" in data
 
-        # We need to remove the node from the edge router before we recompute any kind of zoom
         self._edge_router.remove_node(node)
 
         if position is None:
             node_position = self.node_positions[node]
-            zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
         else:
             node_position = cast(FloatPoint, position)
             node_position += self.offset
             self.node_positions[node] = node_position
-            self.node_buffers[node].center = Point(
-                round(node_position.x * self.zoom_x),
-                round(node_position.y * self.zoom_y),
-            )
+            self.node_buffers[node].center = compute_node_view_position(node_position, self.zoom_x, self.zoom_y)
             self.node_buffers[node].node_anchors.all_positions = dict()
 
-            # Then we recompute zoom (in case we have a zoom to fit)
-            zoom_factor = self._zoom_factor if self._zoom_factor is not None else 0
-            if self._zoom is AutoZoom.FIT or self._zoom is AutoZoom.FIT_PROPORTIONAL or self._zoom_factor is None:
-                zoom_x, zoom_y = self._compute_current_zoom()
-                zoom_factor = min([zoom_x, zoom_y])
-
-            if zoom_factor != self._zoom_factor:
+            needs_recompute, zoom_factor = check_zoom_recomputation(
+                self._zoom,
+                self._zoom_factor,
+                self._compute_current_zoom,
+            )
+            if needs_recompute:
                 self._zoom_factor = zoom_factor
                 self._reset_render_state(RenderState.NODE_LAYOUT_COMPUTED)
                 return
 
-        # This seems quite weird to keep
         # TODO also ports could have changed with data update needs some proper treatment
         self.node_buffers[node].connected_ports = connected_ports
 
         self._render_port_buffer_for_node(node)
 
-        affected_edges: list[tuple[Hashable, Hashable]] = []
-
-        position_view_space = Point(round(node_position.x * self.zoom_x), round(node_position.y * self.zoom_y))
-        self.node_buffers[node].center = position_view_space
+        self.node_buffers[node].center = compute_node_view_position(node_position, self.zoom_x, self.zoom_y)
         self._core_graph.update_node_data(node, dict(data, **{"$properties": properties}))
 
-        self._register_node_with_router(node, self.node_buffers[node])
+        register_node_with_router(self._edge_router, node, self.node_buffers[node])
 
-        for v in self._core_graph.neighbors(node):
-            if (node, v) in self.edge_buffers:
-                affected_edges.append((node, v))
-            if (v, node) in self.edge_buffers:
-                affected_edges.append((v, node))
-
-        if affected_edges and force_edge_rerender:
-            for u, v in affected_edges:
-                self.update_edge(u, v, self._core_graph.edge_data(u, v), update_data=False)
+        if force_edge_rerender:
+            rerender_connected_edges(
+                self.console,
+                self._core_graph,
+                self._edge_router,
+                node,
+                self.node_buffers,
+                self.edge_buffers,
+                self.edge_label_buffers,
+                self._zoom_factor,
+                self._layout_engine.layout_direction,
+                self.port_buffers,
+                self._render_port_buffer_for_node,
+            )
 
     def to_graph_coordinates(self, p: Point) -> FloatPoint:
         """Converts a point from view coordinates to graph coordinates.
@@ -608,7 +595,6 @@ class ConsoleGraph:
 
         """
         self._require(RenderState.EDGES_RENDERED)
-        # This should not happen as we require the render state to have zoomed positions computed.
         if self._zoom_factor is None:
             raise RuntimeError("You can only update edges once the zoom factor has been computed")
 
@@ -619,286 +605,88 @@ class ConsoleGraph:
             del data["$properties"]
 
         properties = EdgeProperties.from_data_dict(data)
-
         self._core_graph.update_edge_data(u, v, dict(data, **{"$properties": properties}))
-        self._edge_router.remove_edge(u, v)
 
-        edge_buffer: EdgeBuffer | None = None
-        label_nodes: list[StripBuffer] | None = None
+        old_z_index = remove_existing_edge_buffers(
+            self._edge_router,
+            u,
+            v,
+            self.node_buffers,
+            self.edge_buffers,
+            self.edge_label_buffers,
+        )
 
-        self.node_buffers[v].disconnect(u)
-        self.node_buffers[u].disconnect(v)
-
-        old_z_index = self.edge_buffers[(u, v)].z_index.layer_index
-
-        del self.edge_buffers[(u, v)]
-        del self.edge_label_buffers[(u, v)]
-
-        edge_lod = properties.lod_map(self._zoom_factor)
-
-        result = rasterize_edge(
+        rasterize_and_store_edge(
             self.console,
             self._edge_router,
-            self.node_buffers[u],
-            self.node_buffers[v],
+            u,
+            v,
+            self.node_buffers,
+            self.edge_buffers,
+            self.edge_label_buffers,
             properties,
-            edge_lod,
-            edge_index=int(old_z_index),
-            layout_direction=self._layout_engine.layout_direction,
+            self._zoom_factor,
+            old_z_index,
+            self._layout_engine.layout_direction,
         )
+
         self._render_port_buffer_for_node(u)
         self._render_port_buffer_for_node(v)
-
-        if result is not None:
-            edge_buffer, label_nodes = result
-        if edge_buffer is not None:
-            self.edge_buffers[(u, v)] = edge_buffer
-            self._register_edge_with_router(u, v, edge_buffer)
-        if label_nodes is not None:
-            self.edge_label_buffers[(u, v)] = label_nodes
 
     def layout(self) -> None:
         self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_FOR_LAYOUT)
 
     def _transition_render_node_buffers_for_layout(self) -> None:
-        # First we create the node buffers, this allows us to pass the sizing information to the
-        # layout engine. For each node in the graph we generate a node buffer that contains the
-        # segments to render the node and metadata where to place the buffer.
-        self.node_buffers_for_layout = {
-            node: rasterize_node(
-                self.console, node, cast(dict[str, Any], self._core_graph.node_data_or_default(node, dict()))
-            )
-            for node in self._core_graph.all_nodes()
-        }
-        for node in self._core_graph.all_nodes():
-            self._core_graph.update_node_size(
-                node,
-                core.Size(
-                    self.node_buffers_for_layout[node].layout_width + 10,
-                    self.node_buffers_for_layout[node].layout_height + 5,
-                ),
-            )
+        self.node_buffers_for_layout = render_node_buffers_for_layout(self.console, self._core_graph)
 
     def _transition_compute_node_layout(self) -> None:
-        # Position the nodes and store these original positions
-        self.node_positions = dict(
-            [(n, FloatPoint(p.x, p.y)) for (n, p) in self._layout_engine.layout(self._core_graph)]
+        self.node_positions, self.offset = compute_node_layout(
+            self._layout_engine, self._core_graph, self.node_buffers_for_layout
         )
 
-        self.offset: FloatPoint = FloatPoint(0, 0)
-
-        if self.node_positions:
-            x_positions = [pos.x for pos in self.node_positions.values()]
-            y_positions = [pos.y for pos in self.node_positions.values()]
-            # Center node positions around the midpoint of all nodes
-            min_x = min(x_positions)
-            max_x = max(x_positions)
-            min_y = min(y_positions)
-            max_y = max(y_positions)
-
-            # We add 0.25 to the offset to make sure we do not get rounding errors
-            # Otherwise nodes that have different coordinates originally end up in
-            # the same position after rounding.
-            self.offset = FloatPoint(-min_x - (max_x - min_x) / 2 + 0.25, -min_y - (max_y - min_y) / 2 + 0.25)
-
-            self.node_positions = {node: pos + self.offset for node, pos in self.node_positions.items()}
-
-            # Computer the median (not mean) position of all node and then determine the offset
-            # to in the layout direction to the median.
-            # Compute the median x and y positions
-            median_x = statistics.median(x_positions)
-            median_y = statistics.median(y_positions)
-
-            x_span = max_x - min_x
-            y_span = max_y - min_y
-
-            for node, position in self.node_positions.items():
-                self.node_buffers_for_layout[node].center = Point(x=round(position.x), y=round(position.y))
-                self.node_buffers_for_layout[node].routing_hints.relative_offset_in_layout_direction = (
-                    ((position.x - median_x) / x_span if x_span else 0.0)
-                    if self._layout_engine.layout_direction == core.LayoutDirection.LEFT_RIGHT
-                    else ((position.y - median_y) / y_span if y_span else 0.0)
-                )
-
-            # Compute the density of the graph in the layout direction
-            # i.e. for each node find how many nodes are in the same row/column
-            # depending on the layout direction. A row / column is defined by
-            # the width / height of the node buffer and the layout direction.
-            # Intersecting nodes with this row are counted.
-
-            for node, node_buffer in self.node_buffers_for_layout.items():
-                if self._layout_engine.layout_direction == core.LayoutDirection.LEFT_RIGHT:
-                    # Define the vertical range of the row.
-                    row_min = node_buffer.center.y - node_buffer.layout_height / 2
-                    row_max = node_buffer.center.y + node_buffer.layout_height / 2
-                    density = sum(
-                        1
-                        for other in self.node_buffers_for_layout.values()
-                        if (
-                            other.center.y + other.layout_height / 2 >= row_min
-                            and other.center.y - other.layout_height / 2 <= row_max
-                        )
-                    )
-                else:
-                    # Define the horizontal range of the column.
-                    col_min = node_buffer.center.x - node_buffer.layout_width / 2
-                    col_max = node_buffer.center.x + node_buffer.layout_width / 2
-                    density = sum(
-                        1
-                        for other in self.node_buffers_for_layout.values()
-                        if (
-                            other.center.x + other.layout_width / 2 >= col_min
-                            and other.center.x - other.layout_width / 2 <= col_max
-                        )
-                    )
-                # Store the computed density in the node buffer (for later use or debugging)
-                node_buffer.routing_hints.density_in_layout_direction = density
-
-        # Compute the port sides for each node
-        for node, node_buffer in self.node_buffers_for_layout.items():
-            out_neighbors = [
-                (
-                    self.node_buffers_for_layout[other],
-                    EdgeProperties.from_data_dict(self._core_graph.edge_data_or_default(node, other, dict())),
-                )
-                for other in self._core_graph.neighbors_outgoing(node)
-            ]
-            in_neighbors = [
-                (
-                    self.node_buffers_for_layout[other],
-                    EdgeProperties.from_data_dict(self._core_graph.edge_data_or_default(other, node, dict())),
-                )
-                for other in self._core_graph.neighbors_incoming(node)
-            ]
-
-            node_buffer.determine_edge_sides(
-                out_neighbors=out_neighbors,
-                in_neighbors=in_neighbors,
-                layout_direction=self._layout_engine.layout_direction,
-            )
-
     def _transition_compute_zoomed_positions(self) -> None:
-        # Reset the edge router, a change of zoom factor requires a new routing
         self._edge_router = core.EdgeRouter()
-
         zoom_x, zoom_y = self._compute_current_zoom()
         self.zoom_x = zoom_x
         self.zoom_y = zoom_y
         self._zoom_factor = min([zoom_x, zoom_y])
 
-    def _compute_current_zoom(self):
-        if self.node_positions:
-            max_node_x = max([pos.x for pos in self.node_positions.values()])
-            max_node_y = max([pos.y for pos in self.node_positions.values()])
-            min_node_x = min([pos.x for pos in self.node_positions.values()])
-            min_node_y = min([pos.y for pos in self.node_positions.values()])
-
-            # Compute the zoom value for both axes
-            max_buffer_width = max([buffer.width for buffer in self.node_buffers_for_layout.values()])
-            max_buffer_height = max([buffer.height for buffer in self.node_buffers_for_layout.values()])
-
-            max_width = (max_node_x - min_node_x) + max_buffer_width + 2
-            max_height = (max_node_y - min_node_y) + max_buffer_height + 2
-
-            match self._zoom:
-                case AutoZoom.FIT:
-                    if self.max_width is None or self.max_height is None:
-                        raise ValueError(
-                            "AutoZoom.FIT is onlye allowed if the maximum renderable width and height is known."
-                        )
-                    zoom_x = self.max_width / max_width
-                    zoom_y = self.max_height / max_height
-                case AutoZoom.FIT_PROPORTIONAL:
-                    if self.max_width is None or self.max_height is None:
-                        raise ValueError(
-                            "AutoZoom.FIT is only allowed if the maximum renderable width and height is known."
-                        )
-                    zoom_x = self.max_width / max_width
-                    zoom_y = self.max_height / max_height
-                    zoom_y = zoom_x = min(zoom_x, zoom_y)
-                case ZoomSpec(x, y):
-                    zoom_x = x
-                    zoom_y = y
-                case _:
-                    raise ValueError(f"Invalid zoom value {self._zoom}")
-        else:
-            zoom_x = 1
-            zoom_y = 1
-        return zoom_x, zoom_y
+    def _compute_current_zoom(self) -> tuple[float, float]:
+        return compute_zoom(
+            self._zoom,
+            self.node_positions,
+            self.node_buffers_for_layout,
+            self._max_width,
+            self._max_height,
+        )
 
     def _transition_render_node_buffers(self) -> None:
         if self._zoom_factor is None:
             raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is computed.")
 
-        for node in self._core_graph.all_nodes():
-            data = self._core_graph.node_data_or_default(node, dict())
-            properties = NodeProperties.from_data_dict(data)
-            lod = properties.lod_map(self._zoom_factor)
-            # Get the zoomed position of the node
-            position = self.node_positions[node]
-            position_view_space = Point(round(position.x * self.zoom_x), round(position.y * self.zoom_y))
-
-            node_buffer = rasterize_node(
-                self.console,
-                node,
-                data,
-                lod=lod,
-                node_anchors=self.node_buffers_for_layout[node].node_anchors,
-            )
-
-            node_buffer.center = position_view_space
-            self.node_buffers[node] = node_buffer
-
-            self._register_node_with_router(node, node_buffer)
-
-            node_buffer.determine_edge_positions()
+        self.node_buffers = render_node_buffers_at_zoom(
+            self.console,
+            self._core_graph,
+            self.node_positions,
+            self.node_buffers_for_layout,
+            self.zoom_x,
+            self.zoom_y,
+            self._zoom_factor,
+            self._edge_router,
+        )
 
     def _transition_render_edges(self) -> None:
         if self._zoom_factor is None:
             raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is computed.")
 
-        # Now we rasterize the edges
-        all_node_buffers = []
-        for _, node_buffer in self.node_buffers.items():
-            all_node_buffers.append(node_buffer)
-
-        edge_routing_requests = []
-
-        for u, v in self._core_graph.all_edges():
-            data = self._core_graph.edge_data_or_default(u, v, dict())
-            properties = EdgeProperties.from_data_dict(data)
-            edge_lod = properties.lod_map(self._zoom_factor)
-
-            edge_routing_requests.append(
-                EdgeRoutingRequest(
-                    u=u,
-                    v=v,
-                    u_buffer=self.node_buffers[u],
-                    v_buffer=self.node_buffers[v],
-                    properties=properties,
-                    lod=edge_lod,
-                )
-            )
-
-        edge_buffers, label_buffers = rasterize_edges(
+        self.edge_buffers, self.edge_label_buffers = render_all_edges(
             self.console,
+            self._core_graph,
+            self.node_buffers,
             self._edge_router,
-            edge_routing_requests,
-            layout_direction=self._layout_engine.layout_direction,
+            self._zoom_factor,
+            self._layout_engine.layout_direction,
         )
-
-        for (u, v), edge_buffer in edge_buffers.items():
-            self.edge_buffers[(u, v)] = edge_buffer
-            self._register_edge_with_router(u, v, edge_buffer)
-
-        for (u, v), label_nodes in label_buffers.items():
-            self.edge_label_buffers[(u, v)] = label_nodes
-
-        self._render_port_buffers()
-
-    def _render_port_buffers(self) -> None:
-        if self._zoom_factor is None:
-            raise RuntimeError("Invalid transition, lod buffers can only be rendered once zoom is computed.")
 
         for node in self._core_graph.all_nodes():
             self._render_port_buffer_for_node(node)
@@ -911,21 +699,6 @@ class ConsoleGraph:
         self.port_buffers[node] = node_buffer.get_port_buffers(
             self.console,
         )
-
-    def _register_node_with_router(self, node: Hashable, node_buffer: NodeBuffer) -> None:
-        placed_node = core.PlacedRectangularNode(
-            center=core.Point(node_buffer.center.x, node_buffer.center.y),
-            node=core.RectangularNode(
-                size=core.Size(node_buffer.width, node_buffer.height),
-            ),
-        )
-        self._edge_router.add_node(node, placed_node)
-
-    def _register_edge_with_router(self, u: Hashable, v: Hashable, edge_buffer: EdgeBuffer) -> None:
-        if edge_buffer.path is None:
-            return
-        line = [directed_point.point for directed_point in edge_buffer.path.directed_points]
-        self._edge_router.add_edge(u, v, line)
 
     def _all_buffers(self) -> Iterable[StripBuffer]:
         self._require(RenderState.EDGES_RENDERED)
