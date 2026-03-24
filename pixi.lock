@@ -3249,14 +3249,22 @@ packages:
   timestamp: 1738196177597
 - pypi: ./
   name: netext
-  version: 0.3.1
-  sha256: 64857b236de8a49f22395d7daa7fe38c51180d81c23c0dcdd104fbc38207cbd7
+  version: 0.4.0
+  sha256: a1886c248a025e655c9bbd088fe7dfd9a3b5451746ce04c1fdfe57526199527b
   requires_dist:
   - rich>=13
   - networkx~=3.0
   - cachetools>=5.3.0
   - typing-extensions>=4.12.2
   - textual>=1 ; extra == 'textual'
+  - pytest>=8.0.0 ; extra == 'test'
+  - syrupy>=4.0.1 ; extra == 'test'
+  - jinja2>=3.1.2 ; extra == 'test'
+  - pytest-cov>=3.0.0 ; extra == 'test'
+  - coverage[toml]>=6.4.2 ; extra == 'test'
+  - pytest-asyncio>=0.21.1 ; extra == 'test'
+  - importlib-metadata>=8.5.0 ; extra == 'test'
+  - pytest-benchmark>=3.4.1 ; extra == 'test'
   requires_python: '>=3.10'
 - pypi: https://files.pythonhosted.org/packages/b9/54/dd730b32ea14ea797530a4479b2ed46a6fb250f682a9cfb997e968bf0261/networkx-3.4.2-py3-none-any.whl
   name: networkx
