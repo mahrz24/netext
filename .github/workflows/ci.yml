@@ -359,7 +359,7 @@ jobs:
             . .venv/bin/activate
             python -m pip install -U pip
             python -m pip install pytest syrupy jinja2 pytest-cov 'coverage[toml]' pytest-asyncio pytest-benchmark textual
-            python -m pip install netext --find-links dist --force-reinstall --no-index
+            python -m pip install netext --find-links dist --force-reinstall --no-index --no-deps
             pytest -m "not exact_rendering"
 
   test-builds-os:
