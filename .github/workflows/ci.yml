@@ -359,7 +359,7 @@ jobs:
             . .venv/bin/activate
             python -m pip install -U pip
             python -m pip install pytest syrupy jinja2 pytest-cov 'coverage[toml]' pytest-asyncio pytest-benchmark textual
-            python -m pip install netext --find-links dist --force-reinstall
+            python -m pip install netext --find-links dist --force-reinstall --no-index
             pytest -m "not exact_rendering"
 
   test-builds-os:
@@ -389,7 +389,7 @@ jobs:
           merge-multiple: true
           path: dist
 
-      - run: pixi run -e py313-testing pip install netext --find-links dist --force-reinstall --no-deps
+      - run: pixi run -e py313-testing pip install netext --find-links dist --force-reinstall --no-index --no-deps
       - run: pixi run -e py313-testing pytest
         if: matrix.os != 'windows'
 
