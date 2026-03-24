@@ -33,19 +33,112 @@
 
 # Routing Improvements
 
-- [ ] Add a cost term for distance to node
-- [ ] Add a cost term for distance to edge
-- [ ] Add a cost term for crossing corners
-- [ ] Multiple intermediate points based on directions
+## High Impact
+
+- [ ] Insert more intermediate grid lines between distant nodes (grid.rs)
+      When endpoints are >5 units apart, only lines at ±2 offset are inserted. Edges have
+      very few routing channels between distant nodes, forcing them into the same corridors
+      and causing overlap that the rip-up loop can't resolve. Insert lines every 2-3 units.
+      ⚠ Perf: more grid lines → larger A* search space (more states to explore). The grid
+      grows quadratically with line count, so insertion density needs a cap. A reasonable
+      approach: insert lines at exponentially increasing intervals (e.g. 2, 4, 8) rather
+      than uniform spacing, so nearby regions get fine resolution without exploding distant
+      ones. Alternatively, only insert extra lines in corridors between nodes where edges
+      actually need to route (demand-driven), skipping empty regions entirely.
+
+- [ ] Add cost term for proximity to nodes (route_single.rs)
+      Edges routed close to node borders look cramped. Add a distance-to-node cost so edges
+      prefer to keep clearance. Currently masking blocks ±1 unit but there's no soft penalty
+      for being near a node.
+      ⚠ Perf: a naive approach iterates all nodes per A* step — O(N) per expansion, which
+      dominates routing time. Instead, precompute a node distance field on the grid once
+      before routing starts: for each grid point, store the minimum Manhattan distance to
+      any node boundary. This is a one-time O(G × N) cost (G = grid points, N = nodes)
+      that can be further reduced to O(G) with a BFS flood-fill from all node boundaries.
+      The per-step A* lookup then becomes a single array index — O(1).
+
+- [ ] Add cost term for proximity to other edges (route_single.rs)
+      Parallel edges that share the same corridor look cluttered. A proximity penalty would
+      spread edges across available routing channels.
+      ⚠ Perf: tracking exact edge positions and querying neighbors per A* step is expensive.
+      Better approach: reuse the existing raw_usage array. After each edge is routed, its
+      segments already increment raw_usage. Extend this with an "adjacency usage" array:
+      when a segment's usage increases, also add a fractional cost (e.g. 0.3) to its
+      neighboring segments. This spreads congestion pressure to adjacent corridors at the
+      cost of a constant-factor increase in usage bookkeeping — no per-step spatial queries.
+      The A* cost function already reads raw_cost per segment, so no inner-loop change needed.
+
+- [ ] Add cost term for crossing corners (route_single.rs)
+      Crossing corners should be avoided unless edges share a node. Corners where multiple
+      edges cross look messy and are hard to read.
+      ⚠ Perf: minimal. Corner usage is already tracked in raw_corner_usage and checked on
+      every turn. This just adjusts the existing cost formula — O(1) per turn, and turns
+      are infrequent relative to straight moves. No new data structures needed.
+
+- [ ] Graceful degradation when A* fails to find a path (route_single.rs:104-165)
+      Fallback L-shaped paths may pass through nodes, producing visually broken edges.
+      Try more fallback shapes (Z-shaped, S-shaped) or temporarily relax masking constraints
+      rather than crashing.
+      ⚠ Perf: only triggered on A* failure, so zero cost on the happy path. The fallback
+      itself is cheap (constant number of candidate paths to check).
+
+## Medium Impact
+
+- [ ] Add history cost decay (ripup.rs)
+      History costs accumulate indefinitely across iterations. Early congestion permanently
+      penalizes segments even after congestion is resolved, biasing later iterations toward
+      suboptimal paths. Multiply by a decay factor (e.g. 0.9) each iteration.
+      ⚠ Perf: one multiply per segment per iteration — O(S) where S = total segments.
+      Negligible compared to A* cost. Could even use integer shift approximation.
+
+- [ ] Add crossing penalty for parallel overlap >1 unit (route_single.rs)
+      Crossing lines for more than 1 unit should have an additional penalty, unless the
+      edges share a node. Brief crossings are acceptable, long parallel overlaps are not.
+      ⚠ Perf: overlap length is naturally captured by summing raw_cost along a segment run.
+      If using the adjacency-usage approach from the proximity item above, this comes for
+      free — sustained parallel routing accumulates cost over multiple consecutive segments.
+      No additional per-step computation needed beyond what raw_cost already provides.
+
+- [ ] Multiple intermediate routing points based on edge direction
+      Edges with complex paths could benefit from intermediate waypoints computed from
+      the general direction of the edge, giving the router more guidance.
+      ⚠ Perf: splits one A* call into multiple shorter ones (start→wp1→wp2→end). Each
+      sub-path searches a smaller space, so total work may actually decrease if waypoints
+      are well-chosen. Waypoint computation itself is O(1) per edge (midpoint + offset).
+
 - [ ] When using the same line style, connect to the closest point on existing edge
-- [ ] T-junctions when renderin line buffers with different styles
-- [ ] Reduce costs on very dense graph automatically
+      Edges with identical styles between the same nodes could merge into a shared segment
+      and split at the appropriate point, reducing visual clutter.
+      ⚠ Perf: requires checking existing routed paths for style-compatible edges during
+      routing. Could maintain a per-style spatial index of routed segments. Lookup is
+      O(log S) per edge, but adds implementation complexity.
+
+- [ ] Reduce costs automatically on very dense graphs
+      Dense graphs overwhelm the router with congestion. Detect density and relax penalties
+      (lower lambda, increase capacity) so edges can share corridors gracefully.
+      ⚠ Perf: density detection is O(1) (node count / grid area). Adjusting parameters
+      is free. May actually improve perf by reducing rip-up iterations on dense graphs.
+
+## Lower Impact
+
 - [ ] Make routing parameters configurable (edge_router.rs:120, 184-189)
       max_iterations=10, lambda=2.0, mu=0.5, corner_lambda=5.0, capacity=1,
       corner_capacity=1 are all hard-coded with no way for users to tune them.
-- [ ] Graceful degradation when A* fails to find a path
-      Currently raises a Python exception (astar.rs:158). Should fall back to a straight
-      line or skip the edge rather than crashing the render.
+
+- [ ] Increase max iterations or make convergence-based (edge_router.rs)
+      Complex graphs may not converge in 10 iterations. Make configurable or continue
+      until overflow stops decreasing.
+
+- [ ] T-junctions when rendering line buffers with different styles
+      When edges with different styles meet, render a proper T-junction character instead
+      of overlapping characters.
+
+- [ ] Validate duplicate node insertion (edge_router.rs:75)
+      `add_node()` doesn't check for duplicates. Could cause issues in existing_edges
+      tracking.
+
+- [ ] Fix port name collision with node names (node_anchors.py:15)
+      If a port name matches a node name, anchor resolution may fail.
 
 # Layout
 
@@ -151,9 +244,3 @@
 - [ ] Other shapes
 - [ ] Overlay edges in rendering
 - [ ] Remove networkx dependency
-
-# Improve edge routing (legacy notes)
-
-- Crossing corners should be avoided (cost term) (unless sharing node)
-- Crossing lines for more than 1 unit should be avoided (additional penalty) (unless sharing node)
-- Prefer distance to node
