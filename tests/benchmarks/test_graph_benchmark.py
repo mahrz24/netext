@@ -8,9 +8,7 @@ from netext.edge_rendering.modes import EdgeSegmentDrawingMode
 from netext.edge_routing.modes import EdgeRoutingMode
 
 
-@pytest.mark.parametrize("n", [2, 4, 6])
-@pytest.mark.benchmark
-def test_graph_performance_small_binomial_tree(n, benchmark):
+def _run_graph_benchmark(n):
     graph = binomial_tree(n)
     nx.set_edge_attributes(graph, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
     nx.set_edge_attributes(
@@ -19,8 +17,11 @@ def test_graph_performance_small_binomial_tree(n, benchmark):
         "$edge-segment-drawing-mode",
     )
     console = Console()
+    cg = ConsoleGraph(graph)
+    console.print(cg)
 
-    @benchmark
-    def _benchmark():
-        cg = ConsoleGraph(graph)
-        console.print(cg)
+
+@pytest.mark.parametrize("n", [2, 4, 6])
+@pytest.mark.benchmark
+def test_graph_performance_small_binomial_tree(n, benchmark):
+    benchmark(lambda: _run_graph_benchmark(n))

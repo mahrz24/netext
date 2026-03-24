@@ -105,7 +105,7 @@ class GraphView(ScrollView):
         self.zoom = zoom
 
     def on_mount(self) -> None:
-        self.call_later(self._resized)
+        self._resized()
 
     def _reset_console_graph(self):
         if self.size.width != 0 and self.size.height != 0:

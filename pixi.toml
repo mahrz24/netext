@@ -72,7 +72,7 @@ pytest = { cmd = "pytest tests/ -x --benchmark-skip" }
 test-snapshots = { cmd = "pytest tests/snapshot_tests" }
 update-snapshots = { cmd = "pytest tests/snapshot_tests --snapshot-update" }
 test = { depends-on = ["cargo-test", "pytest"] }
-benchmark = { cmd = "pytest tests --benchmark-only" }
+benchmark = { cmd = "pytest tests --codspeed" }
 typecheck = { cmd = "pyright" }
 
 [feature.docs.tasks]
