@@ -51,4 +51,4 @@ jobs:
         uses: CodSpeedHQ/action@v3
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
-          run: pixi run -e py313-benchmark pytest tests --codspeed --codspeed-mode=instrumentation
+          run: pixi run -e py313-benchmark python -m pytest tests --codspeed --codspeed-mode=instrumentation

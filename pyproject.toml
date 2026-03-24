@@ -1,6 +1,6 @@
 [project]
 name = "netext"
-version = "0.3.1"
+version = "0.4.0"
 description = "A graph (network) rendering library for the terminal."
 authors = [{ name = "Malte Klemm", email = "me@malteklemm.de" }]
 license = { text = "MIT Licence" }
@@ -11,6 +11,16 @@ dependencies = ["rich>=13", "networkx~=3.0", "cachetools>=5.3.0", "typing-extens
 
 [project.optional-dependencies]
 textual = ["textual>=1"]
+test = [
+    "pytest>=8.0.0",
+    "syrupy>=4.0.1",
+    "jinja2>=3.1.2",
+    "pytest-cov>=3.0.0",
+    "coverage[toml]>=6.4.2",
+    "pytest-asyncio>=0.21.1",
+    "importlib-metadata>=8.5.0",
+    "pytest-benchmark>=3.4.1",
+]
 
 [project.scripts]
 netext-debug = "netext.cli.routing_debugger:main"
@@ -28,6 +38,81 @@ python-source = "."
 module-name = "netext._core"
 features = ["pyo3/extension-module"]
 
+# --- Pixi workspace config ---
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["linux-64", "osx-arm64", "osx-64", "win-64"]
+
+[tool.pixi.dependencies]
+python = ">=3.10"
+maturin = ">=1,<2"
+pip = "*"
+
+[tool.pixi.pypi-dependencies]
+netext = { path = ".", editable = true }
+
+[tool.pixi.feature.testing.pypi-dependencies]
+netext = { path = ".", editable = true, extras = ["test", "textual"] }
+
+[tool.pixi.feature.benchmark.pypi-dependencies]
+pytest-codspeed = ">=2"
+
+[tool.pixi.feature.docs.pypi-dependencies]
+netext = { path = ".", editable = true, extras = ["textual"] }
+mkdocs = ">=1.6.1"
+mkdocstrings = { version = ">=0.20.0", extras = ["python"] }
+mkdocs-material = ">=9.0.5"
+ruff = ">=0.9.1"
+
+[tool.pixi.feature.linting.pypi-dependencies]
+netext = { path = ".", editable = true, extras = ["textual"] }
+ty = ">=0.0.1a7"
+ruff = ">=0.9.1"
+
+[tool.pixi.feature.py310.dependencies]
+python = "3.10.*"
+
+[tool.pixi.feature.py311.dependencies]
+python = "3.11.*"
+
+[tool.pixi.feature.py312.dependencies]
+python = "3.12.*"
+
+[tool.pixi.feature.py313.dependencies]
+python = "3.13.*"
+
+[tool.pixi.environments]
+default = { features = ["py310"] }
+testing = { features = ["py310", "testing"] }
+docs = { features = ["py310", "docs"] }
+linting = { features = ["py310", "linting"] }
+benchmark = { features = ["py310", "testing", "benchmark"] }
+py310-testing = { features = ["py310", "testing"] }
+py311-testing = { features = ["py311", "testing"] }
+py312-testing = { features = ["py312", "testing"] }
+py313-testing = { features = ["py313", "testing"] }
+py313-benchmark = { features = ["py313", "testing", "benchmark"] }
+
+[tool.pixi.tasks]
+cargo-test = { cmd = "bash cargo-test.sh" }
+
+[tool.pixi.feature.testing.tasks]
+pytest = { cmd = "pytest tests/ -x --benchmark-skip" }
+test-snapshots = { cmd = "pytest tests/snapshot_tests" }
+update-snapshots = { cmd = "pytest tests/snapshot_tests --snapshot-update" }
+test = { depends-on = ["cargo-test", "pytest"] }
+benchmark = { cmd = "pytest tests --codspeed" }
+typecheck = { cmd = "pyright" }
+
+[tool.pixi.feature.docs.tasks]
+serve-docs = { cmd = "mkdocs serve" }
+
+[tool.pixi.feature.linting.tasks]
+lint = { cmd = "ruff format && ruff check --fix" }
+
+# --- Tool config ---
+
 # TODO: Fix type errors and re-enable these rules
 [tool.ty.rules]
 invalid-argument-type = "ignore"
@@ -42,9 +127,6 @@ python-version = "3.10"
 markers = [
     "exact_rendering: tests that assert exact rendering dimensions (may fail on non-reference platforms)",
 ]
-
-[tool.black]
-preview = true
 
 [tool.ruff]
 line-length = 120

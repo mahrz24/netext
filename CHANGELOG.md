@@ -1,3 +1,34 @@
+<a id='changelog-0.4.0'></a>
+# Routing & Architecture v0.4.0 — 2026-03-24
+
+## Changed
+
+- Completely rewritten edge routing engine in Rust using bucketed A* with node avoidance and edge decongestion.
+- Decomposed `ConsoleGraph` into separate modules for graph transitions and mutations.
+- Edge router is now seeded with existing edges for better incremental routing.
+- Restructured Rust routing code into multiple modules.
+- Consolidated project configuration: `pixi.toml` merged into `pyproject.toml` under `[tool.pixi.*]`.
+- CI build tests now use `--no-index` to prevent accidental installation from PyPI.
+
+## Fixed
+
+- Division by zero error in Textual widget caused by `set_timer(0, ...)` during initialization.
+- Multiple edge routing bugs around geometry computations and node intersection detection.
+- Edge cases in `CoreGraph` node/edge removal and index set handling.
+- Textual widget now calls `_resized()` synchronously in `on_mount` instead of deferring.
+
+## Added
+
+- CodSpeed benchmark integration for continuous performance tracking.
+- Test and textual optional dependency groups in `pyproject.toml`.
+
+<a id='changelog-0.3.1'></a>
+# v0.3.1 — 2025-02-07
+
+## Fixed
+
+- Added missing `typing-extensions` runtime dependency.
+
 <a id='changelog-0.3'></a>
 # The Resurrection v0.3 — 2025-02-06
 
