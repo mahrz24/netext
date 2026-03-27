@@ -62,7 +62,14 @@ impl Grid {
         }
     }
 
-    fn build_lines_from_coords(mut coords: Vec<i32>) -> Vec<i32> {
+    pub(crate) fn build_lines_from_coords(mut coords: Vec<i32>) -> Vec<i32> {
+        const MAX_INTERMEDIATE: usize = 8;
+        // Minimum guaranteed spacing between consecutive interior lines.
+        // With turn_cost = 3*base_cost, a detour through a MIN_SPACING-wide
+        // gap costs 2*3 + 2*MIN_SPACING, which is expensive enough to prevent
+        // zigzag artifacts while still providing useful routing channels.
+        const MIN_SPACING: i32 = 4;
+
         coords.sort_unstable();
         coords.dedup();
 
@@ -71,14 +78,39 @@ impl Grid {
 
         for value in coords {
             if let Some(last_value) = last {
-                if last_value < value - 5 {
-                    lines.push(last_value + 2);
-                }
-                if last_value < value - 1 {
+                if last_value < value - 4 {
+                    let interior_start = last_value + 3;
+                    let interior_end = value - 3;
+                    let interior_gap = interior_end - interior_start;
+
+                    let mut intermediates = Vec::with_capacity(MAX_INTERMEDIATE + 2);
+                    intermediates.push(last_value + 2); // +2 boundary
+
+                    // Always include the midpoint as a routing channel
+                    let mid = (last_value + value) / 2;
+                    if mid > last_value + 2 && mid < value - 2 {
+                        intermediates.push(mid);
+                    }
+
+                    if interior_gap >= MIN_SPACING {
+                        // Uniform fill: N+1 intervals each >= MIN_SPACING.
+                        let num_lines =
+                            ((interior_gap / MIN_SPACING - 1).max(0) as usize).min(MAX_INTERMEDIATE);
+                        if num_lines > 0 {
+                            let step = interior_gap as f64 / (num_lines as f64 + 1.0);
+                            for i in 1..=num_lines {
+                                intermediates
+                                    .push(interior_start + (step * i as f64).round() as i32);
+                            }
+                        }
+                    }
+
+                    intermediates.push(value - 2); // -2 boundary
+                    intermediates.sort_unstable();
+                    intermediates.dedup();
+                    lines.extend(intermediates);
+                } else if last_value < value - 1 {
                     lines.push((last_value + value) / 2);
-                }
-                if last_value < value - 5 {
-                    lines.push(value - 2);
                 }
             }
             lines.push(value);
@@ -86,23 +118,6 @@ impl Grid {
         }
 
         lines
-    }
-
-    fn ensure_min_max(lines: &mut Vec<i32>, min_value: i32, max_value: i32) {
-        if lines.is_empty() {
-            lines.push(min_value);
-            if max_value != min_value {
-                lines.push(max_value);
-            }
-            return;
-        }
-
-        if lines.binary_search(&min_value).is_err() {
-            lines.insert(0, min_value);
-        }
-        if lines.binary_search(&max_value).is_err() {
-            lines.push(max_value);
-        }
     }
 
     pub fn from_edges_and_nodes(edges: &Vec<(Point, Point)>, nodes: &Vec<PlacedRectangularNode>) -> Self {
@@ -120,9 +135,6 @@ impl Grid {
             y_set.insert(end.y);
         }
 
-        let mut x_lines = Self::build_lines_from_coords(x_set.into_iter().collect());
-        let mut y_lines = Self::build_lines_from_coords(y_set.into_iter().collect());
-
         // Get the bounding box of all nodes
         let mut min_nodes_x = i32::MAX;
         let mut max_nodes_x = i32::MIN;
@@ -138,16 +150,29 @@ impl Grid {
             max_nodes_y = max(max_nodes_y, br.y);
         });
 
-        // We add some padding to the bounding box or use the min/max coordinates of the edges also padded.
-        let padding = 3;
-        let min_x = min(min_nodes_x - padding, x_lines[0] - padding);
-        let max_x = max(max_nodes_x + padding, x_lines[x_lines.len() - 1] + padding);
-        let min_y = min(min_nodes_y - padding, y_lines[0] - padding);
-        let max_y = max(max_nodes_y + padding, y_lines[y_lines.len() - 1] + padding);
+        // Compute padded boundaries. Edges routing around the outside of the
+        // graph need enough margin for multiple routing channels.
+        let padding = 7;
+        let edge_min_x = *x_set.iter().min().unwrap_or(&0);
+        let edge_max_x = *x_set.iter().max().unwrap_or(&0);
+        let edge_min_y = *y_set.iter().min().unwrap_or(&0);
+        let edge_max_y = *y_set.iter().max().unwrap_or(&0);
 
-        // We add these to the grid keeping it sorted and unique.
-        Self::ensure_min_max(&mut x_lines, min_x, max_x);
-        Self::ensure_min_max(&mut y_lines, min_y, max_y);
+        let min_x = min(min_nodes_x - padding, edge_min_x - padding);
+        let max_x = max(max_nodes_x + padding, edge_max_x + padding);
+        let min_y = min(min_nodes_y - padding, edge_min_y - padding);
+        let max_y = max(max_nodes_y + padding, edge_max_y + padding);
+
+        // Include boundary coordinates in the coord sets so that
+        // build_lines_from_coords generates intermediate lines in the
+        // padding area (edges routing around the graph need channels there).
+        x_set.insert(min_x);
+        x_set.insert(max_x);
+        y_set.insert(min_y);
+        y_set.insert(max_y);
+
+        let x_lines = Self::build_lines_from_coords(x_set.into_iter().collect());
+        let y_lines = Self::build_lines_from_coords(y_set.into_iter().collect());
 
         Grid::new(x_lines.len(), y_lines.len(), x_lines, y_lines)
     }
@@ -249,5 +274,133 @@ impl Grid {
             x: self.x_lines[grid_x],
             y: self.y_lines[grid_y],
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_no_intermediates() {
+        let result = Grid::build_lines_from_coords(vec![10, 11]);
+        assert_eq!(result, vec![10, 11]);
+    }
+
+    #[test]
+    fn test_small_gap_midpoint() {
+        let result = Grid::build_lines_from_coords(vec![10, 13]);
+        assert_eq!(result, vec![10, 11, 13]);
+    }
+
+    #[test]
+    fn test_gap_of_5() {
+        // Gap of 5: gets +2 and -2 boundaries (2 routing channels)
+        let result = Grid::build_lines_from_coords(vec![10, 15]);
+        assert_eq!(result, vec![10, 12, 13, 15]);
+    }
+
+    #[test]
+    fn test_gap_of_4_midpoint_only() {
+        // Gap of 4: only midpoint (too tight for boundary lines)
+        let result = Grid::build_lines_from_coords(vec![10, 14]);
+        assert_eq!(result, vec![10, 12, 14]);
+    }
+
+    #[test]
+    fn test_medium_gap() {
+        // Gap of 6: +2, midpoint, -2
+        let result = Grid::build_lines_from_coords(vec![10, 16]);
+        assert!(result.contains(&10));
+        assert!(result.contains(&16));
+        assert!(result.contains(&12)); // +2
+        assert!(result.contains(&13)); // midpoint
+        assert!(result.contains(&14)); // -2
+    }
+
+    #[test]
+    fn test_gap_10_has_midpoint() {
+        // Gap of 10: interior_gap=4, gets midpoint
+        let result = Grid::build_lines_from_coords(vec![0, 10]);
+        assert!(result.contains(&2));  // +2
+        assert!(result.contains(&5));  // midpoint
+        assert!(result.contains(&8));  // -2
+    }
+
+    #[test]
+    fn test_gap_14_gets_extra_line() {
+        // Gap of 14: interior_gap=8, 8/4-1=1 uniform line
+        let result = Grid::build_lines_from_coords(vec![0, 14]);
+        assert!(result.contains(&2));  // +2
+        assert!(result.contains(&12)); // -2
+        // Should have at least one interior line between +2 and -2
+        let interior: Vec<_> = result.iter().filter(|&&v| v > 2 && v < 12).collect();
+        assert!(!interior.is_empty(), "Expected interior line(s), got {:?}", result);
+    }
+
+    #[test]
+    fn test_large_gap_more_channels() {
+        // Gap of 30: interior_gap=24, should get multiple interior lines
+        let result = Grid::build_lines_from_coords(vec![0, 30]);
+        assert!(result.contains(&0));
+        assert!(result.contains(&30));
+        assert!(result.contains(&2));  // +2 boundary
+        assert!(result.contains(&28)); // -2 boundary
+        let interior: Vec<_> = result.iter().filter(|&&v| v > 2 && v < 28).collect();
+        assert!(interior.len() >= 3, "Expected >=3 interior lines for gap=30, got {:?}", result);
+    }
+
+    #[test]
+    fn test_very_large_gap() {
+        // Gap of 200: gets many interior lines, bounded by MAX_INTERMEDIATE + boundaries + midpoint
+        let result = Grid::build_lines_from_coords(vec![0, 200]);
+        assert!(result.contains(&0));
+        assert!(result.contains(&200));
+        assert!(result.contains(&2));   // +2 boundary
+        assert!(result.contains(&100)); // midpoint
+        assert!(result.contains(&198)); // -2 boundary
+        let total_intermediates = result.len() - 2; // minus original coords
+        // MAX_INTERMEDIATE(8) uniform + 2 boundaries + 1 midpoint = up to 11
+        assert!(total_intermediates <= 12, "Too many intermediates: {:?}", result);
+        assert!(total_intermediates >= 5, "Expected >=5 intermediates for gap=200, got {:?}", result);
+    }
+
+    #[test]
+    fn test_uniform_lines_well_spaced() {
+        // For large gaps, the uniform lines (excluding midpoint) should be well-spaced
+        let result = Grid::build_lines_from_coords(vec![0, 100]);
+        // All consecutive lines should be at least 2 apart (midpoint can be close to uniform)
+        for window in result.windows(2) {
+            assert!(
+                window[1] - window[0] >= 1,
+                "Duplicate or reversed: {} to {}, full: {:?}",
+                window[0],
+                window[1],
+                result
+            );
+        }
+        // Should have meaningful number of routing channels
+        let interior: Vec<_> = result.iter().filter(|&&v| v > 2 && v < 98).collect();
+        assert!(interior.len() >= 4, "Expected >=4 interior channels for gap=100, got {:?}", result);
+    }
+
+    #[test]
+    fn test_preserves_original_coords() {
+        let input = vec![5, 20, 50, 100];
+        let result = Grid::build_lines_from_coords(input.clone());
+        for coord in &input {
+            assert!(result.contains(coord), "Missing original coord {}", coord);
+        }
+    }
+
+    #[test]
+    fn test_sorted_and_deduped() {
+        let result = Grid::build_lines_from_coords(vec![50, 10, 30, 10]);
+        for window in result.windows(2) {
+            assert!(window[0] < window[1], "Not sorted: {:?}", result);
+        }
+        let mut deduped = result.clone();
+        deduped.dedup();
+        assert_eq!(result, deduped);
     }
 }

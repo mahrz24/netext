@@ -1,3 +1,5 @@
+use std::cmp::{max, min};
+
 use pyo3::prelude::*;
 use rand::Rng;
 use serde_json::json;
@@ -17,14 +19,14 @@ pub(crate) fn route_single_edge<R: Rng + ?Sized>(
     start: DirectedPoint,
     end: DirectedPoint,
     rng: &mut R,
-    raw_cost_prefix_x: &[f64],
-    raw_cost_prefix_y: &[f64],
     raw_history_cost_prefix_x: &[f64],
     raw_history_cost_prefix_y: &[f64],
     raw_usage: &mut [i32],
     raw_corner_usage: &mut [i32],
     raw_corner_history: &[f64],
     base_cost: f64,
+    lambda: f64,
+    capacity: i32,
     mu: f64,
     corner_lambda: f64,
     corner_capacity: i32,
@@ -62,16 +64,25 @@ pub(crate) fn route_single_edge<R: Rng + ?Sized>(
             let from_point = grid.grid_point_to_point(from_idx).unwrap();
             let to_point = grid.grid_point_to_point(to_idx).unwrap();
 
-            let turn_cost = if from_orientation != to_orientation { 1 } else { 0 };
+            // Turn cost must be high enough that tiny detours around minor
+            // congestion are not worthwhile.  With base_cost=1.0 and lambda=2.0,
+            // a 1-pixel detour saves ~2 per congested pixel but costs 2*turn.
+            // Setting turn_cost = 3*base_cost means a detour only pays off when
+            // the shared corridor is 4+ pixels long.
+            let turn_cost = if from_orientation != to_orientation {
+                base_cost * 3.0
+            } else {
+                0.0
+            };
 
-            let current_cost = segment_cost_from_prefix_sums(
-                grid,
-                raw_cost_prefix_x,
-                raw_cost_prefix_y,
-                from_idx,
-                to_idx,
+            let current_cost = segment_cost_from_usage(
+                raw_area,
+                raw_usage,
                 from_point,
                 to_point,
+                base_cost,
+                lambda,
+                capacity,
             );
             let history_cost = segment_cost_from_prefix_sums(
                 grid,
@@ -98,7 +109,7 @@ pub(crate) fn route_single_edge<R: Rng + ?Sized>(
                 0.0
             };
 
-            (turn_cost as f64 + current_cost + mu * history_cost + corner_penalty) as i32
+            (turn_cost + current_cost + mu * history_cost + corner_penalty) as i32
         },
     ) {
         Ok(path) => path,
@@ -232,6 +243,54 @@ pub(crate) fn route_single_edge<R: Rng + ?Sized>(
     Ok(((start_raw_point, end_raw_point), path_with_endpoints, trace_entry))
 }
 
+/// Compute segment cost directly from raw_usage. O(segment_length) per call,
+/// but always sees the latest congestion — no stale prefix sums.
+fn segment_cost_from_usage(
+    raw_area: &RawArea,
+    raw_usage: &[i32],
+    from_point: Point,
+    to_point: Point,
+    base_cost: f64,
+    lambda: f64,
+    capacity: i32,
+) -> f64 {
+    if from_point == to_point {
+        return 0.0;
+    }
+
+    let width = raw_area.width();
+    let height = raw_area.height();
+    let tl = &raw_area.top_left;
+    let mut cost = 0.0;
+
+    if from_point.x == to_point.x {
+        // Vertical move
+        let x = from_point.x - tl.x;
+        let min_y = min(from_point.y, to_point.y) - tl.y;
+        let max_y = max(from_point.y, to_point.y) - tl.y;
+        let vert_base = ((width - 1) * height) as usize;
+        let col_base = vert_base + (x * (height - 1)) as usize;
+        for y in min_y..max_y {
+            let usage = raw_usage[col_base + y as usize];
+            let overflow = if usage > capacity { usage - capacity } else { 0 };
+            cost += base_cost + lambda * (overflow as f64);
+        }
+    } else {
+        // Horizontal move
+        let y = from_point.y - tl.y;
+        let min_x = min(from_point.x, to_point.x) - tl.x;
+        let max_x = max(from_point.x, to_point.x) - tl.x;
+        let row_base = (y * (width - 1)) as usize;
+        for x in min_x..max_x {
+            let usage = raw_usage[row_base + x as usize];
+            let overflow = if usage > capacity { usage - capacity } else { 0 };
+            cost += base_cost + lambda * (overflow as f64);
+        }
+    }
+
+    cost
+}
+
 fn segment_cost_from_prefix_sums(
     grid: &Grid,
     raw_cost_prefix_x: &[f64],
@@ -246,7 +305,6 @@ fn segment_cost_from_prefix_sums(
     }
 
     if from_point.x == to_point.x {
-        // Vertical move
         let to_upper = to_point.y > from_point.y;
 
         let upper_raw_point = if to_upper {
@@ -262,7 +320,6 @@ fn segment_cost_from_prefix_sums(
 
         raw_cost_prefix_y[upper_raw_point.0 as usize] - raw_cost_prefix_y[lower_raw_point.0 as usize]
     } else {
-        // Horizontal move
         let to_left = to_point.x < from_point.x;
 
         let left_raw_point = if to_left {

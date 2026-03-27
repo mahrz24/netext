@@ -35,16 +35,10 @@
 
 ## High Impact
 
-- [ ] Insert more intermediate grid lines between distant nodes (grid.rs)
-      When endpoints are >5 units apart, only lines at ±2 offset are inserted. Edges have
-      very few routing channels between distant nodes, forcing them into the same corridors
-      and causing overlap that the rip-up loop can't resolve. Insert lines every 2-3 units.
-      ⚠ Perf: more grid lines → larger A* search space (more states to explore). The grid
-      grows quadratically with line count, so insertion density needs a cap. A reasonable
-      approach: insert lines at exponentially increasing intervals (e.g. 2, 4, 8) rather
-      than uniform spacing, so nearby regions get fine resolution without exploding distant
-      ones. Alternatively, only insert extra lines in corridors between nodes where edges
-      actually need to route (demand-driven), skipping empty regions entirely.
+- [X] Insert more intermediate grid lines between distant nodes (grid.rs)
+      Midpoint always included; uniform interior fill (MIN_SPACING=4, up to 8 extra lines)
+      added for gaps with ≥4-unit interior space. Turn cost raised to 3×base_cost to prevent
+      zigzag detours through the denser grid.
 
 - [ ] Add cost term for proximity to nodes (route_single.rs)
       Edges routed close to node borders look cramped. Add a distance-to-node cost so edges
@@ -84,12 +78,9 @@
 
 ## Medium Impact
 
-- [ ] Add history cost decay (ripup.rs)
-      History costs accumulate indefinitely across iterations. Early congestion permanently
-      penalizes segments even after congestion is resolved, biasing later iterations toward
-      suboptimal paths. Multiply by a decay factor (e.g. 0.9) each iteration.
-      ⚠ Perf: one multiply per segment per iteration — O(S) where S = total segments.
-      Negligible compared to A* cost. Could even use integer shift approximation.
+- [X] Add history cost decay (ripup.rs)
+      History costs now decay by 0.85× each iteration before adding new overflow, preventing
+      runaway accumulation from biasing routes toward suboptimal detours.
 
 - [ ] Add crossing penalty for parallel overlap >1 unit (route_single.rs)
       Crossing lines for more than 1 unit should have an additional penalty, unless the

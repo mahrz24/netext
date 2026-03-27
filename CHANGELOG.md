@@ -1,9 +1,14 @@
 <a id='changelog-0.4.0'></a>
-# Routing & Architecture v0.4.0 — 2026-03-24
+# Routing & Architecture v0.4.0 — 27.03.2026
 
 ## Changed
 
 - Completely rewritten edge routing engine in Rust using bucketed A* with node avoidance and edge decongestion.
+    - Edge routing grid now inserts more intermediate lines between coordinates: the large-gap threshold is lowered from 6 to 5 units, midpoint is always included, and uniform fill (MIN_SPACING=4, up to 8 extra) kicks in for larger gaps. This provides more routing channels and reduces edge overlap.
+    - Grid boundary padding increased from 3 to 7 units (3 routing channels), and boundaries are now included in the coordinate set before intermediate line generation. Edges routing around the outside of the graph now have proper routing channels in the padding area instead of just bare boundary lines.
+    - Increased A* turn cost from 1 to 3× base cost, preventing tiny zigzag detours around minor congestion.
+    - History costs for edge segments and corners now decay by 0.85× each rip-up iteration, preventing runaway accumulation from permanently biasing routes.
+    - Current congestion cost is now computed directly from live `raw_usage` during A* traversal instead of from stale prefix sums. Each edge immediately sees congestion from prior edges in the same pass, preventing corridor pileups. History cost still uses prefix sums (unchanged within a pass).
 - Decomposed `ConsoleGraph` into separate modules for graph transitions and mutations.
 - Edge router is now seeded with existing edges for better incremental routing.
 - Restructured Rust routing code into multiple modules.

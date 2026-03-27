@@ -160,13 +160,9 @@ impl EdgeRouter {
         // We also need to maintain usage and capacity on the raw grid, initialized with usage from
         // existing edges. We could also use capacity to change how edges are routed here.
         let mut raw_usage = vec![0; raw_num_segments as usize];
-        let mut raw_cost = vec![0.0; raw_num_segments as usize];
         let mut raw_history_cost = vec![0.0; raw_num_segments as usize];
         let mut raw_corner_usage = vec![0; raw_area.size()];
         let mut raw_corner_history = vec![0.0; raw_area.size()];
-
-        let mut raw_cost_prefix_x = vec![0.0; ((raw_area.width()) * raw_area.height()) as usize];
-        let mut raw_cost_prefix_y = vec![0.0; (raw_area.width() * (raw_area.height())) as usize];
 
         let mut raw_history_cost_prefix_x = vec![0.0; ((raw_area.width()) * raw_area.height()) as usize];
         let mut raw_history_cost_prefix_y = vec![0.0; (raw_area.width() * (raw_area.height())) as usize];
@@ -194,16 +190,7 @@ impl EdgeRouter {
         let mut op_edges = edges.clone();
 
         for i in 0..max_iterations {
-            // 1) Compute present costs from current usage
-            for i in 0..raw_num_segments as usize {
-                // Cost is base + lambda * max(0, usage - capacity)
-                let usage = raw_usage[i];
-                let overflow = if usage > capacity { usage - capacity } else { 0 };
-                raw_cost[i] = 1.0 + lambda * (overflow as f64);
-            }
-
-            // Update prefix sums as the per edge costs have now all changed.
-            raw_area.edge_prefix_sums(&raw_cost, &mut raw_cost_prefix_x, &mut raw_cost_prefix_y);
+            // Update history prefix sums (history doesn't change within a pass).
             raw_area.edge_prefix_sums(
                 &raw_history_cost,
                 &mut raw_history_cost_prefix_x,
@@ -216,6 +203,9 @@ impl EdgeRouter {
                 Vec::new();
             let mut overflow_map: HashMap<(RawPoint, RawPoint), bool> = HashMap::new();
             for (_u, _v, start, end, _) in &sorted_edges {
+                // Current congestion cost is computed directly from raw_usage
+                // inside route_single_edge — no prefix sums needed, so each
+                // edge immediately sees congestion from prior edges.
                 let (key, path_with_endpoints, trace_entry) = route_single_edge(
                     &grid,
                     &raw_area,
@@ -223,14 +213,14 @@ impl EdgeRouter {
                     *start,
                     *end,
                     &mut rng,
-                    &raw_cost_prefix_x,
-                    &raw_cost_prefix_y,
                     &raw_history_cost_prefix_x,
                     &raw_history_cost_prefix_y,
                     &mut raw_usage,
                     &mut raw_corner_usage,
                     &raw_corner_history,
                     base_cost,
+                    lambda,
+                    capacity,
                     mu,
                     corner_lambda,
                     corner_capacity,
@@ -250,9 +240,15 @@ impl EdgeRouter {
             let finished = total_overflow == 0;
 
             if !finished {
-                // 5) Update history cost based on overflow
-                update_edge_history_cost(&raw_usage, &mut raw_history_cost, capacity);
-                update_corner_history_cost(&raw_corner_usage, &mut raw_corner_history, corner_capacity);
+                // 5) Update history cost based on overflow (with decay to prevent runaway accumulation)
+                let history_decay = 0.85;
+                update_edge_history_cost(&raw_usage, &mut raw_history_cost, capacity, history_decay);
+                update_corner_history_cost(
+                    &raw_corner_usage,
+                    &mut raw_corner_history,
+                    corner_capacity,
+                    history_decay,
+                );
 
                 // 6) Select edges to rip up
                 op_edges.clear();

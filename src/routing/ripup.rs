@@ -143,8 +143,14 @@ pub(crate) fn compute_overflow(
     (total_overflow, edge_overflow, corner_overflow)
 }
 
-pub(crate) fn update_edge_history_cost(raw_usage: &[i32], raw_history_cost: &mut [f64], capacity: i32) {
+pub(crate) fn update_edge_history_cost(
+    raw_usage: &[i32],
+    raw_history_cost: &mut [f64],
+    capacity: i32,
+    decay: f64,
+) {
     for (i, usage) in raw_usage.iter().enumerate() {
+        raw_history_cost[i] *= decay;
         if *usage > capacity {
             raw_history_cost[i] += (*usage - capacity) as f64;
         }
@@ -155,8 +161,10 @@ pub(crate) fn update_corner_history_cost(
     raw_corner_usage: &[i32],
     raw_corner_history: &mut [f64],
     corner_capacity: i32,
+    decay: f64,
 ) {
     for (i, usage) in raw_corner_usage.iter().enumerate() {
+        raw_corner_history[i] *= decay;
         if *usage > corner_capacity {
             raw_corner_history[i] += (*usage - corner_capacity) as f64;
         }
