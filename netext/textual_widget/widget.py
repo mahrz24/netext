@@ -114,7 +114,7 @@ class GraphView(ScrollView):
                 console=self.app.console,
                 max_width=self.size.width,
                 max_height=self.size.height,
-                zoom=self._zoom,
+                zoom=self.zoom,
                 **self._console_graph_kwargs,
             )
 
@@ -130,6 +130,17 @@ class GraphView(ScrollView):
     @graph.setter
     def graph(self, graph: DiGraph) -> None:
         self._graph = graph
+        self._reset_console_graph()
+        self._graph_was_updated()
+
+    def sync_graph(self) -> None:
+        """Rebuild the console graph from the current networkx graph.
+
+        Call this after directly mutating graph attributes (e.g. via
+        ``nx.set_node_attributes`` or ``nx.set_edge_attributes``) so
+        that the widget picks up the changes.
+        """
+        self._reset_console_graph()
         self._graph_was_updated()
 
     def node_properties(self, node: Hashable) -> NodeProperties:
@@ -333,7 +344,6 @@ class GraphView(ScrollView):
         # TODO check why mypy gets the setter wrong
         if new_zoom != old_zoom:
             self._console_graph.zoom = new_zoom  # type: ignore
-            self._zoom = new_zoom
             self._graph_was_updated()
 
     # Check if this would work with scrolling via viewport

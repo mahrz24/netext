@@ -1,6 +1,6 @@
 [project]
 name = "netext"
-version = "0.4.0"
+version = "0.4.1"
 description = "A graph (network) rendering library for the terminal."
 authors = [{ name = "Malte Klemm", email = "me@malteklemm.de" }]
 license = { text = "MIT Licence" }

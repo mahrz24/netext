@@ -1,3 +1,15 @@
+<a id='changelog-0.4.1'></a>
+# v0.4.1 — 02.04.2026
+
+## Fixed
+
+- Textual widget: setting graph attributes via `nx.set_node_attributes` / `nx.set_edge_attributes` on `GraphView.graph` no longer silently ignored. The `graph` setter now rebuilds the internal `ConsoleGraph` so changes are rendered.
+- Textual widget: `_reset_console_graph` referenced undefined `self._zoom`; changed to `self.zoom` (the Textual reactive) so it works even when zoom has not been changed from the initial value.
+
+## Added
+
+- `GraphView.sync_graph()` method to rebuild the widget after in-place mutations to the underlying networkx graph.
+
 <a id='changelog-0.4.0'></a>
 # Routing & Architecture v0.4.0 — 27.03.2026
 
