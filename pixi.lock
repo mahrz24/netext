@@ -3249,8 +3249,8 @@ packages:
   timestamp: 1738196177597
 - pypi: ./
   name: netext
-  version: 0.4.0
-  sha256: a1886c248a025e655c9bbd088fe7dfd9a3b5451746ce04c1fdfe57526199527b
+  version: 0.4.1
+  sha256: f44ba0d4d7ab14dca2ef69103f46a9568da6afd7ec9448db0d9e171e4ef9b72f
   requires_dist:
   - rich>=13
   - networkx~=3.0
