@@ -195,15 +195,18 @@ class NodeBuffer(ShapeBuffer):
             else:
                 side = ShapeSide.RIGHT
         elif layout_direction == core.LayoutDirection.LEFT_RIGHT:
+            # Prefer left or right, then top or bottom — symmetric to the
+            # TOP_DOWN branch above. Falls through to top/bottom only when
+            # the two nodes overlap horizontally (e.g. siblings within a
+            # column).
             if other_buffer.right_x < self.left_x:
                 side = ShapeSide.LEFT
             elif other_buffer.left_x > self.right_x:
                 side = ShapeSide.RIGHT
-            elif other_buffer.top_y < self.bottom_y:
-                side = ShapeSide.BOTTOM
-            else:
+            elif other_buffer.bottom_y < self.top_y:
                 side = ShapeSide.TOP
-            side = self.get_closest_side(other_buffer.center)
+            else:
+                side = ShapeSide.BOTTOM
         else:
             side = self.get_closest_side(other_buffer.center)
         return side

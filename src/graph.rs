@@ -12,8 +12,14 @@ pub struct CoreGraph {
     pub graph: DiGraphMap<NodeIndex, ()>,
     pub object_map: PyIndexSet,
     data_map: HashMap<NodeIndex, PyObject>,
-    pub size_map: HashMap<NodeIndex, Size>,
+    size_map: HashMap<NodeIndex, Size>,
     edge_data_map: HashMap<(NodeIndex, NodeIndex), PyObject>,
+}
+
+impl CoreGraph {
+    pub fn size_by_index(&self, index: NodeIndex) -> Option<&Size> {
+        self.size_map.get(&index)
+    }
 }
 
 #[pymethods]
