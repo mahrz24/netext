@@ -62,8 +62,8 @@ impl ForceDirectedLayout {
                         let distance = delta.length_as_vector();
 
                         let origin = Size::new(0, 0);
-                        let size_u = graph.size_map.get(&u).unwrap_or(&origin);
-                        let size_v = graph.size_map.get(&v).unwrap_or(&origin);
+                        let size_u = graph.size_by_index(u).unwrap_or(&origin);
+                        let size_v = graph.size_by_index(v).unwrap_or(&origin);
 
                         let min_distance =
                             cmp::max(size_u.height + size_v.height, size_u.width + size_v.width);

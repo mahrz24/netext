@@ -133,12 +133,16 @@
 
 # Layout
 
-- [ ] Rename or rewrite `brandes_koepf_coordinates` (sugiyama.rs:109)
-      The method doesn't implement Brandes-Köpf. It's a simple left-to-right placement
-      with center-alignment — no vertical alignment, no block/class computation.
-- [ ] Sugiyama better alignment of nodes
-- [ ] Barycenter ordering: add upward pass and iteration (sugiyama.rs:167)
-      Currently only does a single downward pass, limiting crossing minimization quality.
+- [X] Rewrite `brandes_koepf_coordinates` (sugiyama.rs:109)
+      Now implements proper Brandes-Köpf: Type 1 conflict marking, 4-direction vertical
+      alignment, horizontal compaction, median-of-four balance. Dummy nodes are inserted
+      for edges spanning multiple layers so long edges have intermediate anchors.
+- [X] Sugiyama better alignment of nodes
+      Achieved via the Brandes-Köpf rewrite above — chains and long edges now align
+      vertically, and siblings are spaced according to subtree widths.
+- [X] Barycenter ordering: add upward pass and iteration (sugiyama.rs:167)
+      Now alternates down/up sweeps with O(1) position lookup, tracks best ordering by
+      crossing count across sweeps, and stops early when a full round is stable.
 - [ ] Tree layout
 - [ ] Git Branch layout
 
@@ -151,8 +155,9 @@
 - [ ] Move tracing dependencies behind a feature flag (Cargo.toml:18-19)
       tracing, tracing-flame, tracing-subscriber are non-optional dependencies adding
       binary size and compile time even when tracing is disabled.
-- [ ] Fix direct access to `graph.size_map` from sugiyama.rs (sugiyama.rs:123)
-      Has a TODO comment acknowledging this breaks CoreGraph encapsulation.
+- [X] Fix direct access to `graph.size_map` from sugiyama.rs (sugiyama.rs:123)
+      Added `CoreGraph::size_by_index(NodeIndex) -> Option<&Size>`; size_map is now private.
+      sugiyama.rs and force_directed.rs both go through the accessor.
 
 # Testing
 
