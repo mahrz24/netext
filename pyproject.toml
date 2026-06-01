@@ -72,6 +72,28 @@ netext = { path = ".", editable = true, extras = ["textual"] }
 ty = ">=0.0.1a7"
 ruff = ">=0.9.1"
 
+[tool.pixi.feature.examples.pypi-dependencies]
+netext = { path = ".", editable = true, extras = ["networkx"] }
+
+[tool.pixi.feature.examples-textual.pypi-dependencies]
+netext = { path = ".", editable = true, extras = ["textual"] }
+
+[tool.pixi.feature.examples.tasks]
+example-hypercube = "python examples/hypercube.py"
+example-labels = "python examples/labels.py"
+example-magnets-and-ports = "python examples/magnets_and_ports.py"
+example-minimal = "python examples/minimal.py"
+example-mst = "python examples/mst.py"
+example-mst-slotted = "python examples/mst_slotted.py"
+example-rainbow = "python examples/rainbow.py"
+example-rich-nodes = "python examples/rich_nodes.py"
+example-routing = "python examples/routing.py"
+example-sugiyama = "python examples/sugiyama.py"
+example-zoom-and-viewports = "python examples/zoom_and_viewports.py"
+
+[tool.pixi.feature.examples-textual.tasks]
+example-textual = "python examples/textual.py"
+
 [tool.pixi.feature.py310.dependencies]
 python = "3.10.*"
 
@@ -95,6 +117,8 @@ py311-testing = { features = ["py311", "testing"] }
 py312-testing = { features = ["py312", "testing"] }
 py313-testing = { features = ["py313", "testing"] }
 py313-benchmark = { features = ["py313", "testing", "benchmark"] }
+examples = { features = ["py310", "examples"] }
+examples-textual = { features = ["py310", "examples-textual"] }
 
 [tool.pixi.tasks]
 cargo-test = { cmd = "bash cargo-test.sh" }
