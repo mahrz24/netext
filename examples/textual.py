@@ -1,5 +1,6 @@
 from textual.app import App, ComposeResult
 from textual.widgets import Header
+from rich.style import Style
 from netext.textual_widget.widget import GraphView
 
 
@@ -10,7 +11,10 @@ class GraphviewApp(App):
         """Create child widgets for the app."""
         yield Header()
         yield GraphView(
-            nodes={"Hello": {}, "World": {}},
+            nodes={
+                "Hello": {"$content-style": Style(color="white")},
+                "World": {"$content-style": Style(color="white")},
+            },
             edges=[("Hello", "World")],
         )
 

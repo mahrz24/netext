@@ -9,7 +9,7 @@ The viewport, if explicitly specified, is passed as a region, e.g.:
 ```python
 from netext.geometry import Region
 ...
-ConsoleGraph(g, viewport=Region(-20, -25, 40, 15))
+ConsoleGraph(nodes=nodes, edges=edges, viewport=Region(-20, -25, 40, 15))
 ```
 
 that determines the upper left point, i.e. `(-20, -25)` and the size of the region, i.e. `(40, 15)`.

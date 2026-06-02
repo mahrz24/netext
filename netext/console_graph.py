@@ -141,8 +141,9 @@ class ConsoleGraph:
         as any other rich renderable. You can pass a layout engine and a
         specific console that will be used for rendering.
 
-        Rendering of nodes and edges happens on object creation and the
-        object size is determined by the graph (no reactive rendering).
+        Rendering of nodes and edges happens lazily when the graph is
+        rendered by rich. The object size is determined by the graph
+        (no reactive rendering).
 
         Args:
             nodes: A dict mapping node ids to data dicts, e.g. ``{1: {"label": "A"}, 2: {}}``.
@@ -198,7 +199,8 @@ class ConsoleGraph:
     def from_networkx(cls, graph: "Any", **kwargs: Any) -> "ConsoleGraph":
         """Create a ConsoleGraph from a networkx DiGraph.
 
-        Requires networkx to be installed (pip install netext[networkx]).
+        networkx is optional and is only needed to create the graph object
+        passed to this method (pip install netext[networkx]).
 
         Args:
             graph: A networkx DiGraph (or Graph) object.
@@ -357,7 +359,7 @@ class ConsoleGraph:
             data (dict[str, Any] | None, optional): The data and attributes of the edge.
 
         Raises:
-            ValueError: Raised if one of the edges does not exist in the graph.
+            ValueError: Raised if one of the nodes does not exist in the graph.
         """
 
         self._require(RenderState.EDGES_RENDERED)
@@ -578,7 +580,8 @@ class ConsoleGraph:
             v (Hashable): The target node of the edge.
             data (dict[str, Any]): The new or updated data dictionary.
             update_data (bool, optional): Whether to replace or update the data dictionary, by default True.
-            update_layout (bool, optional): Whether to update the layout of the edge, by default True.
+            update_layout (bool, optional): Accepted for API compatibility. The edge is
+                currently rerendered whether this is true or false.
 
         Raises:
             RuntimeError: If the zoom factor has not been computed yet.

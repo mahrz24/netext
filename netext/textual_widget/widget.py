@@ -15,6 +15,7 @@ from rich.segment import Segment
 from netext.geometry.region import Region as NetextRegion
 from netext.geometry.point import FloatPoint
 from textual.message import Message
+from rich.style import Style
 
 from netext.properties.node import NodeProperties
 from netext.rendering.segment_buffer import Reference
@@ -65,7 +66,7 @@ class GraphView(ScrollView):
         disabled: bool = False,
         zoom: float | tuple[float, float] | ZoomSpec | AutoZoom = 1.0,
         scroll_via_viewport: bool = False,
-        **console_graph_kwargs,
+        **console_graph_kwargs: Any,
     ):
         """Initializes a new instance of the GraphView class.
 
@@ -112,7 +113,8 @@ class GraphView(ScrollView):
     def from_networkx(cls, graph: Any, **kwargs: Any) -> "GraphView":
         """Create a GraphView from a networkx DiGraph.
 
-        Requires networkx to be installed (pip install netext[networkx]).
+        networkx is optional and is only needed to create the graph object
+        passed to this method (pip install netext[networkx]).
 
         Args:
             graph: A networkx DiGraph (or Graph) object.
@@ -329,7 +331,8 @@ class GraphView(ScrollView):
             v (Hashable): The destination node of the edge.
             data (dict[str, Any]): The data to update the edge with.
             update_data (bool, optional): Whether to merge the data of the edge. Defaults to True.
-            update_layout (bool, optional): Whether to update the layout of the graph. Defaults to True.
+            update_layout (bool, optional): Accepted for API compatibility. The edge is
+                currently rerendered whether this is true or false.
 
         Returns:
             None
@@ -500,7 +503,7 @@ class GraphView(ScrollView):
         y += scroll_y
 
         if y < 0 or y >= len(self._strip_segments):
-            return Strip.blank(self.size.width)
+            return Strip.blank(self.size.width, Style())
 
         return Strip(self._strip_segments[y]).crop(scroll_x, scroll_x + self.size.width)
 

@@ -45,7 +45,6 @@ plugins:
             show_source: false
           inventories:
             - https://rich.readthedocs.io/en/stable/objects.inv
-            - https://networkx.org/documentation/stable/objects.inv
 
 markdown_extensions:
   - def_list
