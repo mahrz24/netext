@@ -4,9 +4,7 @@ from enum import Enum
 from itertools import chain
 import itertools
 from typing import Any, Iterable, cast
-from networkx import DiGraph  # type: ignore
 
-import networkx as nx  # type: ignore
 from rich.console import Console, ConsoleOptions, RenderResult
 from rich.measure import Measurement
 
@@ -47,6 +45,23 @@ from rich.traceback import install
 install(show_locals=False)
 
 
+def _parse_edges(
+    edges: Iterable[tuple[Hashable, Hashable]] | Iterable[tuple[Hashable, Hashable, dict[str, Any]]] | None,
+) -> tuple[list[tuple[Hashable, Hashable]], list[tuple[Hashable, Hashable, dict[str, Any]]]]:
+    edge_list: list[tuple[Hashable, Hashable]] = []
+    edge_data_list: list[tuple[Hashable, Hashable, dict[str, Any]]] = []
+    if edges is not None:
+        for item in list(edges):
+            item_tuple = tuple(item) if not isinstance(item, tuple) else item
+            if len(item_tuple) == 3:
+                edge_list.append((item_tuple[0], item_tuple[1]))
+                edge_data_list.append((item_tuple[0], item_tuple[1], item_tuple[2]))
+            else:
+                edge_list.append((item_tuple[0], item_tuple[1]))
+                edge_data_list.append((item_tuple[0], item_tuple[1], {}))
+    return edge_list, edge_data_list
+
+
 class RenderState(Enum):
     INITIAL = "initial"
     """The initial state, no rendering has happened yet."""
@@ -67,34 +82,24 @@ class RenderState(Enum):
     """The edges have been rendered for the current lod."""
 
 
-transition_graph = nx.DiGraph()
-
-transition_graph.add_edge(
+_STATE_ORDER: list[RenderState] = [
     RenderState.INITIAL,
     RenderState.NODE_BUFFERS_RENDERED_FOR_LAYOUT,
-    transition="render_node_buffers_for_layout",
-)
-transition_graph.add_edge(
-    RenderState.NODE_BUFFERS_RENDERED_FOR_LAYOUT,
-    RenderState.NODE_LAYOUT_COMPUTED,
-    transition="compute_node_layout",
-)
-transition_graph.add_edge(
     RenderState.NODE_LAYOUT_COMPUTED,
     RenderState.ZOOMED_POSITIONS_COMPUTED,
-    transition="compute_zoomed_positions",
-)
-transition_graph.add_edge(
-    RenderState.ZOOMED_POSITIONS_COMPUTED,
-    RenderState.NODE_BUFFERS_RENDERED,
-    transition="render_node_buffers",
-)
-
-transition_graph.add_edge(
     RenderState.NODE_BUFFERS_RENDERED,
     RenderState.EDGES_RENDERED,
-    transition="render_edges",
-)
+]
+
+_TRANSITIONS: list[str] = [
+    "render_node_buffers_for_layout",
+    "compute_node_layout",
+    "compute_zoomed_positions",
+    "render_node_buffers",
+    "render_edges",
+]
+
+_STATE_INDEX: dict[RenderState, int] = {s: i for i, s in enumerate(_STATE_ORDER)}
 
 
 class AutoZoom(Enum):
@@ -115,7 +120,11 @@ class ZoomSpec:
 class ConsoleGraph:
     def __init__(
         self,
-        graph: DiGraph,
+        nodes: dict[Hashable, dict[str, Any]] | None = None,
+        edges: (
+            Iterable[tuple[Hashable, Hashable]] | Iterable[tuple[Hashable, Hashable, dict[str, Any]]] | None
+        ) = None,
+        *,
         layout_engine: core.LayoutEngine = core.SugiyamaLayout(core.LayoutDirection.TOP_DOWN),
         console: Console = Console(),
         viewport: Region | None = None,
@@ -124,24 +133,26 @@ class ConsoleGraph:
         zoom: float | tuple[float, float] | ZoomSpec | AutoZoom = 1.0,
     ):
         """
-        A console representation of a networkx graph.
+        A console representation of a graph.
 
         The class conforms to the rich console protocol and can be printed
         as any other rich renderable. You can pass a layout engine and a
         specific console that will be used for rendering.
 
-
-
-        Rendering of nodes and edges happens on object creation and the
-        object size is determined by the graph (no reactive rendering).
+        Rendering of nodes and edges happens lazily when the graph is
+        rendered by rich. The object size is determined by the graph
+        (no reactive rendering).
 
         Args:
-            graph (G): A networkx digraph object ([networkx.DiGraph][]).
-            layout_engine (LayoutEngine[G], optional): The layout engine used.
-            console (Console, optional): The rich console driver used to render.
-            viewport (Region, optional): The viewport to render. Defaults to the whole graph.
-            zoom (float | tuple[float, float] | ZoomSpec | AutoZoom, optional): The zoom level, either a float, a
-                tuple of zoom in x and y direction or a zoom spec / auto zoom mode. Defaults to 1.0.
+            nodes: A dict mapping node ids to data dicts, e.g. ``{1: {"label": "A"}, 2: {}}``.
+            edges: An iterable of 2-tuples ``(u, v)`` or 3-tuples ``(u, v, data_dict)``.
+            layout_engine: The layout engine used.
+            console: The rich console driver used to render.
+            viewport: The viewport to render. Defaults to the whole graph.
+            max_width: The maximum width of the graph in characters.
+            max_height: The maximum height of the graph in characters.
+            zoom: The zoom level, either a float, a tuple of zoom in x and y direction
+                or a zoom spec / auto zoom mode. Defaults to 1.0.
         """
         self._viewport = viewport
         self._render_state = RenderState.INITIAL
@@ -159,45 +170,61 @@ class ConsoleGraph:
         self._max_height = max_height
 
         self._layout_engine = layout_engine
-        self._edge_router = core.EdgeRouter()
 
-        # Move efficient transformation into the core graph
-        self._core_graph = core.CoreGraph.from_edges(
-            cast(list[tuple[Hashable, Hashable]], graph.edges()),
-        )
+        edge_list, edge_data_list = _parse_edges(edges)
 
-        for node, data in graph.nodes(data=True):
-            if not self._core_graph.contains_node(node):
-                self._core_graph.add_node(node, data, core.Size(0, 0))
-            else:
-                self._core_graph.update_node_data(node, data)
-        for u, v, data in graph.edges(data=True):
+        self._core_graph = core.CoreGraph.from_edges(edge_list)
+        self._core_graph.init_router()
+
+        if nodes is not None:
+            for node, data in nodes.items():
+                if not self._core_graph.contains_node(node):
+                    self._core_graph.add_node(node, data, core.Size(0, 0))
+                else:
+                    self._core_graph.update_node_data(node, data)
+
+        for u, v, data in edge_data_list:
             self._core_graph.update_edge_data(u, v, data)
 
         self.node_buffers_for_layout: dict[Hashable, NodeBuffer] = dict()
         self.node_buffers: dict[Hashable, NodeBuffer] = dict()
         self.port_buffers: dict[Hashable, list[StripBuffer]] = dict()
 
-        self.node_positions: dict[Hashable, FloatPoint] = dict()
-
         self.edge_buffers: dict[tuple[Hashable, Hashable], EdgeBuffer] = dict()
         self.edge_label_buffers: dict[tuple[Hashable, Hashable], list[StripBuffer]] = dict()
 
-    def _require(self, required_state: RenderState):
-        if required_state in nx.descendants(transition_graph, self._render_state):
+    @classmethod
+    def from_networkx(cls, graph: "Any", **kwargs: Any) -> "ConsoleGraph":
+        """Create a ConsoleGraph from a networkx DiGraph.
+
+        networkx is optional and is only needed to create the graph object
+        passed to this method (pip install netext[networkx]).
+
+        Args:
+            graph: A networkx DiGraph (or Graph) object.
+            **kwargs: Additional keyword arguments passed to the ConsoleGraph constructor.
+
+        Returns:
+            A new ConsoleGraph instance.
+        """
+        nodes = dict(graph.nodes(data=True))
+        edges = [(u, v, d) for u, v, d in graph.edges(data=True)]
+        return cls(nodes=nodes, edges=edges, **kwargs)
+
+    def _require(self, required_state: RenderState) -> None:
+        if _STATE_INDEX[required_state] > _STATE_INDEX[self._render_state]:
             self._transition_to(required_state)
 
-    def _transition_to(self, target_state: RenderState):
-        path = nx.shortest_path(transition_graph, self._render_state, target_state)
-        for u, v in zip(path, path[1:]):
-            el = transition_graph.edges[u, v]
-            transition = el["transition"]
-            transition_func = getattr(self, f"_transition_{transition}")
+    def _transition_to(self, target_state: RenderState) -> None:
+        current_idx = _STATE_INDEX[self._render_state]
+        target_idx = _STATE_INDEX[target_state]
+        for i in range(current_idx, target_idx):
+            transition_func = getattr(self, f"_transition_{_TRANSITIONS[i]}")
             transition_func()
-            self._render_state = v
+            self._render_state = _STATE_ORDER[i + 1]
 
     def _reset_render_state(self, new_state: RenderState) -> None:
-        if self._render_state in nx.descendants(transition_graph, new_state):
+        if _STATE_INDEX[self._render_state] > _STATE_INDEX[new_state]:
             self._render_state = new_state
 
     @property
@@ -311,7 +338,7 @@ class ConsoleGraph:
         if position is not None:
             node_position = cast(FloatPoint, position)
             node_position += self.offset
-            self.node_positions[node] = node_position
+            self._core_graph.set_node_position(node, node_position.x, node_position.y)
             display_buffer.center = compute_node_view_position(node_position, self.zoom_x, self.zoom_y)
 
             needs_recompute, zoom_factor = check_zoom_recomputation(
@@ -325,7 +352,7 @@ class ConsoleGraph:
                 return
 
             self.node_buffers[node].center = compute_node_view_position(node_position, self.zoom_x, self.zoom_y)
-            register_node_with_router(self._edge_router, node, self.node_buffers[node])
+            register_node_with_router(self._core_graph, node, self.node_buffers[node])
             self._render_port_buffer_for_node(node)
         else:
             self._reset_render_state(RenderState.NODE_BUFFERS_RENDERED_FOR_LAYOUT)
@@ -339,7 +366,7 @@ class ConsoleGraph:
             data (dict[str, Any] | None, optional): The data and attributes of the edge.
 
         Raises:
-            ValueError: Raised if one of the edges does not exist in the graph.
+            ValueError: Raised if one of the nodes does not exist in the graph.
         """
 
         self._require(RenderState.EDGES_RENDERED)
@@ -363,7 +390,7 @@ class ConsoleGraph:
 
         rasterize_and_store_edge(
             self.console,
-            self._edge_router,
+            self._core_graph,
             u,
             v,
             self.node_buffers,
@@ -395,13 +422,11 @@ class ConsoleGraph:
             if u == node or v == node:
                 self.remove_edge(u, v)
 
-        self.node_positions.pop(node)
         self.node_buffers_for_layout.pop(node)
         self.node_buffers.pop(node)
 
         self.port_buffers.pop(node, None)
         self._core_graph.remove_node(node)
-        self._edge_router.remove_node(node)
 
     def remove_edge(self, u: Hashable, v: Hashable) -> None:
         """Removes an edge from the graph.
@@ -419,7 +444,6 @@ class ConsoleGraph:
         self.node_buffers[u].disconnect(v)
 
         self._core_graph.remove_edge(u, v)
-        self._edge_router.remove_edge(u, v)
 
         self.edge_buffers.pop((u, v))
         self.edge_label_buffers.pop((u, v))
@@ -495,14 +519,13 @@ class ConsoleGraph:
 
         force_edge_rerender = force_edge_rerender or (position is not None) or "$ports" in data
 
-        self._edge_router.remove_node(node)
-
         if position is None:
-            node_position = self.node_positions[node]
+            pos_x, pos_y = self._core_graph.get_node_position(node)
+            node_position = FloatPoint(pos_x, pos_y)
         else:
             node_position = cast(FloatPoint, position)
             node_position += self.offset
-            self.node_positions[node] = node_position
+            self._core_graph.set_node_position(node, node_position.x, node_position.y)
             self.node_buffers[node].center = compute_node_view_position(node_position, self.zoom_x, self.zoom_y)
             self.node_buffers[node].node_anchors.all_positions = dict()
 
@@ -524,13 +547,12 @@ class ConsoleGraph:
         self.node_buffers[node].center = compute_node_view_position(node_position, self.zoom_x, self.zoom_y)
         self._core_graph.update_node_data(node, dict(data, **{"$properties": properties}))
 
-        register_node_with_router(self._edge_router, node, self.node_buffers[node])
+        register_node_with_router(self._core_graph, node, self.node_buffers[node])
 
         if force_edge_rerender:
             rerender_connected_edges(
                 self.console,
                 self._core_graph,
-                self._edge_router,
                 node,
                 self.node_buffers,
                 self.edge_buffers,
@@ -585,7 +607,8 @@ class ConsoleGraph:
             v (Hashable): The target node of the edge.
             data (dict[str, Any]): The new or updated data dictionary.
             update_data (bool, optional): Whether to replace or update the data dictionary, by default True.
-            update_layout (bool, optional): Whether to update the layout of the edge, by default True.
+            update_layout (bool, optional): Accepted for API compatibility. The edge is
+                currently rerendered whether this is true or false.
 
         Raises:
             RuntimeError: If the zoom factor has not been computed yet.
@@ -608,7 +631,6 @@ class ConsoleGraph:
         self._core_graph.update_edge_data(u, v, dict(data, **{"$properties": properties}))
 
         old_z_index = remove_existing_edge_buffers(
-            self._edge_router,
             u,
             v,
             self.node_buffers,
@@ -618,7 +640,7 @@ class ConsoleGraph:
 
         rasterize_and_store_edge(
             self.console,
-            self._edge_router,
+            self._core_graph,
             u,
             v,
             self.node_buffers,
@@ -640,12 +662,10 @@ class ConsoleGraph:
         self.node_buffers_for_layout = render_node_buffers_for_layout(self.console, self._core_graph)
 
     def _transition_compute_node_layout(self) -> None:
-        self.node_positions, self.offset = compute_node_layout(
-            self._layout_engine, self._core_graph, self.node_buffers_for_layout
-        )
+        self.offset = compute_node_layout(self._layout_engine, self._core_graph, self.node_buffers_for_layout)
 
     def _transition_compute_zoomed_positions(self) -> None:
-        self._edge_router = core.EdgeRouter()
+        self._core_graph.init_router()
         zoom_x, zoom_y = self._compute_current_zoom()
         self.zoom_x = zoom_x
         self.zoom_y = zoom_y
@@ -654,7 +674,7 @@ class ConsoleGraph:
     def _compute_current_zoom(self) -> tuple[float, float]:
         return compute_zoom(
             self._zoom,
-            self.node_positions,
+            self._core_graph,
             self.node_buffers_for_layout,
             self._max_width,
             self._max_height,
@@ -667,12 +687,10 @@ class ConsoleGraph:
         self.node_buffers = render_node_buffers_at_zoom(
             self.console,
             self._core_graph,
-            self.node_positions,
             self.node_buffers_for_layout,
             self.zoom_x,
             self.zoom_y,
             self._zoom_factor,
-            self._edge_router,
         )
 
     def _transition_render_edges(self) -> None:
@@ -683,7 +701,6 @@ class ConsoleGraph:
             self.console,
             self._core_graph,
             self.node_buffers,
-            self._edge_router,
             self._zoom_factor,
             self._layout_engine.layout_direction,
         )

@@ -7,6 +7,6 @@
 
 ![](logo.jpg)
 
-Netext is a graph (network) rendering library for the terminal. It uses the awesome [rich](https://rich.readthedocs.io/en/stable/introduction.html) library to format output and can use different layout engines to place nodes and edges. The library has a very simple API that allows to render graphs created with networkx and integrates well with applications that use rich to output to the terminal. All styling and formatting is done via attributes the nodes and edges of the networkx graph data structures using special attributes keys.
+Netext is a graph (network) rendering library for the terminal. It uses the awesome [rich](https://rich.readthedocs.io/en/stable/introduction.html) library to format output and can use different layout engines to place nodes and edges. The library has a very simple API that can render graphs from plain node and edge data, and it integrates well with applications that use rich to output to the terminal. Optional networkx support is available via `netext[networkx]` for applications that already use networkx graphs. All styling and formatting is done via special attribute keys on node and edge data.
 
 ![](example.svg)

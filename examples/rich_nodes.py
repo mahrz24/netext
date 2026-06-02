@@ -50,4 +50,4 @@ nx.set_node_attributes(ast_graph, "just-content", "$shape")
 
 nx.set_edge_attributes(ast_graph, EdgeRoutingMode.ORTHOGONAL, "$edge-routing-mode")
 nx.set_edge_attributes(ast_graph, EdgeSegmentDrawingMode.BOX_HEAVY, "$edge-segment-drawing-mode")
-print(ConsoleGraph(ast_graph))
+print(ConsoleGraph.from_networkx(ast_graph))

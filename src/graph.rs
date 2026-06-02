@@ -4,8 +4,9 @@ use pyo3::types::PyAny;
 use pyo3::{prelude::*, IntoPyObjectExt};
 use std::collections::HashMap;
 
-use crate::geometry::Size;
+use crate::geometry::{PlacedRectangularNode, Point, Size};
 use crate::pyindexset::PyIndexSet;
+use crate::routing::EdgeRouter;
 
 #[pyclass]
 pub struct CoreGraph {
@@ -14,6 +15,8 @@ pub struct CoreGraph {
     data_map: HashMap<NodeIndex, PyObject>,
     size_map: HashMap<NodeIndex, Size>,
     edge_data_map: HashMap<(NodeIndex, NodeIndex), PyObject>,
+    position_map: HashMap<NodeIndex, (f64, f64)>,
+    router: Option<EdgeRouter>,
 }
 
 impl CoreGraph {
@@ -32,6 +35,8 @@ impl CoreGraph {
             data_map: HashMap::default(),
             edge_data_map: HashMap::default(),
             size_map: HashMap::default(),
+            position_map: HashMap::default(),
+            router: None,
         }
     }
 
@@ -102,12 +107,18 @@ impl CoreGraph {
         Ok(())
     }
 
-    fn remove_node(&mut self, obj: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn remove_node(&mut self, _py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<()> {
         let index = self.object_map.get_full(obj)?;
 
         match index {
             Some((index, _)) => {
                 let index: NodeIndex = NodeIndex::new(index);
+
+                // Remove from router before removing from object_map,
+                // since the router needs to look up the node.
+                if let Some(router) = &mut self.router {
+                    let _ = router.remove_node(obj);
+                }
 
                 // Remove edges referencing this node from edge_data_map
                 self.edge_data_map
@@ -116,6 +127,7 @@ impl CoreGraph {
                 self.graph.remove_node(index);
                 self.data_map.remove(&index);
                 self.size_map.remove(&index);
+                self.position_map.remove(&index);
                 self.object_map.remove(obj)
             }
             None => Err(PyErr::new::<pyo3::exceptions::PyValueError, _>(
@@ -124,13 +136,19 @@ impl CoreGraph {
         }
     }
 
-    fn remove_edge(&mut self, obj_a: &Bound<'_, PyAny>, obj_b: &Bound<'_, PyAny>) -> PyResult<()> {
+    fn remove_edge(&mut self, py: Python<'_>, obj_a: &Bound<'_, PyAny>, obj_b: &Bound<'_, PyAny>) -> PyResult<()> {
         let index_a = self.object_map.get_full(obj_a)?;
         let index_b = self.object_map.get_full(obj_b)?;
 
         if let (Some((index_a, _)), Some((index_b, _))) = (index_a, index_b) {
             let index_a = NodeIndex::new(index_a);
             let index_b = NodeIndex::new(index_b);
+
+            // Remove from router before removing from graph
+            if let Some(router) = &mut self.router {
+                let _ = router.remove_edge(py, obj_a, obj_b);
+            }
+
             self.graph.remove_edge(index_a, index_b);
             self.edge_data_map.remove(&(index_a, index_b));
         }
@@ -336,6 +354,136 @@ impl CoreGraph {
             ))),
         }
     }
+
+    // --- Node position methods ---
+
+    fn set_node_position(&mut self, obj: &Bound<'_, PyAny>, x: f64, y: f64) -> PyResult<()> {
+        let index = self.object_map.get_full(obj)?;
+        match index {
+            Some((index, _)) => {
+                let index = NodeIndex::new(index);
+                self.position_map.insert(index, (x, y));
+                Ok(())
+            }
+            None => Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "Node {:?} does not exist.",
+                obj
+            ))),
+        }
+    }
+
+    fn get_node_position(&self, obj: &Bound<'_, PyAny>) -> PyResult<(f64, f64)> {
+        let index = self.object_map.get_full(obj)?;
+        match index {
+            Some((index, _)) => {
+                let index = NodeIndex::new(index);
+                match self.position_map.get(&index) {
+                    Some(&(x, y)) => Ok((x, y)),
+                    None => Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                        "Node {:?} has no position.",
+                        obj
+                    ))),
+                }
+            }
+            None => Err(PyErr::new::<pyo3::exceptions::PyKeyError, _>(format!(
+                "Node {:?} does not exist.",
+                obj
+            ))),
+        }
+    }
+
+    fn has_node_position(&self, obj: &Bound<'_, PyAny>) -> PyResult<bool> {
+        let index = self.object_map.get_full(obj)?;
+        match index {
+            Some((index, _)) => {
+                let index = NodeIndex::new(index);
+                Ok(self.position_map.contains_key(&index))
+            }
+            None => Ok(false),
+        }
+    }
+
+    fn remove_node_position(&mut self, obj: &Bound<'_, PyAny>) -> PyResult<()> {
+        let index = self.object_map.get_full(obj)?;
+        if let Some((index, _)) = index {
+            let index = NodeIndex::new(index);
+            self.position_map.remove(&index);
+        }
+        Ok(())
+    }
+
+    fn all_node_positions(&self) -> Vec<(&PyObject, (f64, f64))> {
+        self.position_map
+            .iter()
+            .filter_map(|(index, &(x, y))| {
+                self.object_map
+                    .get_index(index.index())
+                    .map(|obj| (obj, (x, y)))
+            })
+            .collect()
+    }
+
+    // --- Embedded router methods ---
+
+    fn init_router(&mut self) {
+        self.router = Some(EdgeRouter::new());
+    }
+
+    fn router_update_node(&mut self, node: &Bound<PyAny>, placed_node: PlacedRectangularNode) -> PyResult<()> {
+        match &mut self.router {
+            Some(router) => {
+                let _ = router.remove_node(node);
+                router.add_node(node, placed_node)
+            }
+            None => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                "Router not initialized. Call init_router() first.",
+            )),
+        }
+    }
+
+    fn router_update_edge(&mut self, py: Python<'_>, start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>, line: Vec<Point>) -> PyResult<()> {
+        match &mut self.router {
+            Some(router) => {
+                let _ = router.remove_edge(py, start, end);
+                router.add_edge(start, end, line)
+            }
+            None => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                "Router not initialized. Call init_router() first.",
+            )),
+        }
+    }
+
+    fn router_route_edges(
+        &mut self,
+        edges: Vec<(Bound<'_, PyAny>, Bound<'_, PyAny>, crate::geometry::DirectedPoint, crate::geometry::DirectedPoint, crate::routing::RoutingConfig)>,
+    ) -> PyResult<crate::routing::EdgeRoutingsResult> {
+        match &mut self.router {
+            Some(router) => router.route_edges(edges),
+            None => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                "Router not initialized. Call init_router() first.",
+            )),
+        }
+    }
+
+    fn router_route_edge(
+        &mut self,
+        u: &Bound<'_, PyAny>,
+        v: &Bound<'_, PyAny>,
+        start: crate::geometry::DirectedPoint,
+        end: crate::geometry::DirectedPoint,
+        global_start: crate::geometry::DirectedPoint,
+        global_end: crate::geometry::DirectedPoint,
+        config: crate::routing::RoutingConfig,
+    ) -> PyResult<crate::routing::EdgeRoutingResult> {
+        match &mut self.router {
+            Some(router) => router.route_edge(u, v, start, end, global_start, global_end, config),
+            None => Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                "Router not initialized. Call init_router() first.",
+            )),
+        }
+    }
+
+    // --- Existing methods ---
 
     pub fn all_nodes(&self) -> Vec<&PyObject> {
         // Would be more efficient to directly use the objects field of the PyIndexSet struct

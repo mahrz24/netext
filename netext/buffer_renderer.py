@@ -4,9 +4,12 @@ from heapq import merge
 from typing import Any
 
 from rich.segment import Segment
+from rich.style import Style
 from netext.geometry import Region
 
 from netext.rendering.segment_buffer import Reference, StripBuffer, Spacer
+
+DEFAULT_STYLE = Style()
 
 
 def flatten_strips(strips: list[list[Segment]], *reverse_map: Any) -> list[Segment]:
@@ -15,7 +18,7 @@ def flatten_strips(strips: list[list[Segment]], *reverse_map: Any) -> list[Segme
     result = []
     for strip in strips:
         result.extend(strip)
-        result.append(Segment("\n"))
+        result.append(Segment("\n", DEFAULT_STYLE))
 
     return result
 
@@ -79,7 +82,7 @@ def render_buffers(
 
         if not active_buffers:
             segment_content = " " * full_width
-            current_strip.append(Segment(segment_content))
+            current_strip.append(Segment(segment_content, DEFAULT_STYLE))
             continue
 
         current_x = viewport.x
@@ -116,7 +119,7 @@ def render_buffers(
                     next_x = min(full_width, segment_left_x)
                     # Pad to the left boundary of the segment
                     segment_content = " " * (next_x - current_x)
-                    current_strip.append(Segment(segment_content))
+                    current_strip.append(Segment(segment_content, DEFAULT_STYLE))
                     current_x = next_x
 
                 # Perform a look ahead, and if the left boundary of any of the next active buffers
@@ -173,7 +176,7 @@ def render_buffers(
                 # will be yielded.
                 if segment.cell_length > 0:
                     if isinstance(segment, Spacer):
-                        out_segment = Segment(" " * segment.cell_length)
+                        out_segment = Segment(" " * segment.cell_length, DEFAULT_STYLE)
                         current_strip.append(out_segment)
                     else:
                         for x in range(current_x, current_x + segment.cell_length):
@@ -184,7 +187,7 @@ def render_buffers(
                 segment_left_x += full_segment_cell_length
 
         if current_x < full_width:
-            segment = Segment(" " * (full_width - current_x))
+            segment = Segment(" " * (full_width - current_x), DEFAULT_STYLE)
             current_strip.append(segment)
 
     return result_strips, reverse_buffer_map

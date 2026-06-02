@@ -1,6 +1,5 @@
 from typing import Any, Hashable, cast
 
-from networkx import DiGraph
 from textual.events import Resize
 from textual import events
 from textual.reactive import reactive
@@ -16,6 +15,7 @@ from rich.segment import Segment
 from netext.geometry.region import Region as NetextRegion
 from netext.geometry.point import FloatPoint
 from textual.message import Message
+from rich.style import Style
 
 from netext.properties.node import NodeProperties
 from netext.rendering.segment_buffer import Reference
@@ -57,19 +57,22 @@ class GraphView(ScrollView):
 
     def __init__(
         self,
-        graph: DiGraph,
+        nodes: dict[Hashable, dict[str, Any]] | None = None,
+        edges: Any = None,
+        *,
         name: str | None = None,
         id: str | None = None,
         classes: str | None = None,
         disabled: bool = False,
         zoom: float | tuple[float, float] | ZoomSpec | AutoZoom = 1.0,
         scroll_via_viewport: bool = False,
-        **console_graph_kwargs,
+        **console_graph_kwargs: Any,
     ):
-        """Initializes a new instance of the Widget class.
+        """Initializes a new instance of the GraphView class.
 
         Args:
-            graph: A graph object to be displayed in the widget.
+            nodes: A dict mapping node ids to data dicts.
+            edges: An iterable of 2-tuples ``(u, v)`` or 3-tuples ``(u, v, data_dict)``.
             name: A string representing the name of the widget (optional).
             id: A string representing the ID of the widget (optional).
             classes: A string representing the CSS classes of the widget (optional).
@@ -86,8 +89,11 @@ class GraphView(ScrollView):
         self._reverse_click_map: dict[tuple[int, int], Reference] = dict()
         self._last_hover: Reference | None = None
         self._console_graph_kwargs = console_graph_kwargs
+        self._graph_nodes = nodes
+        self._graph_edges = edges
         self._console_graph: ConsoleGraph = ConsoleGraph(
-            graph,
+            nodes=nodes,
+            edges=edges,
             console=self.app.console,
             max_width=0,
             max_height=0,
@@ -97,12 +103,29 @@ class GraphView(ScrollView):
         self._scroll_via_viewport = scroll_via_viewport
         self._attached_widgets: dict[Hashable, tuple[Widget, bool]] = dict()
         self._attached_widgets_lookup: dict[Widget, Hashable] = dict()
-        self._graph: DiGraph = graph
         self._strip_segments: list[list[Segment]] = list()
 
         super().__init__(name=name, id=id, classes=classes, disabled=disabled)
 
         self.zoom = zoom
+
+    @classmethod
+    def from_networkx(cls, graph: Any, **kwargs: Any) -> "GraphView":
+        """Create a GraphView from a networkx DiGraph.
+
+        networkx is optional and is only needed to create the graph object
+        passed to this method (pip install netext[networkx]).
+
+        Args:
+            graph: A networkx DiGraph (or Graph) object.
+            **kwargs: Additional keyword arguments passed to the GraphView constructor.
+
+        Returns:
+            A new GraphView instance.
+        """
+        nodes = dict(graph.nodes(data=True))
+        edges = [(u, v, d) for u, v, d in graph.edges(data=True)]
+        return cls(nodes=nodes, edges=edges, **kwargs)
 
     def on_mount(self) -> None:
         self._resized()
@@ -110,7 +133,8 @@ class GraphView(ScrollView):
     def _reset_console_graph(self):
         if self.size.width != 0 and self.size.height != 0:
             self._console_graph = ConsoleGraph(
-                self._graph,
+                nodes=self._graph_nodes,
+                edges=self._graph_edges,
                 console=self.app.console,
                 max_width=self.size.width,
                 max_height=self.size.height,
@@ -118,28 +142,19 @@ class GraphView(ScrollView):
                 **self._console_graph_kwargs,
             )
 
-    @property
-    def graph(self) -> DiGraph:
-        """Returns and sets the graph object associated with this widget.
+    def set_graph(
+        self,
+        nodes: dict[Hashable, dict[str, Any]] | None = None,
+        edges: Any = None,
+    ) -> None:
+        """Replace the graph data and re-render.
 
-        Returns:
-            DiGraph: The graph object associated with this widget.
+        Args:
+            nodes: A dict mapping node ids to data dicts.
+            edges: An iterable of 2-tuples ``(u, v)`` or 3-tuples ``(u, v, data_dict)``.
         """
-        return self._graph
-
-    @graph.setter
-    def graph(self, graph: DiGraph) -> None:
-        self._graph = graph
-        self._reset_console_graph()
-        self._graph_was_updated()
-
-    def sync_graph(self) -> None:
-        """Rebuild the console graph from the current networkx graph.
-
-        Call this after directly mutating graph attributes (e.g. via
-        ``nx.set_node_attributes`` or ``nx.set_edge_attributes``) so
-        that the widget picks up the changes.
-        """
+        self._graph_nodes = nodes
+        self._graph_edges = edges
         self._reset_console_graph()
         self._graph_was_updated()
 
@@ -222,7 +237,6 @@ class GraphView(ScrollView):
         """
 
         self._console_graph.add_node(node, position, data)
-        self._graph.add_node(node, **(data or {}))
         self._graph_was_updated()
 
     def add_edge(
@@ -245,7 +259,6 @@ class GraphView(ScrollView):
         """
 
         self._console_graph.add_edge(u, v, data)
-        self._graph.add_edge(u, v, **(data or {}))
         self._graph_was_updated()
 
     def remove_node(self, node: Hashable) -> None:
@@ -258,7 +271,6 @@ class GraphView(ScrollView):
             None
         """
         self._console_graph.remove_node(node)
-        self._graph.remove_node(node)
         self._graph_was_updated()
 
     def remove_edge(self, u: Hashable, v: Hashable) -> None:
@@ -273,7 +285,6 @@ class GraphView(ScrollView):
             None
         """
         self._console_graph.remove_edge(u, v)
-        self._graph.remove_edge(u, v)
         self._graph_was_updated()
 
     def update_node(
@@ -300,7 +311,6 @@ class GraphView(ScrollView):
         else:
             node_position = None
         self._console_graph.update_node(node, node_position, data, update_data=update_data)
-        self._graph.nodes[node].update(data or {})
         self._graph_was_updated()
 
     def update_edge(
@@ -321,13 +331,13 @@ class GraphView(ScrollView):
             v (Hashable): The destination node of the edge.
             data (dict[str, Any]): The data to update the edge with.
             update_data (bool, optional): Whether to merge the data of the edge. Defaults to True.
-            update_layout (bool, optional): Whether to update the layout of the graph. Defaults to True.
+            update_layout (bool, optional): Accepted for API compatibility. The edge is
+                currently rerendered whether this is true or false.
 
         Returns:
             None
         """
         self._console_graph.update_edge(u, v, data, update_data=update_data, update_layout=update_layout)
-        self._graph.edges[u, v].update(data)
         self._graph_was_updated()
 
     def _resized(self):
@@ -493,7 +503,7 @@ class GraphView(ScrollView):
         y += scroll_y
 
         if y < 0 or y >= len(self._strip_segments):
-            return Strip.blank(self.size.width)
+            return Strip.blank(self.size.width, Style())
 
         return Strip(self._strip_segments[y]).crop(scroll_x, scroll_x + self.size.width)
 

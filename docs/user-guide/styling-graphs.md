@@ -8,20 +8,20 @@
     of all node styling attributes.
 
 
-Nodes can be styled by adding attributes to the networkx graph nodes. All netext attributes are starting with a `$` sign to avoid clashes with other attributes.
+Nodes can be styled by adding attributes to node data. All netext attributes start with a `$` sign to avoid clashes with other attributes.
 
-If you want to style the whole graph in the same way you can call:
+If you are using the optional networkx integration and want to style the whole graph in the same way, you can call:
 
 ```python
 import networkx as nx
 ...
-nx.set_node_attributes(g, "none", "$shape")
+nx.set_node_attributes(g, "just-content", "$shape")
 ```
 
-To set the shape of all nodes in the graph `g` to none. Alternatively you can set individual attributes:
+To render all nodes in the graph `g` without boxes. Alternatively you can set individual attributes:
 
 ```python
-g.nodes["somenode"]["$shape"] = "none"
+g.nodes["somenode"]["$shape"] = "just-content"
 ```
 
 ## Edge Styling
@@ -39,13 +39,13 @@ If you want to style the whole graph in the same way you can call:
 ```python
 import networkx as nx
 ...
-nx.set_edge_attributes(g, EdgeRoutingMode.straight, "$edge-routing-mode")
+nx.set_edge_attributes(g, EdgeRoutingMode.STRAIGHT, "$edge-routing-mode")
 ```
 
-To set the shape of all nodes in the graph `g` to none. Alternatively you can set individual attributes:
+To set the routing mode of all edges in the graph `g` to straight. Alternatively you can set individual attributes:
 
 ```python
-g.edges["a"]["b"]["$edge-routing-mode"] = EdgeRoutingMode.straight
+g.edges["a", "b"]["$edge-routing-mode"] = EdgeRoutingMode.STRAIGHT
 ```
 
 ## Styling via Properties

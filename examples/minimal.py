@@ -1,11 +1,9 @@
 from netext import ConsoleGraph
 from rich import print
 
-import networkx as nx
+g = ConsoleGraph(
+    nodes={"Hello": {}, "World": {}},
+    edges=[("Hello", "World")],
+)
 
-g = nx.Graph()
-g.add_node("Hello")
-g.add_node("World")
-g.add_edge("Hello", "World")
-
-print(ConsoleGraph(g))
+print(g)

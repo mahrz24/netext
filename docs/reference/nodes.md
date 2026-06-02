@@ -33,14 +33,14 @@ from netext.layout_engines import StaticLayout
 from rich import print
 
 
-import networkx as nx
-g = nx.Graph()
-g.add_node("A", **{"$x": 5, "$y": 0}, **{"$shape": "just-content"})
-g.add_node("B", **{"$x": 20, "$y": 0})
-g.add_edge("A", "B")
+nodes = {
+    "A": {"$x": 5, "$y": 0, "$shape": "just-content"},
+    "B": {"$x": 20, "$y": 0},
+}
+edges = [("A", "B")]
 
 
-output = ConsoleGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout())
 ```
 
 ### Box
@@ -62,14 +62,14 @@ from rich import box
 from rich import print
 
 
-import networkx as nx
-g = nx.Graph()
-g.add_node("A", **{"$x": 5, "$y": 0}, **{"$box-type": box.DOUBLE})
-g.add_node("B", **{"$x": 15, "$y": 0})
-g.add_edge("A", "B")
+nodes = {
+    "A": {"$x": 5, "$y": 0, "$box-type": box.DOUBLE},
+    "B": {"$x": 15, "$y": 0},
+}
+edges = [("A", "B")]
 
 
-output = ConsoleGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout())
 ```
 
 ### Generic styling for all shapes
@@ -90,13 +90,13 @@ from rich import print
 from rich.style import Style
 
 
-import networkx as nx
-g = nx.Graph()
-g.add_node("A", **{"$x": 5, "$y": 0}, **{"$style": Style(color="red")})
-g.add_node("B", **{"$x": 15, "$y": 0},  **{"$style": Style(bold=True, bgcolor="blue")})
-g.add_edge("A", "B")
+nodes = {
+    "A": {"$x": 5, "$y": 0, "$style": Style(color="red")},
+    "B": {"$x": 15, "$y": 0, "$style": Style(bold=True, bgcolor="blue")},
+}
+edges = [("A", "B")]
 
-output = ConsoleGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout())
 ```
 
 #### Content Style
@@ -114,13 +114,13 @@ from rich import print
 from rich.style import Style
 
 
-import networkx as nx
-g = nx.Graph()
-g.add_node("A", **{"$x": 5, "$y": 0}, **{"$content-style": Style(color="red")})
-g.add_node("B", **{"$x": 15, "$y": 0},  **{"$content-style": Style(bold=True, bgcolor="blue")})
-g.add_edge("A", "B")
+nodes = {
+    "A": {"$x": 5, "$y": 0, "$content-style": Style(color="red")},
+    "B": {"$x": 15, "$y": 0, "$content-style": Style(bold=True, bgcolor="blue")},
+}
+edges = [("A", "B")]
 
-output = ConsoleGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout())
 ```
 
 #### Content Renderer
@@ -131,7 +131,7 @@ Type: Callable | None
 
 ## Ports
 
-The `ports` attribute determines the ports of the node. Ports are used to connect edges to nodes. Ports are defined as a dictionary mapping port names to port specifications. The port specifications are a dictionary with the following keys: `magnet`, `label`, `offset`, `symbol`, `symbol-connected`, `key`.
+The `ports` attribute determines the ports of the node. Ports are used to connect edges to nodes. Ports are defined as a dictionary mapping port names to port specifications. The port specifications are a dictionary with the following keys: `magnet`, `label`, `offset`, `symbol`, `symbol_connected`, `key`.
 
 Ports are optional and a port only needs to be specified if it is used as a target or source of an edge. A port specification must at least contain a `label`. All other keys are optional.
 
@@ -139,10 +139,10 @@ Ports are optional and a port only needs to be specified if it is used as a targ
 |-------------------|----------|-----------------------------------------------------------------------------|
 | `magnet`          | `str`    | The magnet position of the port.                                            |
 | `label`           | `str`    | The label of the port.                                                      |
-| `offset`          | `Tuple[int, int]` | The offset of the port from the node position.                        |
+| `offset`          | `int`    | The offset of the port from its default position.                        |
 | `symbol`          | `str`    | The symbol to use for the port.                                              |
-| `symbol-connected` | `str`    | The symbol to use for the port when it is connected to an edge.              |
-| `key`             | `str`    | The key of the port used when sorting ports on a side of a node.                                         |
+| `symbol_connected` | `str`    | The symbol to use for the port when it is connected to an edge.              |
+| `key`             | `int`    | The key of the port used when sorting ports on a side of a node.                                         |
 
 
 ##### Example
@@ -153,23 +153,21 @@ from netext.layout_engines import StaticLayout
 from rich import print
 from rich.style import Style
 
-import networkx as nx
-g = nx.Graph()
-g.add_node("X", **{
+nodes = {
+    "X": {
         "$x": 5,
         "$y": 0,
         "$ports": {"a": {"label": "a"}, "b": {"label": "b"}}
-    }
-)
-g.add_node("Y", **{
-    "$x": 25,
-    "$y": 0,
-    "$ports": {"a": {"label": "a"}, "b": {"label": "b"}}
-    }
-)
-g.add_edge("X", "Y", **{"$start-port": "a", "$end-port": "a"})
+    },
+    "Y": {
+        "$x": 25,
+        "$y": 0,
+        "$ports": {"a": {"label": "a"}, "b": {"label": "b"}}
+    },
+}
+edges = [("X", "Y", {"$start-port": "a", "$end-port": "a"})]
 
-print(ConsoleGraph(g, layout_engine=StaticLayout()))
+print(ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout()))
 ```
 
 ```{.rich title='Ports' }
@@ -178,11 +176,11 @@ from netext.layout_engines import StaticLayout
 from rich import print
 from rich.style import Style
 
-import networkx as nx
-g = nx.Graph()
-g.add_node("X", **{"$x": 5, "$y": 0, "$ports": {"a": {"label": "a"}, "b": {"label": "b"}}})
-g.add_node("Y", **{"$x": 25, "$y": 0, "$ports": {"a": {"label": "a"}, "b": {"label": "b"}}})
-g.add_edge("X", "Y", **{"$start-port": "a", "$end-port": "a"})
+nodes = {
+    "X": {"$x": 5, "$y": 0, "$ports": {"a": {"label": "a"}, "b": {"label": "b"}}},
+    "Y": {"$x": 25, "$y": 0, "$ports": {"a": {"label": "a"}, "b": {"label": "b"}}},
+}
+edges = [("X", "Y", {"$start-port": "a", "$end-port": "a"})]
 
-output = ConsoleGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout())
 ```

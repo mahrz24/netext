@@ -1,13 +1,7 @@
 from textual.app import App, ComposeResult
 from textual.widgets import Header
+from rich.style import Style
 from netext.textual_widget.widget import GraphView
-
-import networkx as nx
-
-g = nx.DiGraph()
-g.add_node("Hello")
-g.add_node("World")
-g.add_edge("Hello", "World")
 
 
 class GraphviewApp(App):
@@ -16,7 +10,13 @@ class GraphviewApp(App):
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
         yield Header()
-        yield GraphView(g)
+        yield GraphView(
+            nodes={
+                "Hello": {"$content-style": Style(color="white")},
+                "World": {"$content-style": Style(color="white")},
+            },
+            edges=[("Hello", "World")],
+        )
 
 
 if __name__ == "__main__":

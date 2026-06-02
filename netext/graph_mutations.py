@@ -85,7 +85,7 @@ def check_zoom_recomputation(
 
 def rasterize_and_store_edge(
     console: Console,
-    edge_router: core.EdgeRouter,
+    core_graph: core.CoreGraph,
     u: Hashable,
     v: Hashable,
     node_buffers: dict[Hashable, NodeBuffer],
@@ -101,7 +101,7 @@ def rasterize_and_store_edge(
 
     result = rasterize_edge(
         console,
-        edge_router,
+        core_graph,
         node_buffers[u],
         node_buffers[v],
         properties,
@@ -117,27 +117,25 @@ def rasterize_and_store_edge(
         edge_buffer, label_nodes = result
     if edge_buffer is not None:
         edge_buffers[(u, v)] = edge_buffer
-        register_edge_with_router(edge_router, u, v, edge_buffer)
+        register_edge_with_router(core_graph, u, v, edge_buffer)
     if label_nodes is not None:
         edge_label_buffers[(u, v)] = label_nodes
 
 
 def remove_existing_edge_buffers(
-    edge_router: core.EdgeRouter,
     u: Hashable,
     v: Hashable,
     node_buffers: dict[Hashable, NodeBuffer],
     edge_buffers: dict[tuple[Hashable, Hashable], EdgeBuffer],
     edge_label_buffers: dict[tuple[Hashable, Hashable], list[StripBuffer]],
 ) -> int:
-    """Disconnect nodes, remove edge from router, delete old buffers.
+    """Disconnect nodes, delete old buffers.
 
     Returns the old z_index for reuse.
+    The router entry is cleaned up when the edge is re-registered via register_edge_with_router.
     """
     node_buffers[v].disconnect(u)
     node_buffers[u].disconnect(v)
-
-    edge_router.remove_edge(u, v)
 
     old_z_index = edge_buffers[(u, v)].z_index.layer_index
 
@@ -150,7 +148,6 @@ def remove_existing_edge_buffers(
 def rerender_connected_edges(
     console: Console,
     core_graph: core.CoreGraph,
-    edge_router: core.EdgeRouter,
     node: Hashable,
     node_buffers: dict[Hashable, NodeBuffer],
     edge_buffers: dict[tuple[Hashable, Hashable], EdgeBuffer],
@@ -176,7 +173,6 @@ def rerender_connected_edges(
         _rerender_single_edge(
             console,
             core_graph,
-            edge_router,
             u,
             v,
             node_buffers,
@@ -192,7 +188,6 @@ def rerender_connected_edges(
 def _rerender_single_edge(
     console: Console,
     core_graph: core.CoreGraph,
-    edge_router: core.EdgeRouter,
     u: Hashable,
     v: Hashable,
     node_buffers: dict[Hashable, NodeBuffer],
@@ -211,7 +206,6 @@ def _rerender_single_edge(
     core_graph.update_edge_data(u, v, dict(data, **{"$properties": properties}))
 
     old_z_index = remove_existing_edge_buffers(
-        edge_router,
         u,
         v,
         node_buffers,
@@ -221,7 +215,7 @@ def _rerender_single_edge(
 
     rasterize_and_store_edge(
         console,
-        edge_router,
+        core_graph,
         u,
         v,
         node_buffers,

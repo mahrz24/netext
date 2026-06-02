@@ -49,13 +49,13 @@
     handler: python
     options:
       show_source: false
-      members: ["TOP", "LEFT", "RIGHT", "BOTTOM", "CENTER", "CLOSEST"]
+      members: ["TOP", "LEFT", "RIGHT", "BOTTOM", "AUTO"]
 
 ::: netext.ArrowTip
     handler: python
     options:
       show_source: false
-      members: ["ARROW"]
+      members: ["ARROW", "NONE"]
 
 ::: netext.EdgeRoutingMode
     handler: python

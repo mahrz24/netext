@@ -36,20 +36,22 @@ from netext.layout_engines import StaticLayout
 from rich import print
 
 
-import networkx as nx
-g = nx.Graph()
-g.add_node("A", **{"$x": 5, "$y": 0})
-g.add_node("B", **{"$x": 5, "$y": 9})
-g.add_edge("A", "B", **{"$end-arrow-tip": ArrowTip.ARROW})
+nodes = {
+    "A": {"$x": 5, "$y": 0},
+    "B": {"$x": 5, "$y": 9},
+    "C": {"$x": 15, "$y": 0},
+    "D": {"$x": 15, "$y": 9},
+}
+edges = [
+    ("A", "B", {"$end-arrow-tip": ArrowTip.ARROW}),
+    ("C", "D", {
+        "$end-arrow-tip": ArrowTip.ARROW,
+        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
+        "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
+    }),
+]
 
-g.add_node("C", **{"$x": 15, "$y": 0})
-g.add_node("D", **{"$x": 15, "$y": 9})
-g.add_edge("C", "D", **{"$end-arrow-tip": ArrowTip.ARROW,
-                        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
-                        "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL}
-)
-
-output = ConsoleGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout())
 ```
 
 ## Label
@@ -66,14 +68,14 @@ from netext.layout_engines import StaticLayout
 from rich import print
 
 
-import networkx as nx
-g = nx.Graph()
-g.add_node("A", **{"$x": 5, "$y": 0})
-g.add_node("B", **{"$x": 5, "$y": 9})
-g.add_edge("A", "B", **{"$label": "Label"})
+nodes = {
+    "A": {"$x": 5, "$y": 0},
+    "B": {"$x": 5, "$y": 9},
+}
+edges = [("A", "B", {"$label": "Label"})]
 
 
-output = ConsoleGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout())
 ```
 
 ## Style
@@ -91,29 +93,24 @@ from rich import print
 from rich.style import Style
 
 
-import networkx as nx
-g = nx.Graph()
-g.add_node("A", **{"$x": 5, "$y": 0})
-g.add_node("B", **{"$x": 5, "$y": 9})
-g.add_edge("A", "B", **{"$style": Style(color="red")})
+nodes = {
+    "A": {"$x": 5, "$y": 0},
+    "B": {"$x": 5, "$y": 9},
+    "C": {"$x": 15, "$y": 0},
+    "D": {"$x": 15, "$y": 9},
+    "E": {"$x": 25, "$y": 0},
+    "F": {"$x": 25, "$y": 9},
+    "G": {"$x": 35, "$y": 0},
+    "H": {"$x": 35, "$y": 9},
+}
+edges = [
+    ("A", "B", {"$style": Style(color="red")}),
+    ("C", "D", {"$style": Style(color="blue", bold=True)}),
+    ("E", "F", {"$style": Style(bgcolor="blue", bold=True)}),
+    ("G", "H"),
+]
 
-g.add_node("C", **{"$x": 15, "$y": 0})
-g.add_node("D", **{"$x": 15, "$y": 9})
-g.add_edge("C", "D", **{"$style": Style(color="blue", bold=True)})
-
-
-g.add_node("E", **{"$x": 25, "$y": 0})
-g.add_node("F", **{"$x": 25, "$y": 9})
-g.add_edge("E", "F", **{"$style": Style(bgcolor="blue", bold=True)})
-
-
-g.add_node("G", **{"$x": 35, "$y": 0})
-g.add_node("H", **{"$x": 35, "$y": 9})
-g.add_edge("G", "H"
-
-)
-
-output = ConsoleGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout())
 ```
 
 ## Dash Pattern
@@ -128,37 +125,34 @@ from netext import ConsoleGraph, EdgeSegmentDrawingMode, EdgeRoutingMode
 from netext.layout_engines import StaticLayout
 from rich import print
 
-import networkx as nx
-g = nx.Graph()
-g.add_node("[1, 1]", **{"$x": 5, "$y": 0})
-g.add_node("B", **{"$x": 5, "$y": 16})
-
-g.add_edge("[1, 1]", "B", **{
-    "$dash-pattern": [1, 1],
-    "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
-    "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL
-})
-
-g.add_node("[2, 1]", **{"$x": 17, "$y": 0})
-g.add_node("D", **{"$x": 17, "$y": 16})
-
-g.add_edge("[2, 1]", "D", **{
-    "$dash-pattern": [2, 1],
-    "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
-    "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL
-})
-
-g.add_node("[3, 2, 1]", **{"$x": 30, "$y": 0})
-g.add_node("F", **{"$x": 30, "$y": 16})
-
-g.add_edge("[3, 2, 1]", "F", **{
-    "$dash-pattern": [3, 2, 1],
-    "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
-    "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL
-})
+nodes = {
+    "[1, 1]": {"$x": 5, "$y": 0},
+    "B": {"$x": 5, "$y": 16},
+    "[2, 1]": {"$x": 17, "$y": 0},
+    "D": {"$x": 17, "$y": 16},
+    "[3, 2, 1]": {"$x": 30, "$y": 0},
+    "F": {"$x": 30, "$y": 16},
+}
+edges = [
+    ("[1, 1]", "B", {
+        "$dash-pattern": [1, 1],
+        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
+        "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
+    }),
+    ("[2, 1]", "D", {
+        "$dash-pattern": [2, 1],
+        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
+        "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
+    }),
+    ("[3, 2, 1]", "F", {
+        "$dash-pattern": [3, 2, 1],
+        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
+        "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
+    }),
+]
 
 
-output = ConsoleGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout())
 ```
 
 ## Magnets
@@ -175,7 +169,7 @@ Possible values are:
 | Right   | [Magnet.RIGHT][netext.geometry.magnet.Magnet.RIGHT]     | Connect to the right side of the node   |
 | Top     | [Magnet.TOP][netext.geometry.magnet.Magnet.TOP]         | Connect to the top side of the node     |
 | Bottom  | [Magnet.BOTTOM][netext.geometry.magnet.Magnet.BOTTOM]   | Connect to the bottom side of the node  |
-| Closest | [Magnet.CLOSEST][netext.geometry.magnet.Magnet.CLOSEST] | Connect to the closest magnet position. |
+| Auto    | [Magnet.AUTO][netext.geometry.magnet.Magnet.AUTO]       | Select a magnet position automatically. |
 
 ## Ports
 
@@ -209,18 +203,18 @@ from netext.layout_engines import StaticLayout
 from rich import print
 
 
-import networkx as nx
-g = nx.Graph()
-g.add_node("A", **{"$x": 5, "$y": 0})
-g.add_node("B", **{"$x": 13, "$y": 9})
-g.add_edge("A", "B", **{"$edge-routing-mode": EdgeRoutingMode.STRAIGHT})
+nodes = {
+    "A": {"$x": 5, "$y": 0},
+    "B": {"$x": 13, "$y": 9},
+    "C": {"$x": 21, "$y": 0},
+    "D": {"$x": 29, "$y": 9},
+}
+edges = [
+    ("A", "B", {"$edge-routing-mode": EdgeRoutingMode.STRAIGHT}),
+    ("C", "D", {"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL}),
+]
 
-g.add_node("C", **{"$x": 21, "$y": 0})
-g.add_node("D", **{"$x": 29, "$y": 9})
-g.add_edge("C", "D", **{"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL}
-)
-
-output = ConsoleGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout())
 ```
 
 ## Edge Segment Drawing Mode
@@ -249,35 +243,43 @@ from rich import print
 from rich.style import Style
 
 
-import networkx as nx
-g = nx.Graph()
-g.add_node("A", **{"$x": 5, "$y": 0})
-g.add_node("B", **{"$x": 15, "$y": 9})
-g.add_edge("A", "B", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.SINGLE_CHARACTER})
+nodes = {
+    "A": {"$x": 5, "$y": 0},
+    "B": {"$x": 15, "$y": 9},
+    "C": {"$x": 25, "$y": 0},
+    "D": {"$x": 35, "$y": 9},
+    "E": {"$x": 45, "$y": 0},
+    "F": {"$x": 55, "$y": 9},
+    "G": {"$x": 65, "$y": 0},
+    "H": {"$x": 75, "$y": 9},
+    "I": {"$x": 5, "$y": 13},
+    "J": {"$x": 15, "$y": 22},
+    "K": {"$x": 25, "$y": 13},
+    "L": {"$x": 35, "$y": 22},
+}
+edges = [
+    ("A", "B", {"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.SINGLE_CHARACTER}),
+    ("C", "D", {
+        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
+        "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
+    }),
+    ("E", "F", {
+        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX_ROUNDED,
+        "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
+    }),
+    ("G", "H", {
+        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX_HEAVY,
+        "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
+    }),
+    ("I", "J", {
+        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX_DOUBLE,
+        "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
+    }),
+    ("K", "L", {
+        "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.ASCII,
+        "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
+    }),
+]
 
-g.add_node("C", **{"$x": 25, "$y": 0})
-g.add_node("D", **{"$x": 35, "$y": 9})
-g.add_edge("C", "D", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX, "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
-
-
-
-g.add_node("E", **{"$x": 45, "$y": 0})
-g.add_node("F", **{"$x": 55, "$y": 9})
-g.add_edge("E", "F", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX_ROUNDED,"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
-
-
-g.add_node("G", **{"$x": 65, "$y": 0})
-g.add_node("H", **{"$x": 75, "$y": 9})
-g.add_edge("G", "H", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX_HEAVY,"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
-
-
-g.add_node("I", **{"$x": 5, "$y": 13})
-g.add_node("J", **{"$x": 15, "$y": 22})
-g.add_edge("I", "J", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX_DOUBLE,"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
-
-g.add_node("K", **{"$x": 25, "$y": 13})
-g.add_node("L", **{"$x": 35, "$y": 22})
-g.add_edge("K", "L", **{"$edge-segment-drawing-mode": EdgeSegmentDrawingMode.ASCII,"$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL})
-
-output = ConsoleGraph(g, layout_engine=StaticLayout())
+output = ConsoleGraph(nodes=nodes, edges=edges, layout_engine=StaticLayout())
 ```
