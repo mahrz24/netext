@@ -108,13 +108,19 @@ async def test_set_graph_picks_up_edge_attributes():
     async with app.run_test():
         gv = app.query_one(GraphView)
 
-        styled_edges = [(1, 2, {
-            "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
-            "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
-            "$start-arrow-tip": ArrowTip.NONE,
-            "$end-arrow-tip": ArrowTip.ARROW,
-            "$style": Style(color="blue"),
-        })]
+        styled_edges = [
+            (
+                1,
+                2,
+                {
+                    "$edge-routing-mode": EdgeRoutingMode.ORTHOGONAL,
+                    "$edge-segment-drawing-mode": EdgeSegmentDrawingMode.BOX,
+                    "$start-arrow-tip": ArrowTip.NONE,
+                    "$end-arrow-tip": ArrowTip.ARROW,
+                    "$style": Style(color="blue"),
+                },
+            )
+        ]
         gv.set_graph(nodes=nodes, edges=styled_edges)
 
         # Verify edge properties were applied by checking the core graph edge data
