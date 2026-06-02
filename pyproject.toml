@@ -20,6 +20,7 @@ test = [
     "pytest-asyncio>=0.21.1",
     "importlib-metadata>=8.5.0",
     "pytest-benchmark>=3.4.1",
+    "networkx~=3.0",
 ]
 networkx = ["networkx~=3.0"]
 all = ["textual>=1", "networkx~=3.0"]
